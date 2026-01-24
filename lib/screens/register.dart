@@ -4,18 +4,15 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:gov_reg/routes/approute.dart';
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
 
-import 'success.dart';
-
+/// ✅ MUST be top-level (NOT inside State class)
 class _VehicleForm {
   final brand = TextEditingController();
   final plate = TextEditingController();
   final color = TextEditingController();
   final year = TextEditingController();
-
-  /// UI values: "CAR" | "MOTORBIKE"
   String vehicleType = "CAR";
 
   void dispose() {
@@ -34,12 +31,7 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  static const String baseUrl = "http://172.18.30.225:8080";
-
-  /// ✅ This is the URL you want user to open after scan
-  /// - If you have real domain: https://moi.gov.kh
-  /// - For testing local on phone: use your LAN IP (not 10.0.2.2)
-  static const String publicWebBaseUrl = "https://your-domain.com";
+  static const String baseUrl = "http://localhost:8080";
 
   static const List<String> allowedUserTypes = [
     "GUEST",
@@ -64,7 +56,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? optionalFileName;
   String? optionalFileError;
 
-  // Guest attachments (2 optional)
+  // Guest attachments 2 optional files
   File? guestFile1;
   String? guestFile1Name;
   String? guestFile1Error;
@@ -76,12 +68,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Controllers
   final fullNameController = TextEditingController();
   final idNumberController = TextEditingController();
-
   final ministryController = TextEditingController();
   final departmentController = TextEditingController();
   final officeController = TextEditingController();
   final positionController = TextEditingController();
-
   final phoneController = TextEditingController();
   final requestDateController = TextEditingController();
   final provinceCityController = TextEditingController();
@@ -91,25 +81,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final List<_VehicleForm> vehicles = [_VehicleForm()];
 
   // ----------------------------
-  // UserType Rules
+  // Rules
   // ----------------------------
   bool get isGuest => _userType == "GUEST";
+
   bool get isInsideOfficer => _userType == "INSIDE_OFFICER";
+
   bool get isOutsideOfficer => _userType == "OUTSIDE_OFFICER";
+
   bool get isSecretary => _userType == "SECRETARY_AND_DEPUTY_SECRETARY";
+
   bool get isNationalAdmin =>
       _userType == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER";
 
   bool get isOfficer => isInsideOfficer || isOutsideOfficer;
 
+  // Guest shows work fields too
   static const bool showWorkFieldsForGuest = true;
 
   bool get showIdNumber => isOfficer;
+
   bool get showWorkFields => isOfficer || (isGuest && showWorkFieldsForGuest);
+
   bool get showProvinceCity => isNationalAdmin;
 
   bool get needAttachment => isOfficer;
+
   bool get showOptionalAttachment => isSecretary || isNationalAdmin;
+
   bool get showGuestTwoAttachments => isGuest;
 
   // ----------------------------
@@ -119,6 +118,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
 
   String _digitsOnly(String s) => s.replaceAll(RegExp(r'\D'), '');
+
   bool _isExactlyNDigits(String s, int n) => _digitsOnly(s).length == n;
 
   final RegExp _carPlateRegex = RegExp(r'^2[A-Z]{2}-\d{4}$');
@@ -175,12 +175,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     fullNameController.dispose();
     idNumberController.dispose();
-
     ministryController.dispose();
     departmentController.dispose();
     officeController.dispose();
     positionController.dispose();
-
     phoneController.dispose();
     requestDateController.dispose();
     provinceCityController.dispose();
@@ -193,7 +191,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ----------------------------
-  // Validation
+  // validateForm
   // ----------------------------
   bool validateForm() {
     if (fullNameController.text.trim().isEmpty) {
@@ -294,7 +292,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ----------------------------
-  // Pick file wrappers
+  // Pick files
   // ----------------------------
   Future<void> pickOfficerAttachment() async {
     await _pickFile(
@@ -337,9 +335,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ----------------------------
-  // API (multipart dto + files)
+  // API (✅ FIX unsupported MediaType)
   // ----------------------------
-  Future<Map<String, dynamic>> createParkingCardRequest() async {
+  Future<void> createParkingCardRequest() async {
     final base = Uri.parse("$baseUrl/api/parking-card-requests");
 
     final hasAnyFile = attachmentFile != null ||
@@ -348,7 +346,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         guestFile2 != null;
 
     final uri = hasAnyFile
-        ? base.replace(queryParameters: {"attachmentTypes": attachmentTypeValue})
+        ? base
+            .replace(queryParameters: {"attachmentTypes": attachmentTypeValue})
         : base;
 
     final requestDateValue =
@@ -367,7 +366,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           "plateNumber": _normalizePlate(v.plate.text),
           "color": v.color.text.trim(),
           "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
-          "vehicleType": v.vehicleType, // ✅ CAR or MOTORBIKE
+          "vehicleType": v.vehicleType,
         };
       }).toList(),
       "requestDate": requestDateValue,
@@ -380,34 +379,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final wi = <String, dynamic>{};
     if (showIdNumber) wi["policeId"] = idNumberController.text.trim();
+
     if (showWorkFields) {
       wi["generalDepartmentText"] = ministryController.text.trim();
       wi["departmentText"] = departmentController.text.trim();
       wi["burauText"] = officeController.text.trim();
       wi["positionText"] = positionController.text.trim();
     }
-    if (showProvinceCity) wi["provinceCity"] = provinceCityController.text.trim();
+
+    if (showProvinceCity) {
+      wi["provinceCity"] = provinceCityController.text.trim();
+    }
+
     if (wi.isNotEmpty) {
       (dto["user"] as Map<String, dynamic>)["workingInfo"] = wi;
     }
 
     final request = http.MultipartRequest("POST", uri);
+
+    // ✅ important: let backend parse multipart normally
     request.headers["Accept"] = "application/json";
 
-    request.files.add(
-      http.MultipartFile.fromString(
-        "dto",
-        jsonEncode(dto),
-        contentType: MediaType("application", "json"),
-      ),
-    );
+    // ✅ dto must be string field
+    request.fields["dto"] = jsonEncode(dto);
 
+    // ✅ DO NOT set MediaType for files (fix unsupported MediaType)
     Future<void> addFile(File? file, String? name) async {
       if (file == null) return;
       final filename = name ?? file.path.split('/').last;
+
       request.files.add(
         await http.MultipartFile.fromPath(
-          "files", // change to files[] if backend needs
+          "files", // ✅ backend usually expects "files"
           file.path,
           filename: filename,
         ),
@@ -423,57 +426,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final resp = await http.Response.fromStream(streamed);
 
     if (resp.statusCode != 200 && resp.statusCode != 201) {
-      throw "Failed (${resp.statusCode}): ${resp.body}";
+      throw resp.body;
     }
-
-    final decoded = jsonDecode(resp.body);
-    if (decoded is Map<String, dynamic>) return decoded;
-    return {"raw": decoded};
   }
 
   // ----------------------------
-  // Submit -> Success (QR = URL)
+  // Submit
   // ----------------------------
   Future<void> submitRegister() async {
     if (!validateForm()) return;
 
     setState(() => isLoading = true);
-
     try {
-      final data = await createParkingCardRequest();
-
-      // ✅ Try find code (adjust if your backend uses different key)
-      final code = (data["code"] ??
-              data["requestCode"] ??
-              data["trackingCode"] ??
-              "")
-          .toString();
-
-      // ✅ Build URL for QR
-      final qrUrl = "$publicWebBaseUrl/parking-request/$code";
-
+      await createParkingCardRequest();
       if (!mounted) return;
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => RegisterSuccessScreen(
-            code: code,
-            qrData: qrUrl, // ✅ QR data is URL
-          ),
-        ),
-      );
+      Navigator.pushNamed(context, Approute.verifySuccessScreen);
     } catch (e, st) {
       debugPrint("SUBMIT ERROR: $e");
       debugPrint("STACK: $st");
+
+      final msg = e.toString();
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Error: $e")));
+          .showSnackBar(SnackBar(content: Text("Error: $msg")));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
   }
 
+  // ----------------------------
+  // Date picker
+  // ----------------------------
   void pickDate() async {
     final d = await showDatePicker(
       context: context,
@@ -488,12 +471,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  // ----------------------------
+  // UI
+  // ----------------------------
   @override
   Widget build(BuildContext context) {
     if (!allowedUserTypes.contains(_userType)) _userType = "GUEST";
 
     return Scaffold(
       backgroundColor: const Color(0xFFDFB73B),
+
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -517,7 +504,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             sectionTitle("ព័ត៌មានផ្ទាល់ខ្លួន"),
                             dropdownUserType(),
                             const SizedBox(height: 15),
-
                             if (showIdNumber)
                               twoInputRow(
                                 "គោត្តនាម និងនាម",
@@ -526,6 +512,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 "បញ្ចូលអត្តលេខ",
                                 fullNameController,
                                 idNumberController,
+                                leftIsPlate: false,
+                                rightIsPlate: false,
                               )
                             else
                               oneInput(
@@ -533,7 +521,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 hint: "បញ្ចូលឈ្មោះពេញ",
                                 controller: fullNameController,
                               ),
-
                             if (showWorkFields) ...[
                               twoInputRow(
                                 "ក្រសួង/ស្ថាប័ន",
@@ -542,6 +529,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 "បញ្ចូលនាយកដ្ឋាន",
                                 ministryController,
                                 departmentController,
+                                leftIsPlate: false,
+                                rightIsPlate: false,
                               ),
                               twoInputRow(
                                 "ការិយាល័យ",
@@ -550,23 +539,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 "បញ្ចូលតួនាទី",
                                 officeController,
                                 positionController,
+                                leftIsPlate: false,
+                                rightIsPlate: false,
                               ),
                             ],
-
                             if (showProvinceCity)
                               oneInput(
                                 label: "ខេត្ត/រាជធានី",
                                 hint: "បញ្ចូលខេត្ត/រាជធានី",
                                 controller: provinceCityController,
                               ),
-
                             const SizedBox(height: 10),
                             Rowlabel(),
                             const SizedBox(height: 10),
                             phoneAndDate(),
-
                             sectionTitle("ព័ត៌មានរថយន្ត/ម៉ូតូ"),
-
                             ...List.generate(vehicles.length, (i) {
                               final v = vehicles[i];
                               return Column(
@@ -611,7 +598,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       ),
                                       Expanded(
                                         child: RadioListTile<String>(
-                                          value: "MOTORBIKE", // ✅ enum matches backend
+                                          value: "MOTORCYCLE",
                                           groupValue: v.vehicleType,
                                           title: const Text("ម៉ូតូ"),
                                           onChanged: (x) => setState(() {
@@ -628,6 +615,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     "បញ្ចូលស្លាកលេខ",
                                     v.brand,
                                     v.plate,
+                                    leftIsPlate: false,
                                     rightIsPlate: true,
                                   ),
                                   twoInputRow(
@@ -637,14 +625,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     "ឆ្នាំផលិត",
                                     v.color,
                                     v.year,
+                                    leftIsPlate: false,
+                                    rightIsPlate: false,
                                   ),
                                   const Divider(height: 24),
                                 ],
                               );
                             }),
-
                             if (needAttachment) uploadOfficerAttachment(),
-                            if (showOptionalAttachment) uploadOptionalAttachment(),
+                            if (showOptionalAttachment)
+                              uploadOptionalAttachment(),
                             if (showGuestTwoAttachments) ...[
                               uploadGuestAttachment1(),
                               uploadGuestAttachment2(),
@@ -657,6 +647,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
             ),
+
+      // ✅ bottom fixed
       bottomNavigationBar: SafeArea(
         child: Container(
           color: Colors.white,
@@ -664,10 +656,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.add),
-                  label: const Text("បន្ថែមរថយន្ត"),
-                  onPressed: () => setState(() => vehicles.add(_VehicleForm())),
+                child: SizedBox(
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      side: const BorderSide(width: 0.5, color: Colors.grey),
+                      backgroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                    ),
+                    onPressed: () {
+                      setState(() => vehicles.add(_VehicleForm()));
+                    },
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Icon(Icons.add, color: Color(0xffDFB73B)),
+                        const Text(
+                          "បន្ថែមរថយន្ត",
+                          style: TextStyle(
+                              fontSize: 18, color: Color(0xffDFB73B)),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -722,19 +735,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   Text(
                     'ក្រសួងមហាផ្ទៃ',
                     style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xffDFB73B),
-                    ),
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xffDFB73B)),
                   ),
                   SizedBox(height: 8),
                   Text(
                     'Ministry of Interior',
                     style: TextStyle(
-                      fontSize: 16,
-                      color: Color(0xffDFB73B),
-                      fontWeight: FontWeight.bold,
-                    ),
+                        fontSize: 16,
+                        color: Color(0xffDFB73B),
+                        fontWeight: FontWeight.bold),
                   ),
                 ],
               ),
@@ -776,9 +787,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         case "GUEST":
           return "ភ្ញៀវ";
         case "INSIDE_OFFICER":
-          return "មន្រ្តីបំរើការនៅក្នុងទីស្តីការក្រសួងមហាឫផ្ទៃ";
+          return "មន្រ្តីបំរើការនៅក្នុងទីស្តីការក្រសួងមហាផ្ទៃ";
         case "OUTSIDE_OFFICER":
-          return "មន្រ្តីបំរើការនៅក្រៅទីស្តីការក្រសួងមហាឫផ្ទៃ";
+          return "មន្រ្តីបំរើការនៅក្រៅទីស្តីការក្រសួងមហាផ្ទៃ";
         case "SECRETARY_AND_DEPUTY_SECRETARY":
           return "រដ្ឋលេខាធិការ / អនុរដ្ឋលេខាធិការ​ ក្រសួងមហាផ្ទៃ";
         case "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER":
@@ -791,40 +802,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: DropdownButtonFormField<String>(
-        value: _userType,
         isExpanded: true,
+        value: _userType,
         decoration: inputDecoration("ជ្រើសប្រភេទអ្នកប្រើប្រាស់"),
         items: allowedUserTypes
             .map((v) => DropdownMenuItem<String>(
                   value: v,
-                  child: Text(
-                    labelOf(v),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  child: Text(labelOf(v)),
                 ))
             .toList(),
-        selectedItemBuilder: (context) {
-          return allowedUserTypes
-              .map((v) => Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      labelOf(v),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ))
-              .toList();
-        },
         onChanged: (v) {
           if (v == null) return;
           setState(() {
             _userType = v;
 
-            if (!isOfficer) idNumberController.clear();
+            if (!(v == "INSIDE_OFFICER" || v == "OUTSIDE_OFFICER")) {
+              idNumberController.clear();
+            }
 
-            final shouldShowWork =
-                isOfficer || (isGuest && showWorkFieldsForGuest);
+            final shouldShowWork = (v == "INSIDE_OFFICER" ||
+                v == "OUTSIDE_OFFICER" ||
+                (v == "GUEST" && showWorkFieldsForGuest));
             if (!shouldShowWork) {
               ministryController.clear();
               departmentController.clear();
@@ -832,21 +830,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
               positionController.clear();
             }
 
-            if (!isNationalAdmin) provinceCityController.clear();
+            if (v != "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER") {
+              provinceCityController.clear();
+            }
 
-            if (!isOfficer) {
+            if (!(v == "INSIDE_OFFICER" || v == "OUTSIDE_OFFICER")) {
               attachmentFile = null;
               attachmentName = null;
               attachmentError = null;
             }
 
-            if (!isSecretary && !isNationalAdmin) {
+            if (!(v == "SECRETARY_AND_DEPUTY_SECRETARY" ||
+                v == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER")) {
               optionalFile = null;
               optionalFileName = null;
               optionalFileError = null;
             }
 
-            if (!isGuest) {
+            if (v != "GUEST") {
               guestFile1 = null;
               guestFile1Name = null;
               guestFile1Error = null;
@@ -912,7 +913,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         children: [
           Text(label),
           const SizedBox(height: 6),
-          TextFormField(controller: controller, decoration: inputDecoration(hint)),
+          TextFormField(
+            controller: controller,
+            decoration: inputDecoration(hint),
+          ),
         ],
       ),
     );
@@ -925,7 +929,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     String rHint,
     TextEditingController lCtrl,
     TextEditingController rCtrl, {
-    bool rightIsPlate = false,
+    required bool leftIsPlate,
+    required bool rightIsPlate,
   }) {
     final isLeftId = lCtrl == idNumberController;
     final isRightId = rCtrl == idNumberController;
@@ -957,6 +962,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return null;
     }
 
+    TextCapitalization cap(bool isPlate) =>
+        isPlate ? TextCapitalization.characters : TextCapitalization.none;
+
     TextInputType kbd(bool isId) =>
         isId ? TextInputType.number : TextInputType.text;
 
@@ -979,9 +987,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: lCtrl,
                   decoration: inputDecoration(lHint),
                   keyboardType: kbd(isLeftId),
-                  maxLength: maxLen(isLeftId, false),
-                  buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
-                  inputFormatters: formatters(isLeftId, false),
+                  textCapitalization: cap(leftIsPlate),
+                  maxLength: maxLen(isLeftId, leftIsPlate),
+                  buildCounter: (context,
+                          {required currentLength,
+                          required isFocused,
+                          maxLength}) =>
+                      null,
+                  inputFormatters: formatters(isLeftId, leftIsPlate),
                 ),
               ),
               const SizedBox(width: 10),
@@ -990,10 +1003,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: rCtrl,
                   decoration: inputDecoration(rHint),
                   keyboardType: kbd(isRightId),
-                  textCapitalization:
-                      rightIsPlate ? TextCapitalization.characters : TextCapitalization.none,
+                  textCapitalization: cap(rightIsPlate),
                   maxLength: maxLen(isRightId, rightIsPlate),
-                  buildCounter: (_, {required currentLength, required isFocused, maxLength}) => null,
+                  buildCounter: (context,
+                          {required currentLength,
+                          required isFocused,
+                          maxLength}) =>
+                      null,
                   inputFormatters: formatters(isRightId, rightIsPlate),
                 ),
               ),
@@ -1004,53 +1020,61 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget uploadOfficerAttachment() => _uploadBox(
-        title: "ឯកសារភ្ជាប់ (ចាំបាច់)",
-        onTap: pickOfficerAttachment,
-        fileName: attachmentName,
-        error: attachmentError,
-        onClear: () => setState(() {
-          attachmentFile = null;
-          attachmentName = null;
-          attachmentError = null;
-        }),
-      );
+  Widget uploadOfficerAttachment() {
+    return _uploadBox(
+      title: "ឯកសារភ្ជាប់ (ចាំបាច់)",
+      onTap: pickOfficerAttachment,
+      fileName: attachmentName,
+      error: attachmentError,
+      onClear: () => setState(() {
+        attachmentFile = null;
+        attachmentName = null;
+        attachmentError = null;
+      }),
+    );
+  }
 
-  Widget uploadOptionalAttachment() => _uploadBox(
-        title: "ឯកសារភ្ជាប់ (ជាជម្រើស)",
-        onTap: pickOptionalAttachment,
-        fileName: optionalFileName,
-        error: optionalFileError,
-        onClear: () => setState(() {
-          optionalFile = null;
-          optionalFileName = null;
-          optionalFileError = null;
-        }),
-      );
+  Widget uploadOptionalAttachment() {
+    return _uploadBox(
+      title: "ឯកសារភ្ជាប់ (ជាជម្រើស)",
+      onTap: pickOptionalAttachment,
+      fileName: optionalFileName,
+      error: optionalFileError,
+      onClear: () => setState(() {
+        optionalFile = null;
+        optionalFileName = null;
+        optionalFileError = null;
+      }),
+    );
+  }
 
-  Widget uploadGuestAttachment1() => _uploadBox(
-        title: "ឯកសារភ្ជាប់ (Guest) 1",
-        onTap: pickGuest1,
-        fileName: guestFile1Name,
-        error: guestFile1Error,
-        onClear: () => setState(() {
-          guestFile1 = null;
-          guestFile1Name = null;
-          guestFile1Error = null;
-        }),
-      );
+  Widget uploadGuestAttachment1() {
+    return _uploadBox(
+      title: "ឯកសារភ្ជាប់ (Guest) 1",
+      onTap: pickGuest1,
+      fileName: guestFile1Name,
+      error: guestFile1Error,
+      onClear: () => setState(() {
+        guestFile1 = null;
+        guestFile1Name = null;
+        guestFile1Error = null;
+      }),
+    );
+  }
 
-  Widget uploadGuestAttachment2() => _uploadBox(
-        title: "ឯកសារភ្ជាប់ (Guest) 2",
-        onTap: pickGuest2,
-        fileName: guestFile2Name,
-        error: guestFile2Error,
-        onClear: () => setState(() {
-          guestFile2 = null;
-          guestFile2Name = null;
-          guestFile2Error = null;
-        }),
-      );
+  Widget uploadGuestAttachment2() {
+    return _uploadBox(
+      title: "ឯកសារភ្ជាប់ (Guest) 2",
+      onTap: pickGuest2,
+      fileName: guestFile2Name,
+      error: guestFile2Error,
+      onClear: () => setState(() {
+        guestFile2 = null;
+        guestFile2Name = null;
+        guestFile2Error = null;
+      }),
+    );
+  }
 
   Widget _uploadBox({
     required String title,
@@ -1100,7 +1124,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(child: Text(fileName, overflow: TextOverflow.ellipsis)),
+                Expanded(
+                    child: Text(fileName, overflow: TextOverflow.ellipsis)),
                 IconButton(icon: const Icon(Icons.close), onPressed: onClear),
               ],
             ),
@@ -1108,8 +1133,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           if (error != null)
             Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: Text(error,
-                  style: const TextStyle(color: Colors.red, fontSize: 12)),
+              child: Text(
+                error,
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
             ),
         ],
       ),
@@ -1121,7 +1148,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       hintText: hint,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(15)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-      isDense: true,
     );
   }
 }
