@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "C:/Users/Admin/StudioProjects/Project/gov_reg/linux/runner"
+    "cmake.sourceDirectory": "C:/Users/Admin/StudioProjects/Project/gov_reg/linux/runner",
+    "dart.flutterSdkPath": "C:\\StudioDev\\flutter_windows_3.27.4-stable\\flutter"
 }
