@@ -1,21 +1,31 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
 
 class RegisterSuccessScreen extends StatelessWidget {
   const RegisterSuccessScreen({
     super.key,
     required this.code,
-    required this.qrData,
+    required this.token,
   });
 
   final String code;
-  final String qrData;
+  final String token;
 
-  Future<void> _openLink() async {
-    final uri = Uri.tryParse(qrData);
-    if (uri == null) return;
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  // Android emulator: 10.0.2.2
+  // iOS simulator: 127.0.0.1
+  static const String baseUrl = "http://10.0.2.2:8080";
+
+  Future<Uint8List> _fetchQrPng() async {
+    final uri = Uri.parse("$baseUrl/api/v1/qr/parking/$token");
+
+    final res = await http.get(uri, headers: {"Accept": "image/png"});
+
+    if (res.statusCode != 200) {
+      throw Exception("QR HTTP ${res.statusCode}: ${res.body}");
+    }
+    return res.bodyBytes;
   }
 
   @override
@@ -75,29 +85,43 @@ class RegisterSuccessScreen extends StatelessWidget {
 
                 const SizedBox(height: 12),
 
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: const Color(0xFFB8860B), width: 1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: QrImageView(
-                    data: qrData,
-                    version: QrVersions.auto,
-                    size: 240,
-                  ),
-                ),
+                FutureBuilder<Uint8List>(
+                  future: _fetchQrPng(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: CircularProgressIndicator(),
+                      );
+                    }
+                    if (snapshot.hasError) {
+                      return Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          "Failed to load QR: ${snapshot.error}",
+                          style: const TextStyle(color: Colors.red),
+                          textAlign: TextAlign.center,
+                        ),
+                      );
+                    }
 
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    qrData,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, color: Colors.black54),
-                    textAlign: TextAlign.center,
-                  ),
+                    return Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: const Color(0xFFB8860B),
+                          width: 1,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Image.memory(
+                        snapshot.data!,
+                        width: 240,
+                        height: 240,
+                        fit: BoxFit.contain,
+                      ),
+                    );
+                  },
                 ),
 
                 const SizedBox(height: 18),
@@ -117,8 +141,10 @@ class RegisterSuccessScreen extends StatelessWidget {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFE2B10B),
                           ),
-                          onPressed: _openLink,
-                          child: const Text("ទាញយកQRcode"),
+                          onPressed: () {
+                            // optional: implement save/share later
+                          },
+                          child: const Text("ទាញយក QRcode"),
                         ),
                       ),
                     ],

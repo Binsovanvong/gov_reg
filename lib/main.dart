@@ -17,22 +17,35 @@ class MainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      initialRoute: '/splash',
-      theme: ThemeData(
-        useMaterial3: true,
-        textTheme: GoogleFonts.notoSansKhmerTextTheme(),
-      ),
-      routes: {
-        Approute.splash: (context) => const SplashScreen(),
-        Approute.welcome: (context) => const WelcomeScreen(),
-        Approute.verifySuccessScreen: (context) => const RegisterSuccessScreen(
-              code: '',
-              qrData: '',
-            ),
-        Approute.register: (context) => const RegisterScreen(),
-        Approute.login: (context) => const LoginPage(),
-      },
-    );
+  debugShowCheckedModeBanner: false,
+  initialRoute: Approute.splash,
+  theme: ThemeData(
+    useMaterial3: true,
+    textTheme: GoogleFonts.notoSansKhmerTextTheme(),
+  ),
+
+  // ✅ Keep normal routes here (NO success route here)
+  routes: {
+    Approute.splash: (context) => const SplashScreen(),
+    Approute.welcome: (context) => const WelcomeScreen(),
+    Approute.register: (context) => const RegisterScreen(),
+    Approute.login: (context) => const LoginPage(),
+  },
+
+  // ✅ Put this right here
+  onGenerateRoute: (settings) {
+    if (settings.name == Approute.verifySuccessScreen) {
+      final args = settings.arguments as Map<String, dynamic>?;
+
+      return MaterialPageRoute(
+        builder: (_) => RegisterSuccessScreen(
+          code: (args?["code"] ?? "").toString(),
+          token: (args?["token"] ?? "").toString(),
+        ),
+      );
+    }
+    return null;
+  },
+);
   }
 }

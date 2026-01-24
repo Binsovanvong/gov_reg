@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gov_reg/routes/approute.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// ✅ MUST be top-level (NOT inside State class)
 class _VehicleForm {
@@ -31,7 +32,7 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  static const String baseUrl = "http://localhost:8080";
+  static const String baseUrl = "http://10.0.2.2:8080";
 
   static const List<String> allowedUserTypes = [
     "GUEST",
@@ -84,32 +85,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Rules
   // ----------------------------
   bool get isGuest => _userType == "GUEST";
-
   bool get isInsideOfficer => _userType == "INSIDE_OFFICER";
-
   bool get isOutsideOfficer => _userType == "OUTSIDE_OFFICER";
-
   bool get isSecretary => _userType == "SECRETARY_AND_DEPUTY_SECRETARY";
-
   bool get isNationalAdmin =>
       _userType == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER";
-
   bool get isOfficer => isInsideOfficer || isOutsideOfficer;
 
   // Guest shows work fields too
   static const bool showWorkFieldsForGuest = true;
 
   bool get showIdNumber => isOfficer;
-
   bool get showWorkFields => isOfficer || (isGuest && showWorkFieldsForGuest);
-
   bool get showProvinceCity => isNationalAdmin;
-
   bool get needAttachment => isOfficer;
-
   bool get showOptionalAttachment => isSecretary || isNationalAdmin;
-
   bool get showGuestTwoAttachments => isGuest;
+
+  // ----------------------------
+  // AUTH (🔥 FIX 403)
+  // ----------------------------
+  Future<String?> _getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString("token"); // saved from login.dart
+  }
 
   // ----------------------------
   // Helpers
@@ -118,16 +117,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
 
   String _digitsOnly(String s) => s.replaceAll(RegExp(r'\D'), '');
-
   bool _isExactlyNDigits(String s, int n) => _digitsOnly(s).length == n;
 
   final RegExp _carPlateRegex = RegExp(r'^2[A-Z]{2}-\d{4}$');
   final RegExp _motoPlateRegex = RegExp(r'^1[A-Z]{2}-\d{4}$');
-
-  int _dateToYyyyMMddInt(String yyyyMmDd) {
-    final clean = yyyyMmDd.trim().replaceAll('-', '');
-    return int.tryParse(clean) ?? 0;
-  }
 
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -335,10 +328,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ----------------------------
-  // API (✅ FIX unsupported MediaType)
+  // API (🔥 FIX 403 here)
   // ----------------------------
-  Future<void> createParkingCardRequest() async {
-    final base = Uri.parse("$baseUrl/api/parking-card-requests");
+  Future<Map<String, dynamic>> createParkingCardRequest() async {
+    final base = Uri.parse("$baseUrl/api/v1/parking-card-requests");
 
     final hasAnyFile = attachmentFile != null ||
         optionalFile != null ||
@@ -346,12 +339,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         guestFile2 != null;
 
     final uri = hasAnyFile
-        ? base
-            .replace(queryParameters: {"attachmentTypes": attachmentTypeValue})
+        ? base.replace(queryParameters: {"attachmentTypes": attachmentTypeValue})
         : base;
-
-    final requestDateValue =
-        _dateToYyyyMMddInt(requestDateController.text.trim());
 
     final dto = <String, dynamic>{
       "id": 0,
@@ -369,7 +358,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           "vehicleType": v.vehicleType,
         };
       }).toList(),
-      "requestDate": requestDateValue,
+
+      // ✅ send date string
+      "requestDate": requestDateController.text.trim(),
+
       "accessType": "ONCE",
       "parkingRequestStatus": "NEW",
       "reason": reasonController.text.trim().isEmpty
@@ -395,22 +387,54 @@ class _RegisterScreenState extends State<RegisterScreen> {
       (dto["user"] as Map<String, dynamic>)["workingInfo"] = wi;
     }
 
+    // ✅ GET TOKEN
+    final token = await _getToken();
+    if (token == null || token.isEmpty) {
+      throw "No token. Please login first.";
+    }
+
+    debugPrint("POST => $uri");
+    debugPrint("hasAnyFile => $hasAnyFile");
+    debugPrint("DTO => ${jsonEncode(dto)}");
+
+    // ✅ 1) JSON if no files
+    if (!hasAnyFile) {
+      final res = await http.post(
+        uri,
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+          "Authorization": "Bearer $token",
+        },
+        body: jsonEncode(dto),
+      );
+
+      debugPrint("STATUS => ${res.statusCode}");
+      debugPrint("BODY => ${res.body}");
+
+      if (res.statusCode != 200 && res.statusCode != 201) {
+        throw "HTTP ${res.statusCode}: ${res.body.isEmpty ? '(empty body)' : res.body}";
+      }
+
+      if (res.body.isEmpty) return {};
+      final decoded = jsonDecode(res.body);
+      return decoded is Map<String, dynamic> ? decoded : {};
+    }
+
+    // ✅ 2) Multipart if has files
     final request = http.MultipartRequest("POST", uri);
-
-    // ✅ important: let backend parse multipart normally
     request.headers["Accept"] = "application/json";
+    request.headers["Authorization"] = "Bearer $token";
 
-    // ✅ dto must be string field
     request.fields["dto"] = jsonEncode(dto);
 
-    // ✅ DO NOT set MediaType for files (fix unsupported MediaType)
     Future<void> addFile(File? file, String? name) async {
       if (file == null) return;
       final filename = name ?? file.path.split('/').last;
 
       request.files.add(
         await http.MultipartFile.fromPath(
-          "files", // ✅ backend usually expects "files"
+          "files",
           file.path,
           filename: filename,
         ),
@@ -422,12 +446,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
     await addFile(guestFile1, guestFile1Name);
     await addFile(guestFile2, guestFile2Name);
 
+    debugPrint("FILES => ${request.files.map((f) => f.filename).toList()}");
+
     final streamed = await request.send();
     final resp = await http.Response.fromStream(streamed);
 
+    debugPrint("STATUS => ${resp.statusCode}");
+    debugPrint("BODY => ${resp.body}");
+
     if (resp.statusCode != 200 && resp.statusCode != 201) {
-      throw resp.body;
+      throw "HTTP ${resp.statusCode}: ${resp.body.isEmpty ? '(empty body)' : resp.body}";
     }
+
+    if (resp.body.isEmpty) return {};
+    final decoded = jsonDecode(resp.body);
+    return decoded is Map<String, dynamic> ? decoded : {};
   }
 
   // ----------------------------
@@ -438,17 +471,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => isLoading = true);
     try {
-      await createParkingCardRequest();
+      final res = await createParkingCardRequest();
+
+      final code = (res["code"] ?? res["requestCode"] ?? "").toString();
+      final token = (res["token"] ?? res["qrToken"] ?? "").toString();
+
       if (!mounted) return;
-      Navigator.pushNamed(context, Approute.verifySuccessScreen);
+
+      Navigator.pushNamed(
+        context,
+        Approute.verifySuccessScreen,
+        arguments: {"code": code, "token": token},
+      );
     } catch (e, st) {
       debugPrint("SUBMIT ERROR: $e");
       debugPrint("STACK: $st");
 
-      final msg = e.toString();
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Error: $msg")));
+          .showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -480,7 +521,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFDFB73B),
-
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -633,8 +673,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               );
                             }),
                             if (needAttachment) uploadOfficerAttachment(),
-                            if (showOptionalAttachment)
-                              uploadOptionalAttachment(),
+                            if (showOptionalAttachment) uploadOptionalAttachment(),
                             if (showGuestTwoAttachments) ...[
                               uploadGuestAttachment1(),
                               uploadGuestAttachment2(),
@@ -647,8 +686,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
               ),
             ),
-
-      // ✅ bottom fixed
       bottomNavigationBar: SafeArea(
         child: Container(
           color: Colors.white,
@@ -671,12 +708,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     },
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
+                      children: const [
                         Icon(Icons.add, color: Color(0xffDFB73B)),
-                        const Text(
+                        Text(
                           "បន្ថែមរថយន្ត",
-                          style: TextStyle(
-                              fontSize: 18, color: Color(0xffDFB73B)),
+                          style: TextStyle(fontSize: 18, color: Color(0xffDFB73B)),
                         ),
                       ],
                     ),
@@ -1124,8 +1160,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(
-                    child: Text(fileName, overflow: TextOverflow.ellipsis)),
+                Expanded(child: Text(fileName, overflow: TextOverflow.ellipsis)),
                 IconButton(icon: const Icon(Icons.close), onPressed: onClear),
               ],
             ),
