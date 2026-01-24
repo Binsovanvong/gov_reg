@@ -1,194 +1,130 @@
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-class VerifySuccessScreen extends StatelessWidget {
-  const VerifySuccessScreen({super.key});
+class RegisterSuccessScreen extends StatelessWidget {
+  const RegisterSuccessScreen({
+    super.key,
+    required this.code,
+    required this.qrData,
+  });
+
+  final String code;
+  final String qrData;
+
+  Future<void> _openLink() async {
+    final uri = Uri.tryParse(qrData);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFE2B10B),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Center(
+          child: Container(
+            width: 360,
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(
+                  blurRadius: 18,
+                  offset: Offset(0, 8),
+                  color: Colors.black26,
+                ),
+              ],
+            ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-
-                const SizedBox(height: 40),
-
-                // Title
-                const Text(
-                  'ការស្នើរសុំ',
-                  style: TextStyle(
-                    fontSize: 25,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Check icon
                 Container(
-                  width: 150,
-                  height: 150,
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: const BoxDecoration(
-                    color: Color(0xFF24345A),
-                    shape: BoxShape.circle,
+                    color: Color(0xFF00B36B),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.check,
-                    color: Colors.white,
-                    size: 100,
+                  child: const Center(
+                    child: Text(
+                      "អ្នកបានដាក់ស្នើជោគជ័យ",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
+                    ),
                   ),
                 ),
+                const SizedBox(height: 18),
 
-                SizedBox(height: 20),
-
-                // Success text
-                const Text(
-                  'ការចុះឈ្មោះទទួលបានជោគជ័យ',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 25,
-                    fontWeight: FontWeight.bold,
+                Text(
+                  code,
+                  style: const TextStyle(
+                    color: Color(0xFFB8860B),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
                   ),
                 ),
 
                 const SizedBox(height: 12),
 
-                const Text(
-                  'ពាក្យស្នើសុំរបស់អ្នកត្រូវបានបញ្ជូនដោយជោគជ័យយើងនឹង'
-                  '\nពិនិត្យមើលព័ត៌មានលម្អិតរបស់អ្នកហើយជូនដំណឹងដល់អ្នក'
-                  '\nក្នុងពេលឆាប់ៗនេះ។',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.black45,
-                    height: 1.8,
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: const Color(0xFFB8860B), width: 1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: QrImageView(
+                    data: qrData,
+                    version: QrVersions.auto,
+                    size: 240,
                   ),
                 ),
 
-                const SizedBox(height: 30),
-
-                // Info Card
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(12),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    qrData,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                    textAlign: TextAlign.center,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+
+                const SizedBox(height: 18),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
                     children: [
-
-                      // Status
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: const [
-                          Text(
-                            'ស្ថានភាព',
-                            style: TextStyle(fontSize: 14),
-                          ),
-                          Row(
-                            children: [
-                              Icon(Icons.circle,
-                                  size: 10, color: Colors.green),
-                              SizedBox(width: 6),
-                              Text(
-                                'បានផ្ទៀងផ្ទាត់',
-                                style: TextStyle(
-                                  color: Colors.green,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text("ត្រឡប់ទៅក្រោយ"),
+                        ),
                       ),
-
-                       Divider(height: 24),
-
-                      // Phone number
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children:  [
-                          Text(
-                            'អត្តលេខ',
-                            style: TextStyle(fontSize: 16),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFE2B10B),
                           ),
-                          Row(
-                            children: [
-                              Text(
-                                '05112004',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(width: 8),
-                              IconButton(onPressed: () {
-                                
-                              }, icon: Icon(Icons.copy),color: Color(0xFF24345A),)
-                            ],
-                          ),
-                        ],
+                          onPressed: _openLink,
+                          child: const Text("ទាញយកQRcode"),
+                        ),
                       ),
                     ],
                   ),
                 ),
-
-                const SizedBox(height: 40),
-
-                // Continue button
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF24345A),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    child: Text(
-                      'ត្រឡប់ក្រោយ',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Back link
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.download,color: Color(0xFF24345A),),
-                    TextButton(
-                      onPressed: () {
-                        
-                      },
-                      style: ElevatedButton.styleFrom(
-                      foregroundColor: Color(0xFF24345A),     
-                    ),
-                      child:  Text(
-                        'ត្រឡប់ទៅមុខមុន',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                const SizedBox(height: 16),
               ],
             ),
           ),

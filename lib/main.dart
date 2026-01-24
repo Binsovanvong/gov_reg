@@ -18,7 +18,7 @@ class MainApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      initialRoute: '/register',
+      initialRoute: '/splash',
       theme: ThemeData(
         useMaterial3: true,
         textTheme: GoogleFonts.notoSansKhmerTextTheme(),
@@ -26,7 +26,10 @@ class MainApp extends StatelessWidget {
       routes: {
         Approute.splash: (context) => const SplashScreen(),
         Approute.welcome: (context) => const WelcomeScreen(),
-        Approute.verifySuccessScreen: (context) => const VerifySuccessScreen(),
+        Approute.verifySuccessScreen: (context) => const RegisterSuccessScreen(
+              code: '',
+              qrData: '',
+            ),
         Approute.register: (context) => const RegisterScreen(),
         Approute.login: (context) => const LoginPage(),
       },
