@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:gal/gal.dart';
+import 'package:gov_reg/routes/approute.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -275,7 +276,7 @@ class _RegisterSuccessScreenState extends State<RegisterSuccessScreen> {
                             foregroundColor: Colors.white,
                             textStyle: const TextStyle(fontSize: 14),
                           ),
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: () => Navigator.pushNamed(context, Approute.welcome),
                           child: const Text("ត្រឡប់ទៅទំព័រដើម"),
                         ),
                       ),
