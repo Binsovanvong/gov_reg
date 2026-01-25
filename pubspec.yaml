@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.1.0
+  http_parser: 4.1.2
   file_picker: ^8.0.0
   google_fonts: ^6.1.0
   qr_flutter: ^4.1.0

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:gov_reg/routes/approute.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http_parser/http_parser.dart';
 
 /// ✅ MUST be top-level (NOT inside State class)
 class _VehicleForm {
@@ -38,7 +39,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     "GUEST",
     "INSIDE_OFFICER",
     "OUTSIDE_OFFICER",
-    "SECRETARY_AND_DEPUTY_SECRETARY",
+    "SECRETARY",
+    "DEPUTY_SECRETARY",
     "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER",
   ];
 
@@ -87,7 +89,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool get isGuest => _userType == "GUEST";
   bool get isInsideOfficer => _userType == "INSIDE_OFFICER";
   bool get isOutsideOfficer => _userType == "OUTSIDE_OFFICER";
-  bool get isSecretary => _userType == "SECRETARY_AND_DEPUTY_SECRETARY";
+  bool get isSecretary =>
+      _userType == "SECRETARY" || _userType == "DEPUTY_SECRETARY";
   bool get isNationalAdmin =>
       _userType == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER";
   bool get isOfficer => isInsideOfficer || isOutsideOfficer;
@@ -107,7 +110,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ----------------------------
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString("token"); // saved from login.dart
+    debugPrint(prefs.getString("accessToken"));
+    return prefs.getString("accessToken");
   }
 
   // ----------------------------
@@ -339,7 +343,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         guestFile2 != null;
 
     final uri = hasAnyFile
-        ? base.replace(queryParameters: {"attachmentTypes": attachmentTypeValue})
+        ? base
+            .replace(queryParameters: {"attachmentTypes": attachmentTypeValue})
         : base;
 
     final dto = <String, dynamic>{
@@ -361,9 +366,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       // ✅ send date string
       "requestDate": requestDateController.text.trim(),
-
-      "accessType": "ONCE",
-      "parkingRequestStatus": "NEW",
+      // "accessType": "ONCE",
+      // "parkingRequestStatus": "NEW",
       "reason": reasonController.text.trim().isEmpty
           ? "Parking card request"
           : reasonController.text.trim(),
@@ -397,36 +401,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
     debugPrint("hasAnyFile => $hasAnyFile");
     debugPrint("DTO => ${jsonEncode(dto)}");
 
-    // ✅ 1) JSON if no files
-    if (!hasAnyFile) {
-      final res = await http.post(
-        uri,
-        headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $token",
-        },
-        body: jsonEncode(dto),
-      );
-
-      debugPrint("STATUS => ${res.statusCode}");
-      debugPrint("BODY => ${res.body}");
-
-      if (res.statusCode != 200 && res.statusCode != 201) {
-        throw "HTTP ${res.statusCode}: ${res.body.isEmpty ? '(empty body)' : res.body}";
-      }
-
-      if (res.body.isEmpty) return {};
-      final decoded = jsonDecode(res.body);
-      return decoded is Map<String, dynamic> ? decoded : {};
-    }
-
-    // ✅ 2) Multipart if has files
     final request = http.MultipartRequest("POST", uri);
-    request.headers["Accept"] = "application/json";
+    request.headers["Accept"] = "*/*";
+    request.headers["Content-Type"] = "multipart/form-datar";
     request.headers["Authorization"] = "Bearer $token";
 
-    request.fields["dto"] = jsonEncode(dto);
+    request.files.add(
+      http.MultipartFile.fromString(
+        "dto",
+        jsonEncode(dto),
+        filename: "dto.json",
+        contentType: MediaType('application', 'json'),
+      ),
+    );
 
     Future<void> addFile(File? file, String? name) async {
       if (file == null) return;
@@ -473,8 +460,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       final res = await createParkingCardRequest();
 
-      final code = (res["code"] ?? res["requestCode"] ?? "").toString();
-      final token = (res["token"] ?? res["qrToken"] ?? "").toString();
+      final code = (res["code"]).toString();
+      final token = (res["token"]).toString();
 
       if (!mounted) return;
 
@@ -508,7 +495,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (d != null) {
       requestDateController.text =
-          "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
+          "${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}";
     }
   }
 
@@ -673,7 +660,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               );
                             }),
                             if (needAttachment) uploadOfficerAttachment(),
-                            if (showOptionalAttachment) uploadOptionalAttachment(),
+                            if (showOptionalAttachment)
+                              uploadOptionalAttachment(),
                             if (showGuestTwoAttachments) ...[
                               uploadGuestAttachment1(),
                               uploadGuestAttachment2(),
@@ -712,7 +700,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         Icon(Icons.add, color: Color(0xffDFB73B)),
                         Text(
                           "បន្ថែមរថយន្ត",
-                          style: TextStyle(fontSize: 18, color: Color(0xffDFB73B)),
+                          style:
+                              TextStyle(fontSize: 18, color: Color(0xffDFB73B)),
                         ),
                       ],
                     ),
@@ -826,8 +815,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           return "មន្រ្តីបំរើការនៅក្នុងទីស្តីការក្រសួងមហាផ្ទៃ";
         case "OUTSIDE_OFFICER":
           return "មន្រ្តីបំរើការនៅក្រៅទីស្តីការក្រសួងមហាផ្ទៃ";
-        case "SECRETARY_AND_DEPUTY_SECRETARY":
-          return "រដ្ឋលេខាធិការ / អនុរដ្ឋលេខាធិការ​ ក្រសួងមហាផ្ទៃ";
+        case "SECRETARY":
+          return "រដ្ឋលេខាធិការ";
+        case "DEPUTY_SECRETARY":
+          return "អនុរដ្ឋលេខាធិការ​ ក្រសួងមហាផ្ទៃ";
         case "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER":
           return "មន្ត្រីរដ្ឋបាលថ្នាក់ក្រោមជាតិ";
         default:
@@ -876,7 +867,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
               attachmentError = null;
             }
 
-            if (!(v == "SECRETARY_AND_DEPUTY_SECRETARY" ||
+            if (!(v == "SECRETARY" ||
+                v == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER")) {
+              optionalFile = null;
+              optionalFileName = null;
+              optionalFileError = null;
+            }
+
+            if (!(v == "DEPUTY_SECRETARY" ||
                 v == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER")) {
               optionalFile = null;
               optionalFileName = null;
@@ -1160,7 +1158,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(child: Text(fileName, overflow: TextOverflow.ellipsis)),
+                Expanded(
+                    child: Text(fileName, overflow: TextOverflow.ellipsis)),
                 IconButton(icon: const Icon(Icons.close), onPressed: onClear),
               ],
             ),
