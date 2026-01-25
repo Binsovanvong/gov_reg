@@ -35,13 +35,10 @@ class MainApp extends StatelessWidget {
   // ✅ Put this right here
   onGenerateRoute: (settings) {
     if (settings.name == Approute.verifySuccessScreen) {
-      final args = settings.arguments as Map<String, dynamic>?;
+      final args = settings.arguments as Map<String, dynamic>;
 
       return MaterialPageRoute(
-        builder: (_) => RegisterSuccessScreen(
-          code: (args?["code"] ?? "").toString(),
-          token: (args?["token"] ?? "").toString(),
-        ),
+        builder: (_) => RegisterSuccessScreen(code: args['code'], token: args['token']),
       );
     }
     return null;
