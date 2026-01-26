@@ -37,36 +37,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
   static const String baseUrl = "http://10.0.2.2:8080";
 
   static const List<String> allowedUserTypes = [
-    "GUEST",
-    "INSIDE_OFFICER",
-    "OUTSIDE_OFFICER",
-    "SECRETARY",
-    "DEPUTY_SECRETARY",
-    "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER",
-  ];
+  "GUEST",
+  "INSIDE_OFFICER",
+  "OUTSIDE_OFFICER",
 
+  // ✅ NEW (if backend supports these codes)
+  "STATE_SECRETARY",
+  "DEPUTY_STATE_SECRETARY",
+
+  "SECRETARY",
+  "DEPUTY_SECRETARY",
+  "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER",
+];
+
+  /// ✅ Backend requires attachmentTypes for EACH file uploaded
   static const String attachmentTypeValue = "VEHICLE_DOCUMENT";
 
   String _userType = "GUEST";
   bool isLoading = false;
 
-  // Officer attachment (required)
-  File? attachmentFile;
-  String? attachmentName;
-  String? attachmentError;
+  // ✅ ONLY 2 attachment inputs:
+  // 1) Multi files up to 5
+  static const int maxFiles = 5;
+  final List<File> attachFiles = [];
+  final List<String> attachFileNames = [];
+  String? attachFilesError;
 
-  // Optional attachment for Secretary / National Admin
-  File? optionalFile;
-  String? optionalFileName;
-  String? optionalFileError;
-
-  // ✅ Guest: FILE picker box (multi up to 5)
-  static const int maxGuestFiles = 5;
-  final List<File> guestFiles = [];
-  final List<String> guestFileNames = [];
-  String? guestFilesError;
-
-  // ✅ Guest: CAMERA box (ONLY 1 photo)
+  // 2) Camera (Selfie required only for Guest)
   File? cameraFile;
   String? cameraFileName;
   String? cameraError;
@@ -93,8 +90,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool get isGuest => _userType == "GUEST";
   bool get isInsideOfficer => _userType == "INSIDE_OFFICER";
   bool get isOutsideOfficer => _userType == "OUTSIDE_OFFICER";
-  bool get isSecretary => _userType == "SECRETARY" || _userType == "DEPUTY_SECRETARY";
-  bool get isNationalAdmin => _userType == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER";
   bool get isOfficer => isInsideOfficer || isOutsideOfficer;
 
   // Guest shows work fields too
@@ -102,10 +97,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool get showIdNumber => isOfficer;
   bool get showWorkFields => isOfficer || (isGuest && showWorkFieldsForGuest);
-  bool get showProvinceCity => isNationalAdmin;
-  bool get needAttachment => isOfficer;
-  bool get showOptionalAttachment => isSecretary || isNationalAdmin;
-  bool get showGuestAttachmentBox => isGuest; // ✅ guest shows file+camera boxes
+  bool get showProvinceCity => _userType == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER";
+
+  // ✅ Guest required selfie, other user types optional
+  bool get selfieRequired => isGuest;
 
   // ----------------------------
   // AUTH
@@ -118,8 +113,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ----------------------------
   // Helpers
   // ----------------------------
-  String _normalizePlate(String s) =>
-      s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
+  String _normalizePlate(String s) => s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
 
   final RegExp _carPlateRegex = RegExp(r'^2[A-Z]{2}-\d{4}$');
   final RegExp _motoPlateRegex = RegExp(r'^1[A-Z]{2}-\d{4}$');
@@ -128,50 +122,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  Future<void> _pickFile({
-    required void Function(String? err) setErr,
-    required void Function(File f, String name) setPicked,
-  }) async {
-    setErr(null);
+  // ✅ Multi-file picker (max 5)
+  Future<void> pickAttachFiles() async {
+    setState(() => attachFilesError = null);
 
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['png', 'jpg', 'jpeg', 'pdf'],
-      withData: false,
-    );
-
-    if (result == null || result.files.isEmpty) return;
-
-    final file = result.files.single;
-    if (file.path == null) {
-      setErr("មិនអាចយកផ្លូវឯកសារបានទេ");
-      return;
-    }
-
-    final f = File(file.path!);
-
-    final bytes = await f.length();
-    const maxBytes = 5 * 1024 * 1024;
-    if (bytes > maxBytes) {
-      setErr("ឯកសារធំពេក (≤ 5MB)");
-      return;
-    }
-
-    final ext = (file.extension ?? "").toLowerCase();
-    if (!['png', 'jpg', 'jpeg', 'pdf'].contains(ext)) {
-      setErr("ប្រភេទឯកសារមិនត្រឹមត្រូវ");
-      return;
-    }
-
-    setPicked(f, file.name);
-  }
-
-  // ✅ Guest: add up to 5 files (PNG/JPG/PDF)
-  Future<void> pickGuestFiles() async {
-    setState(() => guestFilesError = null);
-
-    if (guestFiles.length >= maxGuestFiles) {
-      setState(() => guestFilesError = "អាចភ្ជាប់បានតែ ៥ ឯកសារ");
+    if (attachFiles.length >= maxFiles) {
+      setState(() => attachFilesError = "អាចភ្ជាប់បានតែ ៥ ឯកសារ");
       return;
     }
 
@@ -185,48 +141,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (result == null || result.files.isEmpty) return;
 
     for (final f in result.files) {
-      if (guestFiles.length >= maxGuestFiles) break;
-
+      if (attachFiles.length >= maxFiles) break;
       if (f.path == null) continue;
+
       final file = File(f.path!);
 
       const maxBytes = 5 * 1024 * 1024;
       final bytes = await file.length();
       if (bytes > maxBytes) {
-        setState(() => guestFilesError = "ឯកសារត្រូវ ≤ 5MB");
+        setState(() => attachFilesError = "ឯកសារត្រូវ ≤ 5MB");
         return;
       }
 
       final ext = (f.extension ?? "").toLowerCase();
       if (!['png', 'jpg', 'jpeg', 'pdf'].contains(ext)) {
-        setState(() => guestFilesError = "ប្រភេទឯកសារមិនត្រឹមត្រូវ");
+        setState(() => attachFilesError = "ប្រភេទឯកសារមិនត្រឹមត្រូវ");
         return;
       }
 
       // avoid duplicate path
-      if (guestFiles.any((x) => x.path == file.path)) continue;
+      if (attachFiles.any((x) => x.path == file.path)) continue;
 
-      guestFiles.add(file);
-      guestFileNames.add(f.name);
+      attachFiles.add(file);
+      attachFileNames.add(f.name);
     }
 
     setState(() {});
   }
 
-  void removeGuestFileAt(int i) {
+  void removeAttachFileAt(int i) {
     setState(() {
-      guestFiles.removeAt(i);
-      guestFileNames.removeAt(i);
+      attachFiles.removeAt(i);
+      attachFileNames.removeAt(i);
     });
   }
 
-  // ✅ Guest: camera capture (ONLY 1 photo)
+  // ✅ Camera (optional except guest)
   Future<void> pickCameraImage() async {
     setState(() => cameraError = null);
 
     final XFile? xfile = await _imagePicker.pickImage(
       source: ImageSource.camera,
-      imageQuality: 85, // reduce size
+      imageQuality: 85,
     );
 
     if (xfile == null) return;
@@ -373,35 +329,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     }
 
-    if (needAttachment && attachmentFile == null) {
-      setState(() => attachmentError = "សូមភ្ជាប់ឯកសារ");
+    // ✅ Guest must take selfie; others optional
+    if (selfieRequired && cameraFile == null) {
+      setState(() => cameraError = "សូមថតរូប Selfie (ចាំបាច់)");
       return false;
     }
 
     return true;
-  }
-
-  // ----------------------------
-  // Pick files (Officer/Optional)
-  // ----------------------------
-  Future<void> pickOfficerAttachment() async {
-    await _pickFile(
-      setErr: (e) => setState(() => attachmentError = e),
-      setPicked: (f, name) => setState(() {
-        attachmentFile = f;
-        attachmentName = name;
-      }),
-    );
-  }
-
-  Future<void> pickOptionalAttachment() async {
-    await _pickFile(
-      setErr: (e) => setState(() => optionalFileError = e),
-      setPicked: (f, name) => setState(() {
-        optionalFile = f;
-        optionalFileName = name;
-      }),
-    );
   }
 
   // ----------------------------
@@ -410,24 +344,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<Map<String, dynamic>> createParkingCardRequest() async {
     final base = Uri.parse("$baseUrl/api/v1/parking-card-requests");
 
-    final hasAnyFile = attachmentFile != null ||
-        optionalFile != null ||
-        guestFiles.isNotEmpty ||
-        cameraFile != null;
-
-    final uri = hasAnyFile
-        ? base.replace(queryParameters: {"attachmentTypes": attachmentTypeValue})
-        : base;
-
     final dto = <String, dynamic>{
       "id": 0,
-      "user": {
+      "user": <String, dynamic>{
         "name": fullNameController.text.trim(),
         "phone": phoneController.text.trim(),
         "userType": _userType,
       },
       "vehicles": vehicles.map((v) {
-        return {
+        return <String, dynamic>{
           "brand": v.brand.text.trim(),
           "plateNumber": _normalizePlate(v.plate.text),
           "color": v.color.text.trim(),
@@ -436,11 +361,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         };
       }).toList(),
       "requestDate": requestDateController.text.trim(),
-      "reason": reasonController.text.trim().isEmpty
-          ? "Parking card request"
-          : reasonController.text.trim(),
+      "reason": reasonController.text.trim().isEmpty ? "Parking card request" : reasonController.text.trim(),
     };
 
+    // workingInfo
     final wi = <String, dynamic>{};
     if (showIdNumber) wi["policeId"] = idNumberController.text.trim();
 
@@ -464,6 +388,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
       throw "No token. Please login first.";
     }
 
+    // ✅ Collect files (multi + camera only)
+    final List<Map<String, String>> fileList = [];
+
+    for (int i = 0; i < attachFiles.length; i++) {
+      fileList.add({
+        "path": attachFiles[i].path,
+        "name": attachFileNames[i],
+      });
+    }
+
+    if (cameraFile != null) {
+      fileList.add({
+        "path": cameraFile!.path,
+        "name": cameraFileName ?? cameraFile!.path.split('/').last,
+      });
+    }
+
+    // ✅ IMPORTANT: attachmentTypes count must match file count
+    Uri uri = base;
+    if (fileList.isNotEmpty) {
+      uri = base.replace(
+        queryParameters: <String, dynamic>{
+          "attachmentTypes": List<String>.filled(fileList.length, attachmentTypeValue),
+        },
+      );
+    }
+
     final request = http.MultipartRequest("POST", uri);
     request.headers["Accept"] = "*/*";
     request.headers["Authorization"] = "Bearer $token";
@@ -477,28 +428,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
 
-    Future<void> addFile(File? file, String? name) async {
-      if (file == null) return;
-      final filename = name ?? file.path.split('/').last;
+    for (final f in fileList) {
       request.files.add(
         await http.MultipartFile.fromPath(
           "files",
-          file.path,
-          filename: filename,
+          f["path"]!,
+          filename: f["name"]!,
         ),
       );
     }
-
-    await addFile(attachmentFile, attachmentName);
-    await addFile(optionalFile, optionalFileName);
-
-    // ✅ add ALL guest files (up to 5)
-    for (int i = 0; i < guestFiles.length; i++) {
-      await addFile(guestFiles[i], guestFileNames[i]);
-    }
-
-    // ✅ add camera file (ONLY 1)
-    await addFile(cameraFile, cameraFileName);
 
     final streamed = await request.send();
     final resp = await http.Response.fromStream(streamed);
@@ -522,8 +460,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       final res = await createParkingCardRequest();
 
-      final code = (res["code"]).toString();
-      final token = (res["token"]).toString();
+      final code = (res["code"] ?? "").toString();
+
+      // token might be string or map
+      String token = "";
+      final t = res["token"];
+      if (t is String) token = t;
+      if (t is Map) token = (t["accessToken"] ?? t["token"] ?? "").toString();
 
       if (!mounted) return;
 
@@ -537,8 +480,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       debugPrint("STACK: $st");
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Error: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -647,8 +589,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 20, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                                     child: Row(
                                       children: [
                                         Text(
@@ -718,14 +659,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               );
                             }),
 
-                            if (needAttachment) uploadOfficerAttachment(),
-                            if (showOptionalAttachment) uploadOptionalAttachment(),
-
-                            // ✅ Guest: TWO boxes (File picker + Camera 1 photo)
-                            if (showGuestAttachmentBox) ...[
-                              uploadGuestAttachment(),
-                              uploadCameraAttachment(),
-                            ],
+                            // ✅ ONLY 2 boxes:
+                            uploadMultiAttachment(),
+                            uploadCameraAttachment(),
 
                             bottom(),
                           ],
@@ -740,19 +676,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ----------------------------
-  // Widgets
+  // Attachment widgets
   // ----------------------------
-  Widget uploadGuestAttachment() {
+  Widget uploadMultiAttachment() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("ឯកសារភ្ជាប់ (អតិបរមា $maxGuestFiles ឯកសារ)"),
+          Text("ឯកសារភ្ជាប់ (អតិបរមា $maxFiles ឯកសារ)"),
           const SizedBox(height: 8),
-
           GestureDetector(
-            onTap: pickGuestFiles,
+            onTap: pickAttachFiles,
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.all(24),
@@ -760,7 +695,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 color: Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(
-                  color: guestFilesError != null ? Colors.red : Colors.grey.shade400,
+                  color: attachFilesError != null ? Colors.red : Colors.grey.shade400,
                   width: 1.5,
                 ),
               ),
@@ -769,7 +704,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const Icon(Icons.upload_file, size: 40, color: Colors.green),
                   const SizedBox(height: 10),
                   Text(
-                    "ចុចដើម្បីជ្រើសឯកសារ (${guestFiles.length}/$maxGuestFiles)",
+                    "ចុចដើម្បីជ្រើសឯកសារ (${attachFiles.length}/$maxFiles)",
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 6),
@@ -781,27 +716,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ),
           ),
-
           const SizedBox(height: 10),
-          ...List.generate(guestFileNames.length, (i) {
+          ...List.generate(attachFileNames.length, (i) {
             return Row(
               children: [
-                Expanded(
-                  child: Text(guestFileNames[i], overflow: TextOverflow.ellipsis),
-                ),
+                Expanded(child: Text(attachFileNames[i], overflow: TextOverflow.ellipsis)),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.red),
-                  onPressed: () => removeGuestFileAt(i),
+                  onPressed: () => removeAttachFileAt(i),
                 ),
               ],
             );
           }),
-
-          if (guestFilesError != null)
+          if (attachFilesError != null)
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text(
-                guestFilesError!,
+                attachFilesError!,
                 style: const TextStyle(color: Colors.red, fontSize: 12),
               ),
             ),
@@ -816,9 +747,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("ថតរូបភ្ជាប់ (១ រូប)"),
+          Text(selfieRequired ? "ថតរូប Selfie (ចាំបាច់)" : "ថតរូប Selfie (ជាជម្រើស)"),
           const SizedBox(height: 8),
-
           GestureDetector(
             onTap: pickCameraImage,
             child: Container(
@@ -836,27 +766,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 children: const [
                   Icon(Icons.camera_alt, size: 40, color: Colors.blue),
                   SizedBox(height: 10),
-                  Text(
-                    "ចុចដើម្បីថតរូប",
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
+                  Text("ចុចដើម្បីថតរូប", style: TextStyle(fontWeight: FontWeight.w600)),
                   SizedBox(height: 6),
-                  Text(
-                    "Camera Image (≤ 5MB)",
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
+                  Text("Camera Image (≤ 5MB)", style: TextStyle(fontSize: 12, color: Colors.grey)),
                 ],
               ),
             ),
           ),
-
           if (cameraFileName != null) ...[
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(
-                  child: Text(cameraFileName!, overflow: TextOverflow.ellipsis),
-                ),
+                Expanded(child: Text(cameraFileName!, overflow: TextOverflow.ellipsis)),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.red),
                   onPressed: clearCamera,
@@ -864,7 +785,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ],
             ),
           ],
-
           if (cameraError != null)
             Padding(
               padding: const EdgeInsets.only(top: 6),
@@ -878,67 +798,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget bottom() {
-    return SafeArea(
-      child: Container(
-        color: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: 48,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xffDFB73B)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                  ),
-                  onPressed: () {
-                    setState(() => vehicles.add(_VehicleForm()));
-                  },
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.add, color: Color(0xffDFB73B), size: 20),
-                      SizedBox(width: 6),
-                      Text(
-                        "បន្ថែមរថយន្ត",
-                        style: TextStyle(fontSize: 16, color: Color(0xffDFB73B)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xffDFB73B),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                  ),
-                  onPressed: submitRegister,
-                  child: const Text(
-                    "ដាក់ស្នើ",
-                    style: TextStyle(fontSize: 18, color: Colors.white),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ----------------------------
-  // Your existing widgets (unchanged)
+  // Your existing widgets (ported from your original code)
   // ----------------------------
   Widget _header() {
     return Container(
@@ -963,17 +824,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   Text(
                     'ក្រសួងមហាផ្ទៃ',
                     style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xffDFB73B)),
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xffDFB73B),
+                    ),
                   ),
                   SizedBox(height: 8),
                   Text(
                     'Ministry of Interior',
                     style: TextStyle(
-                        fontSize: 16,
-                        color: Color(0xffDFB73B),
-                        fontWeight: FontWeight.bold),
+                      fontSize: 16,
+                      color: Color(0xffDFB73B),
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -1015,9 +878,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
         case "GUEST":
           return "ភ្ញៀវ";
         case "INSIDE_OFFICER":
-          return "មន្រ្តីបំរើការនៅក្នុងទីស្តីការក្រសួងមហាផ្ទៃ";
+          return "មន្រ្តីបំរើការងារនៅក្នុងទីស្តីការក្រសួងមហាផ្ទៃ";
         case "OUTSIDE_OFFICER":
-          return "មន្រ្តីបំរើការនៅក្រៅទីស្តីការក្រសួងមហាឫW";
+          return "មន្រ្តីបំរើការងារនៅក្រៅទីស្តីការក្រសួងមហាផ្ទៃ";
+
+        case "STATE_SECRETARY":
+          return "រដ្ឋលេខាធិការ";
+        case "DEPUTY_STATE_SECRETARY":
+          return "អនុរដ្ឋលេខាធិការ";
+
         case "SECRETARY":
           return "រដ្ឋលេខាធិការក្រសួងមហាផ្ទៃ";
         case "DEPUTY_SECRETARY":
@@ -1028,25 +897,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
           return v;
       }
     }
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: DropdownButtonFormField<String>(
         isExpanded: true,
         value: _userType,
         decoration: inputDecoration("ជ្រើសប្រភេទអ្នកប្រើប្រាស់"),
-        items: allowedUserTypes
-            .map((v) => DropdownMenuItem<String>(value: v, child: Text(labelOf(v))))
-            .toList(),
+        items: allowedUserTypes.map((v) {
+          return DropdownMenuItem<String>(value: v, child: Text(labelOf(v)));
+        }).toList(),
         onChanged: (v) {
           if (v == null) return;
           setState(() {
             _userType = v;
 
+            // clear officer-only field
             if (!(v == "INSIDE_OFFICER" || v == "OUTSIDE_OFFICER")) {
               idNumberController.clear();
             }
 
+            // work fields
             final shouldShowWork = (v == "INSIDE_OFFICER" ||
                 v == "OUTSIDE_OFFICER" ||
                 (v == "GUEST" && showWorkFieldsForGuest));
@@ -1061,30 +931,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
               provinceCityController.clear();
             }
 
-            if (!(v == "INSIDE_OFFICER" || v == "OUTSIDE_OFFICER")) {
-              attachmentFile = null;
-              attachmentName = null;
-              attachmentError = null;
-            }
+            // ✅ attachments are same for all, but you can reset on type change:
+            attachFiles.clear();
+            attachFileNames.clear();
+            attachFilesError = null;
 
-            if (!(v == "SECRETARY" ||
-                v == "DEPUTY_SECRETARY" ||
-                v == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER")) {
-              optionalFile = null;
-              optionalFileName = null;
-              optionalFileError = null;
-            }
-
-            // reset guest + camera when not guest
-            if (v != "GUEST") {
-              guestFiles.clear();
-              guestFileNames.clear();
-              guestFilesError = null;
-
-              cameraFile = null;
-              cameraFileName = null;
-              cameraError = null;
-            }
+            cameraFile = null;
+            cameraFileName = null;
+            cameraError = null;
           });
         },
       ),
@@ -1121,8 +975,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: TextFormField(
               controller: requestDateController,
               readOnly: true,
-              decoration: inputDecoration("ថ្ងៃស្នើរ")
-                  .copyWith(suffixIcon: const Icon(Icons.calendar_month)),
+              decoration: inputDecoration("ថ្ងៃស្នើរ").copyWith(
+                suffixIcon: const Icon(Icons.calendar_month),
+              ),
               onTap: pickDate,
             ),
           ),
@@ -1243,96 +1098,61 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget uploadOfficerAttachment() {
-    return _uploadBox(
-      title: "ឯកសារភ្ជាប់ (ចាំបាច់)",
-      onTap: pickOfficerAttachment,
-      fileName: attachmentName,
-      error: attachmentError,
-      onClear: () => setState(() {
-        attachmentFile = null;
-        attachmentName = null;
-        attachmentError = null;
-      }),
-    );
-  }
-
-  Widget uploadOptionalAttachment() {
-    return _uploadBox(
-      title: "ឯកសារភ្ជាប់ (ជាជម្រើស)",
-      onTap: pickOptionalAttachment,
-      fileName: optionalFileName,
-      error: optionalFileError,
-      onClear: () => setState(() {
-        optionalFile = null;
-        optionalFileName = null;
-        optionalFileError = null;
-      }),
-    );
-  }
-
-  Widget _uploadBox({
-    required String title,
-    required VoidCallback onTap,
-    required String? fileName,
-    required String? error,
-    required VoidCallback onClear,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title),
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: onTap,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(
-                  color: error != null ? Colors.red : Colors.grey.shade400,
-                  width: 1.5,
+  Widget bottom() {
+    return SafeArea(
+      child: Container(
+        color: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 48,
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xffDFB73B)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                  ),
+                  onPressed: () {
+                    setState(() => vehicles.add(_VehicleForm()));
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.add, color: Color(0xffDFB73B), size: 20),
+                      SizedBox(width: 6),
+                      Text(
+                        "បន្ថែមរថយន្ត",
+                        style: TextStyle(fontSize: 16, color: Color(0xffDFB73B)),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              child: Column(
-                children: const [
-                  Icon(Icons.upload_file, size: 40, color: Colors.green),
-                  SizedBox(height: 10),
-                  Text(
-                    "អូសឯកសារដាក់ទីនេះ ឬ ចុចដើម្បីជ្រើស",
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(height: 6),
-                  Text(
-                    "PNG, JPG, PDF (≤ 5MB)",
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
-              ),
             ),
-          ),
-          if (fileName != null) ...[
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(child: Text(fileName, overflow: TextOverflow.ellipsis)),
-                IconButton(icon: const Icon(Icons.close), onPressed: onClear),
-              ],
+            const SizedBox(width: 10),
+            Expanded(
+              child: SizedBox(
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xffDFB73B),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                  ),
+                  onPressed: submitRegister,
+                  child: const Text(
+                    "ដាក់ស្នើ",
+                    style: TextStyle(fontSize: 18, color: Colors.white),
+                  ),
+                ),
+              ),
             ),
           ],
-          if (error != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                error,
-                style: const TextStyle(color: Colors.red, fontSize: 12),
-              ),
-            ),
-        ],
+        ),
       ),
     );
   }
