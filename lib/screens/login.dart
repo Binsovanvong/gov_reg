@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:gov_reg/routes/approute.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -26,16 +29,49 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
+    const String baseUrl = "http://10.0.2.2:8080";
 
-    final identifier = _identifierCtrl.text.trim();
-    var password = _passwordCtrl.text; 
-    password = password.trim();
+    final email = _identifierCtrl.text.trim();
+    final password = _passwordCtrl.text.trim();
+
     try {
-      await Future.delayed(const Duration(milliseconds: 900));
+      final uri = Uri.parse("$baseUrl/api/auth/authenticate");
+
+      final res = await http.post(
+        uri,
+        headers: const {
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode({
+          "email": email,
+          "password": password,
+        }),
+      );
+
+      if (res.statusCode != 200 && res.statusCode != 201) {
+        // If backend returns JSON error message, show it
+        throw "HTTP ${res.statusCode}: ${res.body}";
+      }
+
+      final data = jsonDecode(res.body);
+      final accessToken = data["accessToken"] as String?;
+      final refreshToken = data["refreshToken"] as String?;
+
+      if (accessToken == null || accessToken.isEmpty) {
+        throw "Missing accessToken in response";
+      }
+
+      // Save tokens
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString("accessToken", accessToken);
+      if (refreshToken != null) {
+        await prefs.setString("refreshToken", refreshToken);
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Login success (demo) for $identifier")),
+        const SnackBar(content: Text("Login success")),
       );
 
       Navigator.pushNamed(context, Approute.register);
@@ -172,7 +208,6 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ),
                             const SizedBox(height: 14),
-
                             TextFormField(
                               controller: _identifierCtrl,
                               keyboardType: TextInputType.emailAddress,
@@ -187,9 +222,7 @@ class _LoginPageState extends State<LoginPage> {
                                 return null;
                               },
                             ),
-
                             const SizedBox(height: 12),
-
                             TextFormField(
                               controller: _passwordCtrl,
                               obscureText: _obscure,
@@ -197,21 +230,24 @@ class _LoginPageState extends State<LoginPage> {
                                 label: "ពាក្យសម្ងាត់",
                                 hint: "••••••••",
                                 suffixIcon: IconButton(
-                                  onPressed: () => setState(() => _obscure = !_obscure),
+                                  onPressed: () =>
+                                      setState(() => _obscure = !_obscure),
                                   icon: Icon(
-                                    _obscure ? Icons.visibility : Icons.visibility_off,
+                                    _obscure
+                                        ? Icons.visibility
+                                        : Icons.visibility_off,
                                   ),
                                 ),
                               ),
                               validator: (v) {
-                                if ((v ?? "").isEmpty) return "Password is required";
-                                if ((v ?? "").length < 6) return "Min 6 characters";
+                                if ((v ?? "").isEmpty)
+                                  return "Password is required";
+                                if ((v ?? "").length < 6)
+                                  return "Min 6 characters";
                                 return null;
                               },
                             ),
-
                             const SizedBox(height: 16),
-
                             SizedBox(
                               height: 50,
                               child: ElevatedButton(
@@ -228,22 +264,25 @@ class _LoginPageState extends State<LoginPage> {
                                     ? const SizedBox(
                                         width: 20,
                                         height: 20,
-                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2),
                                       )
                                     : const Text(
                                         "ចូលគណនី",
-                                        style: TextStyle(fontWeight: FontWeight.w700),
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.w700),
                                       ),
                               ),
                             ),
-
                             const SizedBox(height: 10),
-
                             Align(
                               alignment: Alignment.centerRight,
                               child: TextButton(
                                 onPressed: _loading ? null : _forgotPassword,
-                                child: const Text("ភ្លេចពាក្យសម្ងាត់?",style: TextStyle(color: Colors.black),),
+                                child: const Text(
+                                  "ភ្លេចពាក្យសម្ងាត់?",
+                                  style: TextStyle(color: Colors.black),
+                                ),
                               ),
                             ),
                           ],
