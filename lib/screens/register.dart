@@ -16,13 +16,106 @@ class _VehicleForm {
   final plate = TextEditingController();
   final color = TextEditingController();
   final year = TextEditingController();
+
+  /// ✅ already exists in your app
   String vehicleType = "CAR";
+
+  /// ✅ CAR plate types
+  String carPlateType = "NORMAL_CAR";
+
+  /// ✅ MOTO plate types
+  String motoPlateType = "NORMAL_MOTO";
 
   void dispose() {
     brand.dispose();
     plate.dispose();
     color.dispose();
     year.dispose();
+  }
+}
+
+/// =======================
+/// ✅ Dropdown Models
+/// =======================
+class GeneralDepartmentItem {
+  final int id;
+  final String name;
+
+  GeneralDepartmentItem({required this.id, required this.name});
+
+  factory GeneralDepartmentItem.fromJson(Map<String, dynamic> json) {
+    return GeneralDepartmentItem(
+      id: (json['id'] ?? 0) is int
+          ? (json['id'] ?? 0) as int
+          : int.tryParse("${json['id']}") ?? 0,
+      name: (json['name'] ?? '') as String,
+    );
+  }
+}
+
+class DepartmentItem {
+  final int id;
+  final String name;
+  final int generalDepartmentId;
+
+  DepartmentItem({
+    required this.id,
+    required this.name,
+    required this.generalDepartmentId,
+  });
+
+  factory DepartmentItem.fromJson(Map<String, dynamic> json) {
+    final gd = json['generalDepartment'] as Map<String, dynamic>?;
+    final gdId = (json['generalDepartmentId'] ?? gd?['id'] ?? 0);
+
+    return DepartmentItem(
+      id: (json['id'] ?? 0) is int
+          ? (json['id'] ?? 0) as int
+          : int.tryParse("${json['id']}") ?? 0,
+      name: (json['name'] ?? '') as String,
+      generalDepartmentId: gdId is int ? gdId : int.tryParse("$gdId") ?? 0,
+    );
+  }
+}
+
+class BurauItem {
+  final int id;
+  final String name;
+  final int departmentId;
+
+  BurauItem({
+    required this.id,
+    required this.name,
+    required this.departmentId,
+  });
+
+  factory BurauItem.fromJson(Map<String, dynamic> json) {
+    final dept = json['department'] as Map<String, dynamic>?;
+    final deptId = (json['departmentId'] ?? dept?['id'] ?? 0);
+
+    return BurauItem(
+      id: (json['id'] ?? 0) is int
+          ? (json['id'] ?? 0) as int
+          : int.tryParse("${json['id']}") ?? 0,
+      name: (json['name'] ?? '') as String,
+      departmentId: deptId is int ? deptId : int.tryParse("$deptId") ?? 0,
+    );
+  }
+}
+
+class PositionItem {
+  final int id;
+  final String name;
+
+  PositionItem({required this.id, required this.name});
+
+  factory PositionItem.fromJson(Map<String, dynamic> json) {
+    return PositionItem(
+      id: (json['id'] ?? 0) is int
+          ? (json['id'] ?? 0) as int
+          : int.tryParse("${json['id']}") ?? 0,
+      name: (json['name'] ?? '') as String,
+    );
   }
 }
 
@@ -37,18 +130,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   static const String baseUrl = "http://10.0.2.2:8080";
 
   static const List<String> allowedUserTypes = [
-  "GUEST",
-  "INSIDE_OFFICER",
-  "OUTSIDE_OFFICER",
-
-  // ✅ NEW (if backend supports these codes)
-  "STATE_SECRETARY",
-  "DEPUTY_STATE_SECRETARY",
-
-  "SECRETARY",
-  "DEPUTY_SECRETARY",
-  "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER",
-];
+    "GUEST",
+    "INSIDE_OFFICER",
+    "OUTSIDE_OFFICER",
+    "SECRETARY",
+    "DEPUTY_SECRETARY",
+    "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER",
+  ];
 
   /// ✅ Backend requires attachmentTypes for EACH file uploaded
   static const String attachmentTypeValue = "VEHICLE_DOCUMENT";
@@ -77,30 +165,100 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final officeController = TextEditingController();
   final positionController = TextEditingController();
   final phoneController = TextEditingController();
+
+  /// calendar date (yyyy-MM-dd) - only for NON duration types
   final requestDateController = TextEditingController();
+
   final provinceCityController = TextEditingController();
   final reasonController = TextEditingController();
+
+  /// ✅ duration days input (used for NATIONAL + GUEST)
+  final durationDaysController = TextEditingController();
 
   // Vehicles list
   final List<_VehicleForm> vehicles = [_VehicleForm()];
 
   // ----------------------------
-  // Rules
+  // ✅ Work dropdown state
+  // ----------------------------
+  bool dropdownLoading = false;
+
+  List<GeneralDepartmentItem> gdList = [];
+  List<DepartmentItem> deptList = [];
+  List<BurauItem> burauAll = [];
+  List<BurauItem> burauFiltered = [];
+  List<PositionItem> posList = [];
+
+  GeneralDepartmentItem? selectedGD;
+  DepartmentItem? selectedDept;
+  BurauItem? selectedBurau;
+  PositionItem? selectedPos;
+
+  // ----------------------------
+  // Plate Types
+  // ----------------------------
+
+  /// ✅ CAR plate types
+  final List<Map<String, String>> carPlateTypes = [
+    {
+      "key": "NORMAL_CAR",
+      "label": "រថយន្តធម្មតា (2AB-1234)",
+      "pattern": r"^2[A-Z]{2}-\d{4}$"
+    },
+    {"key": "CAR_STATE", "label": "រដ្ឋ (2-0369)", "pattern": r"^2-\d{4}$"},
+    {"key": "CAR_POLICE", "label": "ប៉ូលីស (L-1077)", "pattern": r"^L-\d{4}$"},
+    {
+      "key": "CAR_DIPLOMAT",
+      "label": "ការទូត (CD.76.002)",
+      "pattern": r"^CD\.\d{2}\.\d{3}$"
+    },
+    {"key": "CAR_TRUCK", "label": "ឡានធំ (3A-1070)", "pattern": r"^3[A-Z]-\d{4}$"},
+  ];
+
+  /// ✅ MOTO plate types
+  final List<Map<String, String>> motoPlateTypes = [
+    {
+      "key": "NORMAL_MOTO",
+      "label": "ម៉ូតូធម្មតា (1AB-1234)",
+      "pattern": r"^1[A-Z]{2}-\d{4}$"
+    },
+    {"key": "MOTO_STATE", "label": "ម៉ូតូរដ្ឋ (1-0369)", "pattern": r"^1-\d{4}$"},
+    {"key": "MOTO_POLICE", "label": "ម៉ូតូប៉ូលីស (M-1234)", "pattern": r"^M-\d{4}$"},
+  ];
+
+  // ----------------------------
+  // ✅ Rules (UPDATED for SECRETARY/DEPUTY)
   // ----------------------------
   bool get isGuest => _userType == "GUEST";
   bool get isInsideOfficer => _userType == "INSIDE_OFFICER";
   bool get isOutsideOfficer => _userType == "OUTSIDE_OFFICER";
   bool get isOfficer => isInsideOfficer || isOutsideOfficer;
 
-  // Guest shows work fields too
+  bool get isSecretaryOrDeputy =>
+      _userType == "SECRETARY" || _userType == "DEPUTY_SECRETARY";
+
+  bool get isNational => _userType == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER";
+
   static const bool showWorkFieldsForGuest = true;
 
+  /// ✅ Only officers show ID number
   bool get showIdNumber => isOfficer;
-  bool get showWorkFields => isOfficer || (isGuest && showWorkFieldsForGuest);
-  bool get showProvinceCity => _userType == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER";
 
-  // ✅ Guest required selfie, other user types optional
+  /// ✅ Work fields ONLY for Officer + National + Guest(optional)
+  /// ❌ SECRETARY/DEPUTY: hidden
+  bool get showWorkFields => isOfficer || isNational || (isGuest && showWorkFieldsForGuest);
+
+  /// ✅ Province only for NATIONAL
+  bool get showProvinceCity => isNational;
+
+  /// ✅ GUEST + NATIONAL use duration days input
+  bool get useDurationDays => isNational || isGuest;
+
+  /// ✅ Guest required selfie, other user types optional
   bool get selfieRequired => isGuest;
+
+  /// ✅ Dropdown ONLY for officers
+  bool get useWorkDropdown => isOfficer;
 
   // ----------------------------
   // AUTH
@@ -110,17 +268,260 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return prefs.getString("accessToken");
   }
 
+  Future<String?> _getRefreshToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString("refreshToken");
+  }
+
+  static const String refreshPath = "/api/v1/auth/refresh";
+
+  Future<String?> _refreshAccessToken() async {
+    final refreshToken = await _getRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) return null;
+
+    final uri = Uri.parse("$baseUrl$refreshPath");
+
+    final res = await http.post(
+      uri,
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": "Bearer $refreshToken",
+      },
+      body: jsonEncode({
+        "refreshToken": refreshToken,
+        "token": refreshToken,
+      }),
+    );
+
+    if (res.statusCode != 200) {
+      debugPrint("Refresh failed: ${res.statusCode} ${res.body}");
+      return null;
+    }
+
+    final data = jsonDecode(res.body);
+    String newAccessToken = "";
+
+    if (data is Map) {
+      newAccessToken = (data["accessToken"] ?? data["token"] ?? "").toString();
+      if (newAccessToken.isEmpty && data["token"] is Map) {
+        newAccessToken =
+            (data["token"]["accessToken"] ?? data["token"]["token"] ?? "").toString();
+      }
+    }
+
+    if (newAccessToken.isEmpty) return null;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString("accessToken", newAccessToken);
+    return newAccessToken;
+  }
+
+  Future<void> forceLogout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove("accessToken");
+    await prefs.remove("refreshToken");
+    await prefs.clear();
+    if (!mounted) return;
+    _snack("Session expired. Please login again.");
+    // Navigator.pushReplacementNamed(context, Approute.loginScreen);
+  }
+
+  Future<http.Response> _getWithAuthRetry(Uri uri) async {
+    final prefs = await SharedPreferences.getInstance();
+    String token = prefs.getString("accessToken") ?? "";
+
+    Future<http.Response> doGet(String t) {
+      return http.get(
+        uri,
+        headers: {
+          "Accept": "application/json",
+          if (t.isNotEmpty) "Authorization": "Bearer $t",
+        },
+      );
+    }
+
+    var res = await doGet(token);
+
+    if (res.statusCode == 401 &&
+        (res.body.contains("JWT token has expired") || res.body.contains("JWT expired"))) {
+      final newToken = await _refreshAccessToken();
+      if (newToken == null || newToken.isEmpty) {
+        await forceLogout();
+        return res;
+      }
+      res = await doGet(newToken);
+    }
+
+    if (res.statusCode == 401) {
+      await forceLogout();
+    }
+
+    return res;
+  }
+
+  // ----------------------------
+  // Work dropdown APIs
+  // ----------------------------
+  Future<List<GeneralDepartmentItem>> fetchGeneralDepartments() async {
+    final uri = Uri.parse("$baseUrl/api/v1/general-departments");
+    final res = await _getWithAuthRetry(uri);
+    if (res.statusCode != 200) {
+      throw "GeneralDepartments HTTP ${res.statusCode}: ${res.body}";
+    }
+    final decoded = jsonDecode(res.body);
+    if (decoded is! List) return [];
+    return decoded
+        .map((e) => GeneralDepartmentItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<DepartmentItem>> fetchDepartmentsByGeneralDepartment(int gdId) async {
+    final uri = Uri.parse("$baseUrl/api/v1/departments/general-department/$gdId");
+    final res = await _getWithAuthRetry(uri);
+    if (res.statusCode != 200) {
+      throw "Departments HTTP ${res.statusCode}: ${res.body}";
+    }
+    final decoded = jsonDecode(res.body);
+    if (decoded is! List) return [];
+    return decoded.map((e) => DepartmentItem.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<BurauItem>> fetchBuraus() async {
+    final uri = Uri.parse("$baseUrl/api/v1/buraus");
+    final res = await _getWithAuthRetry(uri);
+    if (res.statusCode != 200) {
+      throw "Buraus HTTP ${res.statusCode}: ${res.body}";
+    }
+    final decoded = jsonDecode(res.body);
+    if (decoded is! List) return [];
+    return decoded.map((e) => BurauItem.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<PositionItem>> fetchPositions() async {
+    final uri = Uri.parse("$baseUrl/api/v1/positions");
+    final res = await _getWithAuthRetry(uri);
+    if (res.statusCode != 200) {
+      throw "Positions HTTP ${res.statusCode}: ${res.body}";
+    }
+    final decoded = jsonDecode(res.body);
+    if (decoded is! List) return [];
+    return decoded.map((e) => PositionItem.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<void> _loadWorkDropdownsIfNeeded() async {
+    if (!useWorkDropdown) return;
+
+    setState(() => dropdownLoading = true);
+    try {
+      final gds = await fetchGeneralDepartments();
+      final buraus = await fetchBuraus();
+      final positions = await fetchPositions();
+
+      if (!mounted) return;
+      setState(() {
+        gdList = gds;
+        burauAll = buraus;
+        posList = positions;
+      });
+    } catch (e) {
+      debugPrint("Dropdown load error: $e");
+      if (mounted) _snack("Dropdown load error: $e");
+    } finally {
+      if (mounted) setState(() => dropdownLoading = false);
+    }
+  }
+
+  void _resetWorkDropdownStateAndControllers() {
+    selectedGD = null;
+    selectedDept = null;
+    selectedBurau = null;
+    selectedPos = null;
+
+    deptList = [];
+    burauFiltered = [];
+
+    ministryController.clear();
+    departmentController.clear();
+    officeController.clear();
+    positionController.clear();
+  }
+
+  Future<void> onSelectGD(GeneralDepartmentItem? gd) async {
+    setState(() {
+      selectedGD = gd;
+
+      selectedDept = null;
+      selectedBurau = null;
+      deptList = [];
+      burauFiltered = [];
+
+      ministryController.text = gd?.name ?? "";
+      departmentController.clear();
+      officeController.clear();
+    });
+
+    if (gd == null) return;
+
+    try {
+      setState(() => dropdownLoading = true);
+      final deps = await fetchDepartmentsByGeneralDepartment(gd.id);
+      if (!mounted) return;
+      setState(() => deptList = deps);
+    } catch (e) {
+      debugPrint("Departments load error: $e");
+      if (mounted) _snack("Load departments error: $e");
+    } finally {
+      if (mounted) setState(() => dropdownLoading = false);
+    }
+  }
+
+  void onSelectDept(DepartmentItem? d) {
+    setState(() {
+      selectedDept = d;
+      selectedBurau = null;
+
+      departmentController.text = d?.name ?? "";
+      officeController.clear();
+
+      burauFiltered = burauAll.where((b) => b.departmentId == (d?.id ?? -1)).toList();
+    });
+  }
+
+  void onSelectBurau(BurauItem? b) {
+    setState(() {
+      selectedBurau = b;
+      officeController.text = b?.name ?? "";
+    });
+  }
+
+  void onSelectPosition(PositionItem? p) {
+    setState(() {
+      selectedPos = p;
+      positionController.text = p?.name ?? "";
+    });
+  }
+
   // ----------------------------
   // Helpers
   // ----------------------------
   String _normalizePlate(String s) => s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
 
-  final RegExp _carPlateRegex = RegExp(r'^2[A-Z]{2}-\d{4}$');
-  final RegExp _motoPlateRegex = RegExp(r'^1[A-Z]{2}-\d{4}$');
-
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
+
+  /// ✅ yyyy-MM-dd (UI)
+  String _fmtYmd(DateTime d) =>
+      "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
+
+  /// yyyymmdd int
+  int _fmtYmdInt(DateTime d) =>
+      int.parse("${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}");
+
+  /// ✅ dd-MM-yyyy (Backend expects this for LocalDate)
+  String _fmtDmy(DateTime d) =>
+      "${d.day.toString().padLeft(2, '0')}-${d.month.toString().padLeft(2, '0')}-${d.year}";
 
   // ✅ Multi-file picker (max 5)
   Future<void> pickAttachFiles() async {
@@ -159,7 +560,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
 
-      // avoid duplicate path
       if (attachFiles.any((x) => x.path == file.path)) continue;
 
       attachFiles.add(file);
@@ -222,11 +622,39 @@ class _RegisterScreenState extends State<RegisterScreen> {
     requestDateController.dispose();
     provinceCityController.dispose();
     reasonController.dispose();
+    durationDaysController.dispose();
 
     for (final v in vehicles) {
       v.dispose();
     }
     super.dispose();
+  }
+
+  // ----------------------------
+  // Plate validation helper
+  // ----------------------------
+  bool _isPlateValid(_VehicleForm v) {
+    final plateValue = _normalizePlate(v.plate.text);
+
+    if (v.vehicleType == "MOTORBIKE") {
+      final selected = motoPlateTypes.firstWhere((t) => t["key"] == v.motoPlateType);
+      final reg = RegExp(selected["pattern"]!);
+      return reg.hasMatch(plateValue);
+    } else {
+      final selected = carPlateTypes.firstWhere((t) => t["key"] == v.carPlateType);
+      final reg = RegExp(selected["pattern"]!);
+      return reg.hasMatch(plateValue);
+    }
+  }
+
+  String _plateHint(_VehicleForm v) {
+    if (v.vehicleType == "MOTORBIKE") {
+      final selected = motoPlateTypes.firstWhere((t) => t["key"] == v.motoPlateType);
+      return selected["label"]!;
+    } else {
+      final selected = carPlateTypes.firstWhere((t) => t["key"] == v.carPlateType);
+      return selected["label"]!;
+    }
   }
 
   // ----------------------------
@@ -262,27 +690,64 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return false;
     }
 
-    if (requestDateController.text.trim().isEmpty) {
-      _snack("សូមជ្រើសកាលបរិច្ឆេទស្នើរ");
-      return false;
+    // ✅ GUEST + NATIONAL use duration
+    if (useDurationDays) {
+      final durText = durationDaysController.text.trim();
+      if (durText.isEmpty) {
+        _snack("សូមបញ្ចូលរយៈពេល (ចំនួនថ្ងៃ)");
+        return false;
+      }
+      final dur = int.tryParse(durText);
+      if (dur == null || dur <= 0) {
+        _snack("រយៈពេលត្រូវជាលេខ > 0");
+        return false;
+      }
+      if (dur > 365) {
+        _snack("រយៈពេលមិនអាចលើស 365 ថ្ងៃ");
+        return false;
+      }
+    } else {
+      if (requestDateController.text.trim().isEmpty) {
+        _snack("សូមជ្រើសកាលបរិច្ឆេទស្នើរ");
+        return false;
+      }
     }
 
     if (showWorkFields) {
-      if (ministryController.text.trim().isEmpty) {
-        _snack("សូមបញ្ចូលក្រសួង/ស្ថាប័ន");
-        return false;
-      }
-      if (departmentController.text.trim().isEmpty) {
-        _snack("សូមបញ្ចូលនាយកដ្ឋាន/អង្គភាព");
-        return false;
-      }
-      if (officeController.text.trim().isEmpty) {
-        _snack("សូមបញ្ចូលការិយាល័យ");
-        return false;
-      }
-      if (positionController.text.trim().isEmpty) {
-        _snack("សូមបញ្ចូលតួនាទី");
-        return false;
+      if (useWorkDropdown) {
+        if (selectedGD == null) {
+          _snack("សូមជ្រើសក្រសួង/ស្ថាប័ន");
+          return false;
+        }
+        if (selectedDept == null) {
+          _snack("សូមជ្រើសនាយកដ្ឋាន/អង្គភាព");
+          return false;
+        }
+        if (selectedBurau == null) {
+          _snack("សូមជ្រើសការិយាល័យ");
+          return false;
+        }
+        if (selectedPos == null) {
+          _snack("សូមជ្រើសតួនាទី");
+          return false;
+        }
+      } else {
+        if (ministryController.text.trim().isEmpty) {
+          _snack("សូមបញ្ចូលក្រសួង/ស្ថាប័ន");
+          return false;
+        }
+        if (departmentController.text.trim().isEmpty) {
+          _snack("សូមបញ្ចូលនាយកដ្ឋាន/អង្គភាព");
+          return false;
+        }
+        if (officeController.text.trim().isEmpty) {
+          _snack("សូមបញ្ចូលការិយាល័យ");
+          return false;
+        }
+        if (positionController.text.trim().isEmpty) {
+          _snack("សូមបញ្ចូលតួនាទី");
+          return false;
+        }
       }
     }
 
@@ -299,22 +764,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return false;
       }
 
-      final plate = _normalizePlate(v.plate.text);
-      if (plate.isEmpty) {
+      if (_normalizePlate(v.plate.text).isEmpty) {
         _snack("សូមបញ្ចូលស្លាកលេខ (#${i + 1})");
         return false;
       }
 
-      if (v.vehicleType == "CAR") {
-        if (!_carPlateRegex.hasMatch(plate)) {
-          _snack("ស្លាកលេខរថយន្ត (#${i + 1}) ត្រូវជា 2AB-1223");
-          return false;
-        }
-      } else {
-        if (!_motoPlateRegex.hasMatch(plate)) {
-          _snack("ស្លាកលេខម៉ូតូ (#${i + 1}) ត្រូវជា 1AB-1223");
-          return false;
-        }
+      if (!_isPlateValid(v)) {
+        _snack("ស្លាកលេខ (#${i + 1}) មិនត្រឹមត្រូវ: ${_plateHint(v)}");
+        return false;
       }
 
       if (v.color.text.trim().isEmpty) {
@@ -329,7 +786,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     }
 
-    // ✅ Guest must take selfie; others optional
     if (selfieRequired && cameraFile == null) {
       setState(() => cameraError = "សូមថតរូប Selfie (ចាំបាច់)");
       return false;
@@ -344,8 +800,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<Map<String, dynamic>> createParkingCardRequest() async {
     final base = Uri.parse("$baseUrl/api/v1/parking-card-requests");
 
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    DateTime requestAt;
+    DateTime requestEnd;
+
+    // ✅ duration for GUEST + NATIONAL
+    if (useDurationDays) {
+      final dur = int.parse(durationDaysController.text.trim());
+      requestAt = today;
+      requestEnd = today.add(Duration(days: dur));
+    } else {
+      final chosen = DateTime.parse(requestDateController.text.trim()); // yyyy-MM-dd
+      requestAt = chosen;
+      requestEnd = chosen;
+    }
+
+    final int requestDateInt = _fmtYmdInt(requestEnd);
+
+    // ✅ FIX: backend expects dd-MM-yyyy for LocalDate
+    final String requestAtDateStr = _fmtDmy(requestAt);
+
     final dto = <String, dynamic>{
-      "id": 0,
+      "reason": reasonController.text.trim().isEmpty ? "Parking card request" : reasonController.text.trim(),
+      "requestDate": requestDateInt,
       "user": <String, dynamic>{
         "name": fullNameController.text.trim(),
         "phone": phoneController.text.trim(),
@@ -360,9 +839,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
           "vehicleType": v.vehicleType,
         };
       }).toList(),
-      "requestDate": requestDateController.text.trim(),
-      "reason": reasonController.text.trim().isEmpty ? "Parking card request" : reasonController.text.trim(),
     };
+
+    /// ✅ GUEST -> DO NOT send requestAtDate (only requestDate)
+    if (_userType != "GUEST") {
+      dto["requestAtDate"] = requestAtDateStr;
+    }
 
     // workingInfo
     final wi = <String, dynamic>{};
@@ -383,19 +865,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       (dto["user"] as Map<String, dynamic>)["workingInfo"] = wi;
     }
 
-    final token = await _getToken();
-    if (token == null || token.isEmpty) {
-      throw "No token. Please login first.";
-    }
+    // ✅ Token OPTIONAL (guest can submit without login)
+    final token = await _getToken(); // may be null/empty
 
     // ✅ Collect files (multi + camera only)
     final List<Map<String, String>> fileList = [];
 
     for (int i = 0; i < attachFiles.length; i++) {
-      fileList.add({
-        "path": attachFiles[i].path,
-        "name": attachFileNames[i],
-      });
+      fileList.add({"path": attachFiles[i].path, "name": attachFileNames[i]});
     }
 
     if (cameraFile != null) {
@@ -405,7 +882,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
     }
 
-    // ✅ IMPORTANT: attachmentTypes count must match file count
+    // ✅ attachmentTypes count must match file count
     Uri uri = base;
     if (fileList.isNotEmpty) {
       uri = base.replace(
@@ -417,7 +894,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final request = http.MultipartRequest("POST", uri);
     request.headers["Accept"] = "*/*";
-    request.headers["Authorization"] = "Bearer $token";
+
+    // ✅ Only send Authorization if token exists
+    if (token != null && token.isNotEmpty) {
+      request.headers["Authorization"] = "Bearer $token";
+    }
 
     request.files.add(
       http.MultipartFile.fromString(
@@ -462,7 +943,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       final code = (res["code"] ?? "").toString();
 
-      // token might be string or map
       String token = "";
       final t = res["token"];
       if (t is String) token = t;
@@ -470,24 +950,65 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (!mounted) return;
 
+      // ✅ read selfie bytes (BEST)
+      Uint8List? selfieBytes;
+      if (cameraFile != null) {
+        selfieBytes = await cameraFile!.readAsBytes();
+      }
+
       Navigator.pushNamed(
         context,
         Approute.verifySuccessScreen,
-        arguments: {"code": code, "token": token},
+        arguments: {
+          "code": code,
+          "token": token,
+
+          // ✅ personal
+          "fullName": fullNameController.text.trim(),
+          "phone": phoneController.text.trim(),
+          "userType": _userType,
+
+          // ✅ selfie (TOP LEVEL ✅)
+          "selfieBytes": selfieBytes,
+          "selfiePath": cameraFile?.path, // optional backup
+
+          // ✅ working info (texts)
+          "workingInfo": {
+            "generalDepartmentText": ministryController.text.trim(),
+            "departmentText": departmentController.text.trim(),
+            "burauText": officeController.text.trim(),
+            "positionText": positionController.text.trim(),
+            "policeId": idNumberController.text.trim(),
+            "provinceCity": provinceCityController.text.trim(),
+          },
+
+          // ✅ vehicles list (NO selfie here)
+          "vehicles": vehicles.map((v) => {
+                "brand": v.brand.text.trim(),
+                "plateNumber": v.plate.text.trim(),
+                "color": v.color.text.trim(),
+                "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
+                "vehicleType": v.vehicleType,
+              }).toList(),
+        },
       );
     } catch (e, st) {
       debugPrint("SUBMIT ERROR: $e");
       debugPrint("STACK: $st");
-
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+
+      final msg = e.toString().contains("401") || e.toString().contains("403")
+          ? "Backend still requires login (401/403). You must allow guest POST /parking-card-requests in backend."
+          : "Error: $e";
+
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
   }
 
   // ----------------------------
-  // Date picker
+  // Date picker (NON duration)
   // ----------------------------
   void pickDate() async {
     final d = await showDatePicker(
@@ -498,8 +1019,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
 
     if (d != null) {
-      requestDateController.text =
-          "${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}";
+      requestDateController.text = _fmtYmd(d); // yyyy-MM-dd
     }
   }
 
@@ -555,32 +1075,89 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
 
                             if (showWorkFields) ...[
-                              twoInputRow(
-                                "ក្រសួង/ស្ថាប័ន",
-                                "នាយកដ្ឋាន/អង្គភាព",
-                                "បញ្ចូលក្រសួង",
-                                "បញ្ចូលនាយកដ្ឋាន",
-                                ministryController,
-                                departmentController,
-                                leftIsPlate: false,
-                                rightIsPlate: false,
-                              ),
-                              twoInputRow(
-                                "ការិយាល័យ",
-                                "តួនាទី",
-                                "បញ្ចូលការិយាល័យ",
-                                "បញ្ចូលតួនាទី",
-                                officeController,
-                                positionController,
-                                leftIsPlate: false,
-                                rightIsPlate: false,
-                              ),
+                              sectionTitle("ព័ត៌មានការងារ"),
+
+                              /// ✅ Officers -> dropdown
+                              if (useWorkDropdown) ...[
+                                if (dropdownLoading)
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                    child: LinearProgressIndicator(),
+                                  ),
+                                _ddGeneralDepartment(),
+                                _ddDepartment(),
+                                _ddBurau(),
+                                _ddPosition(),
+                              ] else ...[
+                                /// ✅ Guest + National -> text fields
+                                twoInputRow(
+                                  "ក្រសួង/ស្ថាប័ន",
+                                  "នាយកដ្ឋាន/អង្គភាព",
+                                  "បញ្ចូលក្រសួង",
+                                  "បញ្ចូលនាយកដ្ឋាន",
+                                  ministryController,
+                                  departmentController,
+                                  leftIsPlate: false,
+                                  rightIsPlate: false,
+                                ),
+                                twoInputRow(
+                                  "ការិយាល័យ",
+                                  "តួនាទី",
+                                  "បញ្ចូលការិយាល័យ",
+                                  "បញ្ចូលតួនាទី",
+                                  officeController,
+                                  positionController,
+                                  leftIsPlate: false,
+                                  rightIsPlate: false,
+                                ),
+                              ],
                             ],
 
+                            if (showProvinceCity)
+                              oneInput(
+                                label: "ខេត្ត/រាជធានី",
+                                hint: "បញ្ចូលខេត្ត/រាជធានី",
+                                controller: provinceCityController,
+                              ),
+
                             const SizedBox(height: 10),
-                            Rowlabel(),
-                            const SizedBox(height: 10),
-                            phoneAndDate(),
+
+                            /// ✅ If duration: phone + duration days
+                            if (useDurationDays) ...[
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text("លេខទូរស័ព្ទ"),
+                                    const SizedBox(height: 6),
+                                    TextFormField(
+                                      controller: phoneController,
+                                      keyboardType: TextInputType.phone,
+                                      decoration: inputDecoration("លេខទូរស័ព្ទ"),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    const Text("រយៈពេលស្នើរ (ចំនួនថ្ងៃ)"),
+                                    const SizedBox(height: 6),
+                                    TextFormField(
+                                      controller: durationDaysController,
+                                      keyboardType: TextInputType.number,
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                        LengthLimitingTextInputFormatter(3),
+                                      ],
+                                      decoration: inputDecoration("ឧ: 2 ឬ 4 ឬ 7").copyWith(
+                                        suffixText: "ថ្ងៃ",
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ] else ...[
+                              Rowlabel(),
+                              const SizedBox(height: 10),
+                              phoneAndDate(),
+                            ],
 
                             sectionTitle("ព័ត៌មានរថយន្ត/ម៉ូតូ"),
                             ...List.generate(vehicles.length, (i) {
@@ -592,10 +1169,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                                     child: Row(
                                       children: [
-                                        Text(
-                                          "រថយន្ត/ម៉ូតូ #${i + 1}",
-                                          style: const TextStyle(fontWeight: FontWeight.bold),
-                                        ),
+                                        Text("រថយន្ត/ម៉ូតូ #${i + 1}",
+                                            style: const TextStyle(fontWeight: FontWeight.bold)),
                                         const Spacer(),
                                         if (vehicles.length > 1)
                                           IconButton(
@@ -634,16 +1209,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       ),
                                     ],
                                   ),
-                                  twoInputRow(
-                                    "ម៉ាក",
-                                    "ស្លាកលេខ",
-                                    "បញ្ចូលម៉ាក",
-                                    "បញ្ចូលស្លាកលេខ",
-                                    v.brand,
-                                    v.plate,
-                                    leftIsPlate: false,
-                                    rightIsPlate: true,
-                                  ),
+                                  oneInput(label: "ម៉ាក", hint: "បញ្ចូលម៉ាក", controller: v.brand),
+                                  plateRow(v),
                                   twoInputRow(
                                     "ពណ៌",
                                     "ឆ្នាំផលិត",
@@ -659,10 +1226,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               );
                             }),
 
-                            // ✅ ONLY 2 boxes:
                             uploadMultiAttachment(),
                             uploadCameraAttachment(),
-
                             bottom(),
                           ],
                         ),
@@ -676,6 +1241,180 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ----------------------------
+  // Work dropdown widgets
+  // ----------------------------
+  Widget _ddGeneralDepartment() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("ក្រសួង/ស្ថាប័ន"),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<GeneralDepartmentItem>(
+            isExpanded: true,
+            value: selectedGD,
+            decoration: inputDecoration("ជ្រើសក្រសួង/ស្ថាប័ន"),
+            items: gdList
+                .map((x) => DropdownMenuItem(
+                      value: x,
+                      child: Text(x.name, overflow: TextOverflow.ellipsis),
+                    ))
+                .toList(),
+            onChanged: (x) => onSelectGD(x),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _ddDepartment() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("នាយកដ្ឋាន/អង្គភាព"),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<DepartmentItem>(
+            isExpanded: true,
+            value: selectedDept,
+            decoration: inputDecoration("ជ្រើសនាយកដ្ឋាន/អង្គភាព"),
+            items: deptList
+                .map((x) => DropdownMenuItem(
+                      value: x,
+                      child: Text(x.name, overflow: TextOverflow.ellipsis),
+                    ))
+                .toList(),
+            onChanged: (x) => onSelectDept(x),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _ddBurau() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("ការិយាល័យ"),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<BurauItem>(
+            isExpanded: true,
+            value: selectedBurau,
+            decoration: inputDecoration("ជ្រើសការិយាល័យ"),
+            items: burauFiltered
+                .map((x) => DropdownMenuItem(
+                      value: x,
+                      child: Text(x.name, overflow: TextOverflow.ellipsis),
+                    ))
+                .toList(),
+            onChanged: (x) => onSelectBurau(x),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _ddPosition() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("តួនាទី"),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<PositionItem>(
+            isExpanded: true,
+            value: selectedPos,
+            decoration: inputDecoration("ជ្រើសតួនាទី"),
+            items: posList
+                .map((x) => DropdownMenuItem(
+                      value: x,
+                      child: Text(x.name, overflow: TextOverflow.ellipsis),
+                    ))
+                .toList(),
+            onChanged: (x) => onSelectPosition(x),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ----------------------------
+  // Plate UI: CAR & MOTO
+  // ----------------------------
+  Widget plateRow(_VehicleForm v) {
+    final isMoto = v.vehicleType == "MOTORBIKE";
+    final items = isMoto ? motoPlateTypes : carPlateTypes;
+    final currentType = isMoto ? v.motoPlateType : v.carPlateType;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(isMoto ? "ស្លាកលេខម៉ូតូ" : "ស្លាកលេខរថយន្ត"),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Flexible(
+                flex: 2,
+                child: DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  value: currentType,
+                  decoration: inputDecoration("ប្រភេទស្លាក"),
+                  items: items.map((t) {
+                    return DropdownMenuItem<String>(
+                      value: t["key"],
+                      child: Text(
+                        t["label"]!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (x) {
+                    if (x == null) return;
+                    setState(() {
+                      if (isMoto) {
+                        v.motoPlateType = x;
+                      } else {
+                        v.carPlateType = x;
+                      }
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Flexible(
+                flex: 3,
+                child: TextFormField(
+                  controller: v.plate,
+                  decoration: inputDecoration("បញ្ចូលស្លាកលេខ"),
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(12),
+                    TextInputFormatter.withFunction((oldValue, newValue) {
+                      final up = newValue.text.toUpperCase();
+                      return newValue.copyWith(
+                        text: up,
+                        selection: newValue.selection,
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ----------------------------
   // Attachment widgets
   // ----------------------------
   Widget uploadMultiAttachment() {
@@ -684,7 +1423,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("ឯកសារភ្ជាប់ (អតិបរមា $maxFiles ឯកសារ)"),
+          Text(
+            isGuest
+                ? "សូមថតឡានមុខក្រោយ (អតិបរមា $maxFiles ឯកសារ)"
+                : "សូមថតកាតគ្រីឡាន, អត្តសញ្ញាណប័ណ្ណ​និងឯកសារពាក់ព័ន្ធ (អតិបរមា $maxFiles ឯកសារ)",
+          ),
           const SizedBox(height: 8),
           GestureDetector(
             onTap: pickAttachFiles,
@@ -708,10 +1451,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    "PNG, JPG, PDF (≤ 5MB)",
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
+                  const Text("PNG, JPG, PDF (≤ 5MB)",
+                      style: TextStyle(fontSize: 12, color: Colors.grey)),
                 ],
               ),
             ),
@@ -762,13 +1503,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   width: 1.5,
                 ),
               ),
-              child: Column(
-                children: const [
+              child: const Column(
+                children: [
                   Icon(Icons.camera_alt, size: 40, color: Colors.blue),
                   SizedBox(height: 10),
                   Text("ចុចដើម្បីថតរូប", style: TextStyle(fontWeight: FontWeight.w600)),
                   SizedBox(height: 6),
-                  Text("Camera Image (≤ 5MB)", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text("Camera Image (≤ 5MB)",
+                      style: TextStyle(fontSize: 12, color: Colors.grey)),
                 ],
               ),
             ),
@@ -799,7 +1541,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ----------------------------
-  // Your existing widgets (ported from your original code)
+  // Header + UI helpers
   // ----------------------------
   Widget _header() {
     return Container(
@@ -878,48 +1620,49 @@ class _RegisterScreenState extends State<RegisterScreen> {
         case "GUEST":
           return "ភ្ញៀវ";
         case "INSIDE_OFFICER":
-          return "មន្រ្តីបំរើការងារនៅក្នុងទីស្តីការក្រសួងមហាផ្ទៃ";
+          return "មន្រ្តីបំរើការងារនៅក្នុងទីស្តីការក្រសួងមហាឫ្ទៃ";
         case "OUTSIDE_OFFICER":
-          return "មន្រ្តីបំរើការងារនៅក្រៅទីស្តីការក្រសួងមហាផ្ទៃ";
-
-        case "STATE_SECRETARY":
-          return "រដ្ឋលេខាធិការ";
-        case "DEPUTY_STATE_SECRETARY":
-          return "អនុរដ្ឋលេខាធិការ";
-
+          return "មន្រ្តីបំរើការងារនៅក្រៅទីស្តីការក្រសួងមហាឫ្ទៃ";
         case "SECRETARY":
-          return "រដ្ឋលេខាធិការក្រសួងមហាផ្ទៃ";
+          return "រដ្ឋលេខាធិការក្រសួងមហាឫ្ទៃ";
         case "DEPUTY_SECRETARY":
-          return "អនុរដ្ឋលេខាធិការ​ ក្រសួងមហាផ្ទៃ";
+          return "អនុរដ្ឋលេខាធិការ​ ក្រសួងមហាឫ្ទៃ";
         case "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER":
           return "មន្ត្រីរដ្ឋបាលថ្នាក់ក្រោមជាតិ";
         default:
           return v;
       }
     }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: DropdownButtonFormField<String>(
         isExpanded: true,
         value: _userType,
         decoration: inputDecoration("ជ្រើសប្រភេទអ្នកប្រើប្រាស់"),
-        items: allowedUserTypes.map((v) {
-          return DropdownMenuItem<String>(value: v, child: Text(labelOf(v)));
-        }).toList(),
-        onChanged: (v) {
+        items: allowedUserTypes
+            .map((v) => DropdownMenuItem<String>(
+                  value: v,
+                  child: Text(labelOf(v), overflow: TextOverflow.ellipsis, maxLines: 2),
+                ))
+            .toList(),
+        onChanged: (v) async {
           if (v == null) return;
+
           setState(() {
             _userType = v;
 
-            // clear officer-only field
+            // reset ids
             if (!(v == "INSIDE_OFFICER" || v == "OUTSIDE_OFFICER")) {
               idNumberController.clear();
             }
 
-            // work fields
+            // ✅ UPDATED: SECRETARY/DEPUTY should NOT show work fields
             final shouldShowWork = (v == "INSIDE_OFFICER" ||
                 v == "OUTSIDE_OFFICER" ||
+                v == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER" ||
                 (v == "GUEST" && showWorkFieldsForGuest));
+
             if (!shouldShowWork) {
               ministryController.clear();
               departmentController.clear();
@@ -931,7 +1674,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
               provinceCityController.clear();
             }
 
-            // ✅ attachments are same for all, but you can reset on type change:
+            // duration types: NATIONAL + GUEST
+            if (v == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER" || v == "GUEST") {
+              requestDateController.clear();
+            } else {
+              durationDaysController.clear();
+            }
+
+            // reset attachments
             attachFiles.clear();
             attachFileNames.clear();
             attachFilesError = null;
@@ -939,7 +1689,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
             cameraFile = null;
             cameraFileName = null;
             cameraError = null;
+
+            // reset dropdown selections/controllers
+            _resetWorkDropdownStateAndControllers();
           });
+
+          // ✅ load dropdown data only for OFFICERS
+          await _loadWorkDropdownsIfNeeded();
         },
       ),
     );
@@ -1017,7 +1773,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final isLeftId = lCtrl == idNumberController;
     final isRightId = rCtrl == idNumberController;
 
-    const plateMaxLen = 8;
+    const plateMaxLen = 18;
 
     List<TextInputFormatter>? formatters(bool isId, bool isPlate) {
       if (isId) {
@@ -1047,8 +1803,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     TextCapitalization cap(bool isPlate) =>
         isPlate ? TextCapitalization.characters : TextCapitalization.none;
 
-    TextInputType kbd(bool isId) =>
-        isId ? TextInputType.number : TextInputType.text;
+    TextInputType kbd(bool isId) => isId ? TextInputType.number : TextInputType.text;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
