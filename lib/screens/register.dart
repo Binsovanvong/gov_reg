@@ -243,6 +243,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   /// ✅ Only officers show ID number
   bool get showIdNumber => isOfficer;
+  bool get showWorkFields => isOfficer || (isGuest && showWorkFieldsForGuest);
+  bool get showProvinceCity =>
+      _userType == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER";
 
   /// ✅ Work fields ONLY for Officer + National + Guest(optional)
   /// ❌ SECRETARY/DEPUTY: hidden
@@ -505,7 +508,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ----------------------------
   // Helpers
   // ----------------------------
-  String _normalizePlate(String s) => s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
+  String _normalizePlate(String s) =>
+      s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
 
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -839,6 +843,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           "vehicleType": v.vehicleType,
         };
       }).toList(),
+      "requestDate": requestDateController.text.trim(),
+      "reason": reasonController.text.trim().isEmpty
+          ? "Parking card request"
+          : reasonController.text.trim(),
     };
 
     /// ✅ GUEST -> DO NOT send requestAtDate (only requestDate)
@@ -887,7 +895,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (fileList.isNotEmpty) {
       uri = base.replace(
         queryParameters: <String, dynamic>{
-          "attachmentTypes": List<String>.filled(fileList.length, attachmentTypeValue),
+          "attachmentTypes":
+              List<String>.filled(fileList.length, attachmentTypeValue),
         },
       );
     }
@@ -996,12 +1005,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       debugPrint("SUBMIT ERROR: $e");
       debugPrint("STACK: $st");
       if (!mounted) return;
-
-      final msg = e.toString().contains("401") || e.toString().contains("403")
-          ? "Backend still requires login (401/403). You must allow guest POST /parking-card-requests in backend."
-          : "Error: $e";
-
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
@@ -1121,43 +1126,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
 
                             const SizedBox(height: 10),
-
-                            /// ✅ If duration: phone + duration days
-                            if (useDurationDays) ...[
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 20),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text("លេខទូរស័ព្ទ"),
-                                    const SizedBox(height: 6),
-                                    TextFormField(
-                                      controller: phoneController,
-                                      keyboardType: TextInputType.phone,
-                                      decoration: inputDecoration("លេខទូរស័ព្ទ"),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    const Text("រយៈពេលស្នើរ (ចំនួនថ្ងៃ)"),
-                                    const SizedBox(height: 6),
-                                    TextFormField(
-                                      controller: durationDaysController,
-                                      keyboardType: TextInputType.number,
-                                      inputFormatters: [
-                                        FilteringTextInputFormatter.digitsOnly,
-                                        LengthLimitingTextInputFormatter(3),
-                                      ],
-                                      decoration: inputDecoration("ឧ: 2 ឬ 4 ឬ 7").copyWith(
-                                        suffixText: "ថ្ងៃ",
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ] else ...[
-                              Rowlabel(),
-                              const SizedBox(height: 10),
-                              phoneAndDate(),
-                            ],
+                            Rowlabel(),
+                            const SizedBox(height: 10),
+                            phoneAndDate(),
+                            oneInput(
+                              label: "ហេតុផលស្នេីរសំុ",
+                              controller: reasonController,
+                              hint: "ហេតុផល"
+                            ),
+                            const SizedBox(height: 10),
 
                             sectionTitle("ព័ត៌មានរថយន្ត/ម៉ូតូ"),
                             ...List.generate(vehicles.length, (i) {
@@ -1166,15 +1143,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 20, vertical: 6),
                                     child: Row(
                                       children: [
-                                        Text("រថយន្ត/ម៉ូតូ #${i + 1}",
-                                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                                        Text(
+                                          "រថយន្ត/ម៉ូតូ #${i + 1}",
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold),
+                                        ),
                                         const Spacer(),
                                         if (vehicles.length > 1)
                                           IconButton(
-                                            icon: const Icon(Icons.delete, color: Colors.red),
+                                            icon: const Icon(Icons.delete,
+                                                color: Colors.red),
                                             onPressed: () {
                                               setState(() {
                                                 v.dispose();
@@ -1438,7 +1420,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 color: Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(
-                  color: attachFilesError != null ? Colors.red : Colors.grey.shade400,
+                  color: attachFilesError != null
+                      ? Colors.red
+                      : Colors.grey.shade400,
                   width: 1.5,
                 ),
               ),
@@ -1461,7 +1445,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ...List.generate(attachFileNames.length, (i) {
             return Row(
               children: [
-                Expanded(child: Text(attachFileNames[i], overflow: TextOverflow.ellipsis)),
+                Expanded(
+                    child: Text(attachFileNames[i],
+                        overflow: TextOverflow.ellipsis)),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.red),
                   onPressed: () => removeAttachFileAt(i),
@@ -1488,7 +1474,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(selfieRequired ? "ថតរូប Selfie (ចាំបាច់)" : "ថតរូប Selfie (ជាជម្រើស)"),
+          Text(selfieRequired
+              ? "ថតរូប Selfie (ចាំបាច់)"
+              : "ថតរូប Selfie (ជាជម្រើស)"),
           const SizedBox(height: 8),
           GestureDetector(
             onTap: pickCameraImage,
@@ -1499,7 +1487,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 color: Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(
-                  color: cameraError != null ? Colors.red : Colors.grey.shade400,
+                  color:
+                      cameraError != null ? Colors.red : Colors.grey.shade400,
                   width: 1.5,
                 ),
               ),
@@ -1507,7 +1496,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 children: [
                   Icon(Icons.camera_alt, size: 40, color: Colors.blue),
                   SizedBox(height: 10),
-                  Text("ចុចដើម្បីថតរូប", style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text("ចុចដើម្បីថតរូប",
+                      style: TextStyle(fontWeight: FontWeight.w600)),
                   SizedBox(height: 6),
                   Text("Camera Image (≤ 5MB)",
                       style: TextStyle(fontSize: 12, color: Colors.grey)),
@@ -1519,7 +1509,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(child: Text(cameraFileName!, overflow: TextOverflow.ellipsis)),
+                Expanded(
+                    child:
+                        Text(cameraFileName!, overflow: TextOverflow.ellipsis)),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.red),
                   onPressed: clearCamera,
@@ -1622,7 +1614,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         case "INSIDE_OFFICER":
           return "មន្រ្តីបំរើការងារនៅក្នុងទីស្តីការក្រសួងមហាឫ្ទៃ";
         case "OUTSIDE_OFFICER":
-          return "មន្រ្តីបំរើការងារនៅក្រៅទីស្តីការក្រសួងមហាឫ្ទៃ";
+          return "មន្រ្តីបំរើការងារនៅក្រៅទីស្តីការក្រសួងមហាផ្ទៃ";
         case "SECRETARY":
           return "រដ្ឋលេខាធិការក្រសួងមហាឫ្ទៃ";
         case "DEPUTY_SECRETARY":
@@ -1754,7 +1746,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         children: [
           Text(label),
           const SizedBox(height: 6),
-          TextFormField(controller: controller, decoration: inputDecoration(hint)),
+          TextFormField(
+              controller: controller, decoration: inputDecoration(hint)),
         ],
       ),
     );
@@ -1827,7 +1820,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   textCapitalization: cap(leftIsPlate),
                   maxLength: maxLen(isLeftId, leftIsPlate),
                   buildCounter: (context,
-                          {required currentLength, required isFocused, maxLength}) =>
+                          {required currentLength,
+                          required isFocused,
+                          maxLength}) =>
                       null,
                   inputFormatters: formatters(isLeftId, leftIsPlate),
                 ),
@@ -1841,7 +1836,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   textCapitalization: cap(rightIsPlate),
                   maxLength: maxLen(isRightId, rightIsPlate),
                   buildCounter: (context,
-                          {required currentLength, required isFocused, maxLength}) =>
+                          {required currentLength,
+                          required isFocused,
+                          maxLength}) =>
                       null,
                   inputFormatters: formatters(isRightId, rightIsPlate),
                 ),
@@ -1880,7 +1877,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       SizedBox(width: 6),
                       Text(
                         "បន្ថែមរថយន្ត",
-                        style: TextStyle(fontSize: 16, color: Color(0xffDFB73B)),
+                        style:
+                            TextStyle(fontSize: 16, color: Color(0xffDFB73B)),
                       ),
                     ],
                   ),
