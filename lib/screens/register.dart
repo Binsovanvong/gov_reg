@@ -940,7 +940,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => isLoading = true);
     try {
       final res = await createParkingCardRequest();
-
       final code = (res["code"] ?? "").toString();
 
       String token = "";
@@ -962,7 +961,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         arguments: {
           "code": code,
           "token": token,
-
           // ✅ personal
           "fullName": fullNameController.text.trim(),
           "phone": phoneController.text.trim(),
