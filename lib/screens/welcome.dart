@@ -30,7 +30,7 @@ class WelcomeScreen extends StatelessWidget {
                   clipBehavior: Clip.antiAlias,
                   child: Image.asset(
                     'assets/img/about-moi-logo.png', // <-- your logo
-                    height: 120,
+                    fit: BoxFit.contain,
                   ),
                 ),
                 SizedBox(height: 30),
@@ -78,7 +78,7 @@ class WelcomeScreen extends StatelessWidget {
                     ),
                   ),
                   onPressed: () {
-                    Navigator.pushNamed(context,Approute.login);
+                    Navigator.pushNamed(context,Approute.register);
                   },
                   child: Text(
                     'ចុះឈ្មោះ',

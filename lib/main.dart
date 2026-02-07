@@ -23,26 +23,22 @@ class MainApp extends StatelessWidget {
     useMaterial3: true,
     textTheme: GoogleFonts.notoSansKhmerTextTheme(),
   ),
-
-  // ✅ Keep normal routes here (NO success route here)
   routes: {
     Approute.splash: (context) => const SplashScreen(),
     Approute.welcome: (context) => const WelcomeScreen(),
     Approute.register: (context) => const RegisterScreen(),
     Approute.login: (context) => const LoginPage(),
   },
-
-  // ✅ Put this right here
   onGenerateRoute: (settings) {
     if (settings.name == Approute.verifySuccessScreen) {
-      final args = settings.arguments as Map<String, dynamic>;
-
       return MaterialPageRoute(
-        builder: (_) => RegisterSuccessScreen(code: args['code'], token: args['token']),
+        builder: (_) => const RegisterSuccessMixedScreen(),
+        settings: settings, 
       );
     }
     return null;
   },
+
 );
   }
 }

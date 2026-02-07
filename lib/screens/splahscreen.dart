@@ -76,7 +76,7 @@ class _SplashScreenState extends State<SplashScreen>
                   clipBehavior: Clip.antiAlias,
                   child: Image.asset(
                     'assets/img/about-moi-logo.png', // <-- your logo
-                    height: 120,
+                    fit: BoxFit.contain,
                   ),
                 ),
                 ),
