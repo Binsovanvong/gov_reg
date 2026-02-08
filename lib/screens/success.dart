@@ -16,7 +16,8 @@ class RegisterSuccessMixedScreen extends StatefulWidget {
       _RegisterSuccessMixedScreenState();
 }
 
-class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen> {
+class _RegisterSuccessMixedScreenState
+    extends State<RegisterSuccessMixedScreen> {
   static const String baseUrl = "http://10.0.2.2:8080";
 
   late Future<Uint8List?> _qrFuture;
@@ -27,6 +28,8 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
   late String fullName;
   late String phone;
   late String userType;
+  late String parkingRequestStatus;
+
 
   Map workingInfo = {};
   List vehicles = [];
@@ -62,6 +65,7 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
     fullName = (args["fullName"] ?? "").toString();
     phone = (args["phone"] ?? "").toString();
     userType = (args["userType"] ?? "").toString();
+    parkingRequestStatus = (args["parkingRequestStatus"] ?? "").toString();
 
     workingInfo =
         (args["workingInfo"] is Map) ? (args["workingInfo"] as Map) : {};
@@ -80,6 +84,55 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
     precacheImage(const AssetImage("assets/img/about-moi-logo.png"), context);
 
     _qrFuture = _fetchQrPngOrNull();
+  }
+  Color getStatusColor(String status) {
+  switch (status) {
+    case "NEW":
+      return Colors.blue;
+    case "ASSIGNED":
+      return Colors.orange;
+    case "ACTIVE":
+      return Colors.green;
+    case "IN_PROGRESS":
+      return Colors.lightBlue;
+    case "RESOLVED":
+      return Colors.teal;
+    case "APPROVED":
+      return Colors.greenAccent;
+    case "CLOSED":
+      return Colors.grey;
+    case "REJECTED":
+      return Colors.red;
+    case "WAITING_INFO":
+      return Colors.amber;
+    default:
+      return Colors.black;
+  }
+}
+
+String getStatusText(String status) {
+  switch (status) {
+    case "NEW":
+      return "សំណេីរថ្មី"; // New
+    case "ASSIGNED":
+      return "បានចាត់ចែង"; // Assigned
+    case "ACTIVE":
+      return "សកម្ម"; // Active
+    case "IN_PROGRESS":
+      return "កំពុងដំណើរការ"; // In Progress
+    case "RESOLVED":
+      return "បានដោះស្រាយ"; // Resolved
+    case "APPROVED":
+      return "អនុញ្ញាតអោយចូល"; // Approved
+    case "CLOSED":
+      return "បិទ"; // Closed
+    case "REJECTED":
+      return "មិនអនុញ្ញាតអោយចូល"; // Rejected
+    case "WAITING_INFO":
+      return "រង់ចាំព័ត៌មាន"; // Waiting Info
+    default:
+      return status; // fallback
+  }
   }
 
   Future<Uint8List?> _fetchQrPngOrNull() async {
@@ -123,7 +176,8 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
       if (!Platform.isAndroid && !Platform.isIOS) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Save to Photos supports only Android/iOS")),
+          const SnackBar(
+              content: Text("Save to Photos supports only Android/iOS")),
         );
         return;
       }
@@ -236,6 +290,7 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
                           fullName: fullName,
                           phone: phone,
                           code: code,
+                          parkingRequestStatus: parkingRequestStatus,
                           userTypeText: _userTypeKhmer(userType),
                           vehicles: vehicles, // ✅ supports 2 vehicles
                           selfieBytes: selfieBytes,
@@ -340,25 +395,25 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
                       children: [
                         // title bar
                         Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: const BoxDecoration(
-                            color: green,
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(18),
-                              topRight: Radius.circular(18),
-                            ),
-                          ),
-                          child: const Text(
-                            "ពិនិត្យមើលព័តមាននិងទាញយកឯកសារ \nQR-CODEដើម្បីផ្ទៀងផ្ទាត់",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 16,
-                            ),
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: getStatusColor(parkingRequestStatus),
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(18),
+                            topRight: Radius.circular(18),
                           ),
                         ),
+                        child: Text(
+                          getStatusText(parkingRequestStatus),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
                         const SizedBox(height: 16),
 
                         _profileBlock(),
@@ -395,12 +450,13 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
                               _infoCard(
                                 title: "ព័ត៌មានសំណើរ",
                                 rows: [
-                                  _row("លេខកូដស្នើរ", code.isEmpty ? "-" : code),
-                                  _row("លេខទូរស័ព្ទ", phone.isEmpty ? "-" : phone),
+                                  _row(
+                                      "លេខកូដស្នើរ", code.isEmpty ? "-" : code),
+                                  _row("លេខទូរស័ព្ទ",
+                                      phone.isEmpty ? "-" : phone),
                                 ],
                               ),
                               const SizedBox(height: 12),
-
                               if (!hideWorkInfo) ...[
                                 _infoCard(
                                   title: "ព័ត៌មានការងារ",
@@ -410,30 +466,36 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
                                         .isNotEmpty)
                                       _row("អត្តលេខ",
                                           workingInfo["policeId"].toString()),
-                                    if (_safe(workingInfo["generalDepartmentText"])
+                                    if (_safe(workingInfo[
+                                            "generalDepartmentText"])
                                         .isNotEmpty)
-                                      _row("ក្រសួង/ស្ថាប័ន",
-                                          _safe(workingInfo["generalDepartmentText"])),
-                                    if (_safe(workingInfo["departmentText"]).isNotEmpty)
+                                      _row(
+                                          "ក្រសួង/ស្ថាប័ន",
+                                          _safe(workingInfo[
+                                              "generalDepartmentText"])),
+                                    if (_safe(workingInfo["departmentText"])
+                                        .isNotEmpty)
                                       _row("នាយកដ្ឋាន/អង្គភាព",
                                           _safe(workingInfo["departmentText"])),
-                                    if (_safe(workingInfo["burauText"]).isNotEmpty)
+                                    if (_safe(workingInfo["burauText"])
+                                        .isNotEmpty)
                                       _row("ការិយាល័យ",
                                           _safe(workingInfo["burauText"])),
-                                    if (_safe(workingInfo["positionText"]).isNotEmpty)
+                                    if (_safe(workingInfo["positionText"])
+                                        .isNotEmpty)
                                       _row("តួនាទី",
                                           _safe(workingInfo["positionText"])),
-                                    if (_safe(workingInfo["provinceCity"]).isNotEmpty)
+                                    if (_safe(workingInfo["provinceCity"])
+                                        .isNotEmpty)
                                       _row("ខេត្ត/រាជធានី",
                                           _safe(workingInfo["provinceCity"])),
                                   ],
                                 ),
                                 const SizedBox(height: 12),
                               ],
-
-                              _vehicleCard(title: "ព័ត៌មានរថយន្ត", vehicles: vehicles),
+                              _vehicleCard(
+                                  title: "ព័ត៌មានរថយន្ត", vehicles: vehicles),
                               const SizedBox(height: 12),
-
                               FutureBuilder<Uint8List?>(
                                 future: _qrFuture,
                                 builder: (context, snap) {
@@ -466,7 +528,8 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
                                           border: Border.all(
                                             color: Color(0xFFF0D9A2),
                                           ),
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                         ),
                                         child: Image.memory(
                                           snap.data!,
@@ -479,17 +542,17 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
                                   );
                                 },
                               ),
-
                               const SizedBox(height: 18),
-
                               Row(
                                 children: [
                                   Expanded(
                                     child: OutlinedButton(
                                       style: OutlinedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(vertical: 14),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 14),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(14),
+                                          borderRadius:
+                                              BorderRadius.circular(14),
                                         ),
                                         side: const BorderSide(color: gold),
                                       ),
@@ -510,21 +573,25 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
                                     child: ElevatedButton(
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: gold,
-                                        padding: const EdgeInsets.symmetric(vertical: 14),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 14),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(14),
+                                          borderRadius:
+                                              BorderRadius.circular(14),
                                         ),
                                         elevation: 0,
                                       ),
                                       onPressed: _saving ? null : _saveToPhotos,
                                       child: AnimatedSwitcher(
-                                        duration: const Duration(milliseconds: 220),
+                                        duration:
+                                            const Duration(milliseconds: 220),
                                         child: _saving
                                             ? const SizedBox(
                                                 key: ValueKey("loading"),
                                                 height: 18,
                                                 width: 18,
-                                                child: CircularProgressIndicator(
+                                                child:
+                                                    CircularProgressIndicator(
                                                   strokeWidth: 2,
                                                   color: Colors.white,
                                                 ),
@@ -541,7 +608,8 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
                                                   Text(
                                                     "ទាញទុក",
                                                     style: TextStyle(
-                                                      fontWeight: FontWeight.w800,
+                                                      fontWeight:
+                                                          FontWeight.w800,
                                                       color: Colors.white,
                                                     ),
                                                   ),
@@ -556,9 +624,11 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
                                     child: ElevatedButton(
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: gold,
-                                        padding: const EdgeInsets.symmetric(vertical: 14),
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 14),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(14),
+                                          borderRadius:
+                                              BorderRadius.circular(14),
                                         ),
                                       ),
                                       onPressed: () => Navigator.pushNamed(
@@ -576,7 +646,6 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
                                   ),
                                 ],
                               ),
-
                               const SizedBox(height: 14),
                             ],
                           ),
@@ -641,7 +710,8 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
   }
 
   String _safe(dynamic v) => (v ?? "").toString().trim();
-  Widget _row(String label, String value) => _InfoRow(label: label, value: value);
+  Widget _row(String label, String value) =>
+      _InfoRow(label: label, value: value);
 
   Widget _infoCard({required String title, required List<Widget> rows}) {
     return Container(
@@ -711,11 +781,15 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
               ),
               child: Column(
                 children: [
-                  _InfoRow(label: "រថយន្ត #${i + 1}", value: type.isEmpty ? "-" : type),
+                  _InfoRow(
+                      label: "រថយន្ត #${i + 1}",
+                      value: type.isEmpty ? "-" : type),
                   _InfoRow(label: "ម៉ាក", value: brand.isEmpty ? "-" : brand),
-                  _InfoRow(label: "ស្លាកលេខ", value: plate.isEmpty ? "-" : plate),
+                  _InfoRow(
+                      label: "ស្លាកលេខ", value: plate.isEmpty ? "-" : plate),
                   _InfoRow(label: "ពណ៌", value: color.isEmpty ? "-" : color),
-                  _InfoRow(label: "ឆ្នាំផលិត", value: year.isEmpty ? "-" : year),
+                  _InfoRow(
+                      label: "ឆ្នាំផលិត", value: year.isEmpty ? "-" : year),
                 ],
               ),
             );
@@ -802,6 +876,7 @@ class _ExportParkingBadge extends StatelessWidget {
   final String phone;
   final String code;
   final String userTypeText;
+  final String parkingRequestStatus;
   final List vehicles;
   final Uint8List? selfieBytes;
   final String selfiePath;
@@ -816,6 +891,7 @@ class _ExportParkingBadge extends StatelessWidget {
     required this.selfieBytes,
     required this.selfiePath,
     required this.qrFuture,
+    required this.parkingRequestStatus,
   });
 
   @override
@@ -905,7 +981,8 @@ class _ExportParkingBadge extends StatelessWidget {
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 decoration: BoxDecoration(
                   color: gold,
                   borderRadius: BorderRadius.circular(18),
@@ -953,7 +1030,8 @@ class _ExportParkingBadge extends StatelessWidget {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.22),
                         borderRadius: BorderRadius.circular(14),
@@ -971,13 +1049,9 @@ class _ExportParkingBadge extends StatelessWidget {
                   ],
                 ),
               ),
-
               const SizedBox(height: 16),
-
               _badgePhoto(selfieBytes, selfiePath),
-
               const SizedBox(height: 10),
-
               Text(
                 fullName.isEmpty ? "-" : fullName,
                 textAlign: TextAlign.center,
@@ -987,9 +1061,7 @@ class _ExportParkingBadge extends StatelessWidget {
                   color: navy,
                 ),
               ),
-
               const SizedBox(height: 4),
-
               Text(
                 userTypeText,
                 textAlign: TextAlign.center,
@@ -999,9 +1071,7 @@ class _ExportParkingBadge extends StatelessWidget {
                   color: Color(0xFF64748B),
                 ),
               ),
-
               const SizedBox(height: 14),
-
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -1016,7 +1086,6 @@ class _ExportParkingBadge extends StatelessWidget {
                   ],
                 ),
               ),
-
               if (top2Vehicles.isEmpty)
                 Container(
                   margin: const EdgeInsets.only(top: 10),
@@ -1041,9 +1110,7 @@ class _ExportParkingBadge extends StatelessWidget {
                 for (int i = 0; i < top2Vehicles.length; i++)
                   vehicleBox(i, top2Vehicles[i]),
               ],
-
               const Spacer(),
-
               FutureBuilder<Uint8List?>(
                 future: qrFuture,
                 builder: (context, snap) {
@@ -1074,12 +1141,12 @@ class _ExportParkingBadge extends StatelessWidget {
                                 ),
                               )
                             : Image.memory(
-                              bytes,
-                              width: 200,
-                              height: 200,
-                              fit: BoxFit.contain,
-                              filterQuality: FilterQuality.high,
-                            ),
+                                bytes,
+                                width: 200,
+                                height: 200,
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.high,
+                              ),
                       ),
                       const SizedBox(height: 6),
                       const Text(

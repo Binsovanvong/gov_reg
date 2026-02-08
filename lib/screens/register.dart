@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image/image.dart' as img;
 
 /// ✅ MUST be top-level (NOT inside State class)
 class _VehicleForm {
@@ -199,20 +199,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ----------------------------
 
   /// ✅ CAR plate types
-  final List<Map<String, String>> carPlateTypes = [
+  final List<Map<String, String>> plateCategory = [
     {
       "key": "NORMAL_CAR",
       "label": "រថយន្តធម្មតា (2AB-1234)",
+      // "plateCode":,
       "pattern": r"^2[A-Z]{2}-\d{4}$"
     },
-    {"key": "CAR_STATE", "label": "រដ្ឋ (2-0369)", "pattern": r"^2-\d{4}$"},
-    {"key": "CAR_POLICE", "label": "ប៉ូលីស (L-1077)", "pattern": r"^L-\d{4}$"},
+    {
+      "key": "CAR_STATE",
+      "label": "រដ្ឋ (2-0369)",
+      // "plateCode":,
+      "pattern": r"^2-\d{4}$"
+    },
+    {
+      "key": "CAR_POLICE",
+      "label": "ប៉ូលីស (L-1077)",
+      // "plateCode":,
+      "pattern": r"^L-\d{4}$"
+    },
     {
       "key": "CAR_DIPLOMAT",
       "label": "ការទូត (CD.76.002)",
+      // "plateCode":,
       "pattern": r"^CD\.\d{2}\.\d{3}$"
     },
-    {"key": "CAR_TRUCK", "label": "ឡានធំ (3A-1070)", "pattern": r"^3[A-Z]-\d{4}$"},
+    {
+      "key": "CAR_TRUCK",
+      "label": "ឡានធំ (3A-1070)",
+      // "plateCode":,
+      "pattern": r"^3[A-Z]-\d{4}$"
+    },
   ];
 
   /// ✅ MOTO plate types
@@ -222,8 +239,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
       "label": "ម៉ូតូធម្មតា (1AB-1234)",
       "pattern": r"^1[A-Z]{2}-\d{4}$"
     },
-    {"key": "MOTO_STATE", "label": "ម៉ូតូរដ្ឋ (1-0369)", "pattern": r"^1-\d{4}$"},
-    {"key": "MOTO_POLICE", "label": "ម៉ូតូប៉ូលីស (M-1234)", "pattern": r"^M-\d{4}$"},
+    {
+      "key": "MOTO_STATE",
+      "label": "ម៉ូតូរដ្ឋ (1-0369)",
+      "pattern": r"^1-\d{4}$"
+    },
+    {
+      "key": "MOTO_POLICE",
+      "label": "ម៉ូតូប៉ូលីស (M-1234)",
+      "pattern": r"^M-\d{4}$"
+    },
   ];
 
   // ----------------------------
@@ -237,7 +262,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool get isSecretaryOrDeputy =>
       _userType == "SECRETARY" || _userType == "DEPUTY_SECRETARY";
 
-  bool get isNational => _userType == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER";
+  bool get isNational =>
+      _userType == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER";
 
   static const bool showWorkFieldsForGuest = true;
 
@@ -246,7 +272,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   /// ✅ Work fields ONLY for Officer + National + Guest(optional)
   /// ❌ SECRETARY/DEPUTY: hidden
-  bool get showWorkFields => isOfficer || isNational || (isGuest && showWorkFieldsForGuest);
+  bool get showWorkFields =>
+      isOfficer || isNational || (isGuest && showWorkFieldsForGuest);
 
   /// ✅ Province only for NATIONAL
   bool get showProvinceCity => isNational;
@@ -263,6 +290,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ----------------------------
   // AUTH
   // ----------------------------
+  Future<http.Response> _login({
+    required String baseUrl,
+    required String email,
+    required String password,
+  }) async {
+    final uri = Uri.parse("$baseUrl/api/auth/authenticate");
+
+    final res = await http.post(
+      uri,
+      headers: const {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
+        "email": email,
+        "password": password,
+      }),
+    );
+
+    return res;
+  }
+
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString("accessToken");
@@ -306,7 +355,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       newAccessToken = (data["accessToken"] ?? data["token"] ?? "").toString();
       if (newAccessToken.isEmpty && data["token"] is Map) {
         newAccessToken =
-            (data["token"]["accessToken"] ?? data["token"]["token"] ?? "").toString();
+            (data["token"]["accessToken"] ?? data["token"]["token"] ?? "")
+                .toString();
       }
     }
 
@@ -344,7 +394,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     var res = await doGet(token);
 
     if (res.statusCode == 401 &&
-        (res.body.contains("JWT token has expired") || res.body.contains("JWT expired"))) {
+        (res.body.contains("JWT token has expired") ||
+            res.body.contains("JWT expired"))) {
       final newToken = await _refreshAccessToken();
       if (newToken == null || newToken.isEmpty) {
         await forceLogout();
@@ -376,15 +427,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
         .toList();
   }
 
-  Future<List<DepartmentItem>> fetchDepartmentsByGeneralDepartment(int gdId) async {
-    final uri = Uri.parse("$baseUrl/api/v1/departments/general-department/$gdId");
+  Future<List<DepartmentItem>> fetchDepartmentsByGeneralDepartment(
+      int gdId) async {
+    final uri =
+        Uri.parse("$baseUrl/api/v1/departments/general-department/$gdId");
     final res = await _getWithAuthRetry(uri);
     if (res.statusCode != 200) {
       throw "Departments HTTP ${res.statusCode}: ${res.body}";
     }
     final decoded = jsonDecode(res.body);
     if (decoded is! List) return [];
-    return decoded.map((e) => DepartmentItem.fromJson(e as Map<String, dynamic>)).toList();
+    return decoded
+        .map((e) => DepartmentItem.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<BurauItem>> fetchBuraus() async {
@@ -395,7 +450,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
     final decoded = jsonDecode(res.body);
     if (decoded is! List) return [];
-    return decoded.map((e) => BurauItem.fromJson(e as Map<String, dynamic>)).toList();
+    return decoded
+        .map((e) => BurauItem.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<PositionItem>> fetchPositions() async {
@@ -406,7 +463,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
     final decoded = jsonDecode(res.body);
     if (decoded is! List) return [];
-    return decoded.map((e) => PositionItem.fromJson(e as Map<String, dynamic>)).toList();
+    return decoded
+        .map((e) => PositionItem.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> _loadWorkDropdownsIfNeeded() async {
@@ -484,7 +543,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       departmentController.text = d?.name ?? "";
       officeController.clear();
 
-      burauFiltered = burauAll.where((b) => b.departmentId == (d?.id ?? -1)).toList();
+      burauFiltered =
+          burauAll.where((b) => b.departmentId == (d?.id ?? -1)).toList();
     });
   }
 
@@ -505,7 +565,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ----------------------------
   // Helpers
   // ----------------------------
-  String _normalizePlate(String s) => s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
+  String _normalizePlate(String s) =>
+      s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
 
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -516,8 +577,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
 
   /// yyyymmdd int
-  int _fmtYmdInt(DateTime d) =>
-      int.parse("${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}");
+  int _fmtYmdInt(DateTime d) => int.parse(
+      "${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}");
 
   /// ✅ dd-MM-yyyy (Backend expects this for LocalDate)
   String _fmtDmy(DateTime d) =>
@@ -582,19 +643,66 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final XFile? xfile = await _imagePicker.pickImage(
       source: ImageSource.camera,
-      imageQuality: 85,
+      imageQuality: 85, // initial capture quality
+      maxWidth: 2000,
+      maxHeight: 2000,
     );
 
     if (xfile == null) return;
 
-    final file = File(xfile.path);
+    File file = File(xfile.path);
 
+    // Maximum size check (5MB)
     const maxBytes = 5 * 1024 * 1024;
-    final bytes = await file.length();
+    int bytes = await file.length();
     if (bytes > maxBytes) {
       setState(() => cameraError = "រូបភាពត្រូវ ≤ 5MB");
       return;
     }
+
+    // Minimum size check (150KB) + guarantee
+    const minBytes = 153600;
+    if (bytes < minBytes) {
+      // Decode the image
+      img.Image? decoded = img.decodeImage(await file.readAsBytes());
+
+      if (decoded == null) {
+        setState(() => cameraError = "មិនអាចដំណើរការរូបភាពបាន");
+        return;
+      }
+
+      // Slightly upscale until we reach minimum bytes
+      int quality = 100;
+      int attempt = 0;
+      const maxAttempts = 5;
+
+      while (bytes < minBytes && attempt < maxAttempts) {
+        // Slightly upscale by 10% each attempt
+        decoded = img.copyResize(
+          decoded!,
+          width: (decoded.width * 1.1).toInt(),
+          height: (decoded.height * 1.1).toInt(),
+        );
+
+        // Encode at max quality
+        final newBytes = img.encodeJpg(decoded, quality: quality);
+        await file.writeAsBytes(newBytes);
+        bytes = await file.length();
+        attempt++;
+      }
+
+      if (bytes < minBytes) {
+        setState(() => cameraError = "រូបភាពត្រូវមានទំហំ ≥ 150KB");
+        return;
+      }
+    }
+
+    // ✅ File is valid
+    setState(() {
+      cameraFile = file;
+      cameraFileName = xfile.name;
+      cameraError = null;
+    });
 
     setState(() {
       cameraFile = file;
@@ -637,11 +745,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final plateValue = _normalizePlate(v.plate.text);
 
     if (v.vehicleType == "MOTORBIKE") {
-      final selected = motoPlateTypes.firstWhere((t) => t["key"] == v.motoPlateType);
+      final selected =
+          motoPlateTypes.firstWhere((t) => t["key"] == v.motoPlateType);
       final reg = RegExp(selected["pattern"]!);
       return reg.hasMatch(plateValue);
     } else {
-      final selected = carPlateTypes.firstWhere((t) => t["key"] == v.carPlateType);
+      final selected =
+          plateCategory.firstWhere((t) => t["key"] == v.carPlateType);
       final reg = RegExp(selected["pattern"]!);
       return reg.hasMatch(plateValue);
     }
@@ -649,10 +759,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   String _plateHint(_VehicleForm v) {
     if (v.vehicleType == "MOTORBIKE") {
-      final selected = motoPlateTypes.firstWhere((t) => t["key"] == v.motoPlateType);
+      final selected =
+          motoPlateTypes.firstWhere((t) => t["key"] == v.motoPlateType);
       return selected["label"]!;
     } else {
-      final selected = carPlateTypes.firstWhere((t) => t["key"] == v.carPlateType);
+      final selected =
+          plateCategory.firstWhere((t) => t["key"] == v.carPlateType);
       return selected["label"]!;
     }
   }
@@ -812,7 +924,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       requestAt = today;
       requestEnd = today.add(Duration(days: dur));
     } else {
-      final chosen = DateTime.parse(requestDateController.text.trim()); // yyyy-MM-dd
+      final chosen =
+          DateTime.parse(requestDateController.text.trim()); // yyyy-MM-dd
       requestAt = chosen;
       requestEnd = chosen;
     }
@@ -823,7 +936,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final String requestAtDateStr = _fmtDmy(requestAt);
 
     final dto = <String, dynamic>{
-      "reason": reasonController.text.trim().isEmpty ? "Parking card request" : reasonController.text.trim(),
+      "reason": reasonController.text.trim().isEmpty
+          ? "Parking card request"
+          : reasonController.text.trim(),
       "requestDate": requestDateInt,
       "user": <String, dynamic>{
         "name": fullNameController.text.trim(),
@@ -833,7 +948,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       "vehicles": vehicles.map((v) {
         return <String, dynamic>{
           "brand": v.brand.text.trim(),
-          "plateNumber": _normalizePlate(v.plate.text),
+          "plate": <String, dynamic>{
+            "plateNumber": _normalizePlate(v.plate.text),
+            "plateCategory": "REGULAR",
+            // "plateSubCategory": "REGULAR",  // set correct value
+          },
           "color": v.color.text.trim(),
           "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
           "vehicleType": v.vehicleType,
@@ -887,7 +1006,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (fileList.isNotEmpty) {
       uri = base.replace(
         queryParameters: <String, dynamic>{
-          "attachmentTypes": List<String>.filled(fileList.length, attachmentTypeValue),
+          "attachmentTypes":
+              List<String>.filled(fileList.length, attachmentTypeValue),
         },
       );
     }
@@ -935,12 +1055,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Submit
   // ----------------------------
   Future<void> submitRegister() async {
+    await _login(
+      baseUrl: "http://10.0.2.2:8080",
+      email: "user@moi.com",
+      password: "Moi@2026\$",
+    );
+
     if (!validateForm()) return;
 
     setState(() => isLoading = true);
     try {
       final res = await createParkingCardRequest();
       final code = (res["code"] ?? "").toString();
+      debugPrint("DEBUG,$code");
 
       String token = "";
       final t = res["token"];
@@ -954,13 +1081,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (cameraFile != null) {
         selfieBytes = await cameraFile!.readAsBytes();
       }
-
+      // TODO change all to take from response
       Navigator.pushNamed(
         context,
         Approute.verifySuccessScreen,
         arguments: {
-          "code": code,
-          "token": token,
+          "code": res["code"],
+          "token": res["token"],
+          "parkingRequestStatus": res["parkingRequestStatus"],
           // ✅ personal
           "fullName": fullNameController.text.trim(),
           "phone": phoneController.text.trim(),
@@ -981,13 +1109,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
           },
 
           // ✅ vehicles list (NO selfie here)
-          "vehicles": vehicles.map((v) => {
-                "brand": v.brand.text.trim(),
-                "plateNumber": v.plate.text.trim(),
-                "color": v.color.text.trim(),
-                "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
-                "vehicleType": v.vehicleType,
-              }).toList(),
+          "vehicles": vehicles
+              .map((v) => {
+                    "brand": v.brand.text.trim(),
+                    "color": v.color.text.trim(),
+                    "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
+                    "vehicleType": v.vehicleType,
+                    "plateNumber": v.plate.text.trim(),
+                  })
+              .toList(),
         },
       );
     } catch (e, st) {
@@ -1079,7 +1209,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               if (useWorkDropdown) ...[
                                 if (dropdownLoading)
                                   const Padding(
-                                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 20, vertical: 8),
                                     child: LinearProgressIndicator(),
                                   ),
                                 _ddGeneralDepartment(),
@@ -1123,7 +1254,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             /// ✅ If duration: phone + duration days
                             if (useDurationDays) ...[
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 20),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -1132,7 +1264,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     TextFormField(
                                       controller: phoneController,
                                       keyboardType: TextInputType.phone,
-                                      decoration: inputDecoration("លេខទូរស័ព្ទ"),
+                                      decoration:
+                                          inputDecoration("លេខទូរស័ព្ទ"),
                                     ),
                                     const SizedBox(height: 12),
                                     const Text("រយៈពេលស្នើរ (ចំនួនថ្ងៃ)"),
@@ -1144,7 +1277,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                         FilteringTextInputFormatter.digitsOnly,
                                         LengthLimitingTextInputFormatter(3),
                                       ],
-                                      decoration: inputDecoration("ឧ: 2 ឬ 4 ឬ 7").copyWith(
+                                      decoration:
+                                          inputDecoration("ឧ: 2 ឬ 4 ឬ 7")
+                                              .copyWith(
                                         suffixText: "ថ្ងៃ",
                                       ),
                                     ),
@@ -1164,15 +1299,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 20, vertical: 6),
                                     child: Row(
                                       children: [
                                         Text("រថយន្ត/ម៉ូតូ #${i + 1}",
-                                            style: const TextStyle(fontWeight: FontWeight.bold)),
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.bold)),
                                         const Spacer(),
                                         if (vehicles.length > 1)
                                           IconButton(
-                                            icon: const Icon(Icons.delete, color: Colors.red),
+                                            icon: const Icon(Icons.delete,
+                                                color: Colors.red),
                                             onPressed: () {
                                               setState(() {
                                                 v.dispose();
@@ -1207,7 +1345,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       ),
                                     ],
                                   ),
-                                  oneInput(label: "ម៉ាក", hint: "បញ្ចូលម៉ាក", controller: v.brand),
+                                  oneInput(
+                                      label: "ម៉ាក",
+                                      hint: "បញ្ចូលម៉ាក",
+                                      controller: v.brand),
                                   plateRow(v),
                                   twoInputRow(
                                     "ពណ៌",
@@ -1346,7 +1487,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ----------------------------
   Widget plateRow(_VehicleForm v) {
     final isMoto = v.vehicleType == "MOTORBIKE";
-    final items = isMoto ? motoPlateTypes : carPlateTypes;
+    final items = isMoto ? motoPlateTypes : plateCategory;
     final currentType = isMoto ? v.motoPlateType : v.carPlateType;
 
     return Padding(
@@ -1436,7 +1577,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 color: Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(
-                  color: attachFilesError != null ? Colors.red : Colors.grey.shade400,
+                  color: attachFilesError != null
+                      ? Colors.red
+                      : Colors.grey.shade400,
                   width: 1.5,
                 ),
               ),
@@ -1459,7 +1602,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ...List.generate(attachFileNames.length, (i) {
             return Row(
               children: [
-                Expanded(child: Text(attachFileNames[i], overflow: TextOverflow.ellipsis)),
+                Expanded(
+                    child: Text(attachFileNames[i],
+                        overflow: TextOverflow.ellipsis)),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.red),
                   onPressed: () => removeAttachFileAt(i),
@@ -1486,7 +1631,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(selfieRequired ? "ថតរូប Selfie (ចាំបាច់)" : "ថតរូប Selfie (ជាជម្រើស)"),
+          Text(selfieRequired
+              ? "ថតរូប Selfie (ចាំបាច់)"
+              : "ថតរូប Selfie (ជាជម្រើស)"),
           const SizedBox(height: 8),
           GestureDetector(
             onTap: pickCameraImage,
@@ -1497,7 +1644,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 color: Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(
-                  color: cameraError != null ? Colors.red : Colors.grey.shade400,
+                  color:
+                      cameraError != null ? Colors.red : Colors.grey.shade400,
                   width: 1.5,
                 ),
               ),
@@ -1505,7 +1653,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 children: [
                   Icon(Icons.camera_alt, size: 40, color: Colors.blue),
                   SizedBox(height: 10),
-                  Text("ចុចដើម្បីថតរូប", style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text("ចុចដើម្បីថតរូប",
+                      style: TextStyle(fontWeight: FontWeight.w600)),
                   SizedBox(height: 6),
                   Text("Camera Image (≤ 5MB)",
                       style: TextStyle(fontSize: 12, color: Colors.grey)),
@@ -1517,7 +1666,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(child: Text(cameraFileName!, overflow: TextOverflow.ellipsis)),
+                Expanded(
+                    child:
+                        Text(cameraFileName!, overflow: TextOverflow.ellipsis)),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.red),
                   onPressed: clearCamera,
@@ -1641,7 +1792,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         items: allowedUserTypes
             .map((v) => DropdownMenuItem<String>(
                   value: v,
-                  child: Text(labelOf(v), overflow: TextOverflow.ellipsis, maxLines: 2),
+                  child: Text(labelOf(v),
+                      overflow: TextOverflow.ellipsis, maxLines: 2),
                 ))
             .toList(),
         onChanged: (v) async {
@@ -1673,7 +1825,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             }
 
             // duration types: NATIONAL + GUEST
-            if (v == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER" || v == "GUEST") {
+            if (v == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER" ||
+                v == "GUEST") {
               requestDateController.clear();
             } else {
               durationDaysController.clear();
@@ -1752,7 +1905,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         children: [
           Text(label),
           const SizedBox(height: 6),
-          TextFormField(controller: controller, decoration: inputDecoration(hint)),
+          TextFormField(
+              controller: controller, decoration: inputDecoration(hint)),
         ],
       ),
     );
@@ -1801,7 +1955,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     TextCapitalization cap(bool isPlate) =>
         isPlate ? TextCapitalization.characters : TextCapitalization.none;
 
-    TextInputType kbd(bool isId) => isId ? TextInputType.number : TextInputType.text;
+    TextInputType kbd(bool isId) =>
+        isId ? TextInputType.number : TextInputType.text;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -1825,7 +1980,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   textCapitalization: cap(leftIsPlate),
                   maxLength: maxLen(isLeftId, leftIsPlate),
                   buildCounter: (context,
-                          {required currentLength, required isFocused, maxLength}) =>
+                          {required currentLength,
+                          required isFocused,
+                          maxLength}) =>
                       null,
                   inputFormatters: formatters(isLeftId, leftIsPlate),
                 ),
@@ -1839,7 +1996,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   textCapitalization: cap(rightIsPlate),
                   maxLength: maxLen(isRightId, rightIsPlate),
                   buildCounter: (context,
-                          {required currentLength, required isFocused, maxLength}) =>
+                          {required currentLength,
+                          required isFocused,
+                          maxLength}) =>
                       null,
                   inputFormatters: formatters(isRightId, rightIsPlate),
                 ),
@@ -1878,7 +2037,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       SizedBox(width: 6),
                       Text(
                         "បន្ថែមរថយន្ត",
-                        style: TextStyle(fontSize: 16, color: Color(0xffDFB73B)),
+                        style:
+                            TextStyle(fontSize: 16, color: Color(0xffDFB73B)),
                       ),
                     ],
                   ),
