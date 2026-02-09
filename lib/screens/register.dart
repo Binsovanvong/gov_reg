@@ -17,14 +17,12 @@ class _VehicleForm {
   final color = TextEditingController();
   final year = TextEditingController();
 
-  /// ✅ already exists in your app
   String vehicleType = "CAR";
+  String carPlateType = "REGULAR";
+  String motoPlateType = "MOTORBIKE_REGULAR";
 
-  /// ✅ CAR plate types
-  String carPlateType = "NORMAL_CAR";
-
-  /// ✅ MOTO plate types
-  String motoPlateType = "NORMAL_MOTO";
+  String? carPlateSubcategory;
+  String? motoPlateSubcategory;
 
   void dispose() {
     brand.dispose();
@@ -166,6 +164,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final positionController = TextEditingController();
   final phoneController = TextEditingController();
 
+  final plateController = TextEditingController();
+
   /// calendar date (yyyy-MM-dd) - only for NON duration types
   final requestDateController = TextEditingController();
 
@@ -199,57 +199,195 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ----------------------------
 
   /// ✅ CAR plate types
-  final List<Map<String, String>> plateCategory = [
+  final List<Map<String, dynamic>> plateCategory = [
     {
-      "key": "NORMAL_CAR",
-      "label": "រថយន្តធម្មតា (2AB-1234)",
-      // "plateCode":,
-      "pattern": r"^2[A-Z]{2}-\d{4}$"
+      "key": "ROYAL_PALACE",
+      "label": "រាជវាំង",
+      "subcategory": ["រាជវាំង"],
+      // "pattern": r"^2[A-Z]{2}-\d{4}$"
     },
     {
-      "key": "CAR_STATE",
-      "label": "រដ្ឋ (2-0369)",
-      // "plateCode":,
-      "pattern": r"^2-\d{4}$"
+      "key": "STATE",
+      "label": "រដ្ឋ",
+      "subcategory": List.generate(
+        61,
+        (i) => "រដ្ឋ-${(i + 1).toString().padLeft(2, '0')}",
+      ),
+      // "pattern": r"^2-\d{4}$"
     },
     {
-      "key": "CAR_POLICE",
-      "label": "ប៉ូលីស (L-1077)",
-      // "plateCode":,
-      "pattern": r"^L-\d{4}$"
+      "key": "POLICE",
+      "label": "នគរបាល",
+      "subcategory": ["នគរបាល"],
+      // "pattern": r"^L-\d{4}$"
     },
     {
-      "key": "CAR_DIPLOMAT",
-      "label": "ការទូត (CD.76.002)",
-      // "plateCode":,
-      "pattern": r"^CD\.\d{2}\.\d{3}$"
+      "key": "ARMY_FORCE",
+      "label": "ខេមរភូមិន្ទ",
+      "subcategory": List.generate(
+        9,
+        (i) => "ខេមរភូមិន្ទ-${(i + 1).toString().padLeft(2, '0')}",
+      ),
+      // "pattern": r"^CD\.\d{2}\.\d{3}$"
     },
     {
-      "key": "CAR_TRUCK",
-      "label": "ឡានធំ (3A-1070)",
-      // "plateCode":,
-      "pattern": r"^3[A-Z]-\d{4}$"
+      "key": "ORGANIZATION",
+      "label": "អង្គការ",
+      "subcategory": ["OI", 'ONG1', 'ONG2'],
+      // "pattern": r"^3[A-Z]-\d{4}$"
+    },
+    {
+      "key": "EMBASSY",
+      "label": "អង្គទូត",
+      "subcategory": ["CMD01-1", "CD01"],
+      // "pattern": r"^3[A-Z]-\d{4}$"
+    },
+    {
+      "key": "UNITED_NATIONS",
+      "label": "អង្គការសហប្រជាជាតិ",
+      "subcategory": ['OUN01-1', 'ONU01'],
+      // "pattern": r"^3[A-Z]-\d{4}$"
+    },
+    {
+      "key": "TEMPORARY",
+      "label": "បណ្តោះអាសន្ន",
+      "subcategory": ["AT18"],
+      // "pattern": r"^3[A-Z]-\d{4}$"
+    },
+    {
+      "key": "REGULAR",
+      "label": "ធម្មតា",
+      "subcategory": [
+        "ភ្នំពេញ",
+        "កណ្តាល",
+        "បន្ទាយមានជ័យ",
+        "បាត់ដំបង",
+        "កំពង់ចាម",
+        "កំពង់ឆ្នាំង",
+        "កំពង់ស្ពឺ",
+        "កំពង់ធំ",
+        "កំពត",
+        "កែប",
+        "កោះកុង",
+        "ក្រចេះ",
+        "មណ្ឌលគិរី",
+        "ឧត្តរមានជ័យ",
+        "ប៉ៃលិន",
+        "ព្រះសីហនុ",
+        "ព្រះវិហារ",
+        "ព្រៃវែង",
+        "ពោធិ៍សាត់",
+        "សៀមរាប",
+        "ស្ទឹងត្រែង",
+        "ស្វាយរៀង",
+        "តាកែវ",
+        "ត្បូងឃ្មុំ",
+        "រតនគិរី",
+      ],
+      // "pattern": r"^3[A-Z]-\d{4}$"
+    },
+    {
+      "key": "CAMBODIA",
+      "label": "កម្ពុជា",
+      "subcategory": ["កម្ពុជា"],
+      // "pattern": r"^3[A-Z]-\d{4}$"
     },
   ];
 
   /// ✅ MOTO plate types
-  final List<Map<String, String>> motoPlateTypes = [
+  final List<Map<String, dynamic>> motoPlateTypes = [
     {
-      "key": "NORMAL_MOTO",
-      "label": "ម៉ូតូធម្មតា (1AB-1234)",
-      "pattern": r"^1[A-Z]{2}-\d{4}$"
+      "key": "MOTORBIKE_REGULAR",
+      "label": "ម៉ូតូធម្មតា",
+      // "pattern": r"^1[A-Z]{2}-\d{4}$"
+      "subcategory": [
+        "ភ្នំពេញ",
+        "កណ្តាល",
+        "បន្ទាយមានជ័យ",
+        "បាត់ដំបង",
+        "កំពង់ចាម",
+        "កំពង់ឆ្នាំង",
+        "កំពង់ស្ពឺ",
+        "កំពង់ធំ",
+        "កំពត",
+        "កែប",
+        "កោះកុង",
+        "ក្រចេះ",
+        "មណ្ឌលគិរី",
+        "ឧត្តរមានជ័យ",
+        "ប៉ៃលិន",
+        "ព្រះសីហនុ",
+        "ព្រះវិហារ",
+        "ព្រៃវែង",
+        "ពោធិ៍សាត់",
+        "សៀមរាប",
+        "ស្ទឹងត្រែង",
+        "ស្វាយរៀង",
+        "តាកែវ",
+        "ត្បូងឃ្មុំ",
+        "រតនគិរី",
+      ],
     },
     {
-      "key": "MOTO_STATE",
-      "label": "ម៉ូតូរដ្ឋ (1-0369)",
-      "pattern": r"^1-\d{4}$"
+      "key": "MOTORBIKE_CAMBODIA",
+      "label": "ម៉ូតូកម្ពុជា",
+      // "pattern": r"^1-\d{4}$"
+      "subcategory": ["កម្ពុជា"]
     },
     {
-      "key": "MOTO_POLICE",
-      "label": "ម៉ូតូប៉ូលីស (M-1234)",
-      "pattern": r"^M-\d{4}$"
+      "key": "MOTORBIKE_POLICE",
+      "label": "ម៉ូតូនគរបាល",
+      // "pattern": r"^M-\d{4}$"
+      "subcategory": ["នគរបាល"]
+    },
+    {
+      "key": "MOTORBIKE_ARMY_FORCE",
+      "label": "ម៉ូតូខេមរភូមិន្ទ",
+      // "pattern": r"^M-\d{4}$"
+      "subcategory": List.generate(
+        9,
+        (i) => "ខេមរភូមិន្ទ-${(i + 1).toString().padLeft(2, '0')}",
+      ),
     },
   ];
+
+  String getPlateKey(_VehicleForm v) {
+    final isMoto = v.vehicleType == "MOTORBIKE";
+    final items = isMoto ? motoPlateTypes : plateCategory;
+    final type = isMoto ? v.motoPlateType : v.carPlateType;
+
+    if (type == null) return "UNKNOWN";
+
+    // Find the map in the list that matches the selected type
+    final found = items.firstWhere(
+      (item) => item["key"] == type,
+      orElse: () => {"key": "UNKNOWN"},
+    );
+
+    return found["key"]!;
+  }
+
+  String getSubcategoryKey(_VehicleForm v) {
+    final isMoto = v.vehicleType == "MOTORBIKE";
+    final items = isMoto ? motoPlateTypes : plateCategory;
+    final type = isMoto ? v.motoPlateType : v.carPlateType;
+    final sub = isMoto ? v.motoPlateSubcategory : v.carPlateSubcategory;
+
+    // Find the type map
+    final found = items.firstWhere(
+      (item) => item["key"] == type,
+      orElse: () => items.isNotEmpty ? items[0] : {"label": "N/A"},
+    );
+
+    final typeLabel = found["label"]!;
+
+    // If sub is null or doesn't contain Khmer, fallback to type label
+    if (sub == null || !RegExp(r'[\u1780-\u17FF]').hasMatch(sub)) {
+      return typeLabel;
+    }
+
+    return sub; // subcategory contains Khmer → return it
+  }
 
   // ----------------------------
   // ✅ Rules (UPDATED for SECRETARY/DEPUTY)
@@ -741,6 +879,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ----------------------------
   // Plate validation helper
   // ----------------------------
+  //TODO Refactor this
   bool _isPlateValid(_VehicleForm v) {
     final plateValue = _normalizePlate(v.plate.text);
 
@@ -876,15 +1015,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return false;
       }
 
-      if (_normalizePlate(v.plate.text).isEmpty) {
-        _snack("សូមបញ្ចូលស្លាកលេខ (#${i + 1})");
-        return false;
-      }
-
-      if (!_isPlateValid(v)) {
-        _snack("ស្លាកលេខ (#${i + 1}) មិនត្រឹមត្រូវ: ${_plateHint(v)}");
-        return false;
-      }
+      // if (_normalizePlate(v.plate.text).isEmpty) {
+      //   _snack("សូមបញ្ចូលស្លាកលេខ (#${i + 1})");
+      //   return false;
+      // }
+      //TODO Refactor this
+      // if (!_isPlateValid(v)) {
+      //   _snack("ស្លាកលេខ (#${i + 1}) មិនត្រឹមត្រូវ: ${_plateHint(v)}");
+      //   return false;
+      // }
 
       if (v.color.text.trim().isEmpty) {
         _snack("សូមបញ្ចូលពណ៌ (#${i + 1})");
@@ -949,9 +1088,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return <String, dynamic>{
           "brand": v.brand.text.trim(),
           "plate": <String, dynamic>{
-            "plateNumber": _normalizePlate(v.plate.text),
-            "plateCategory": "REGULAR",
-            // "plateSubCategory": "REGULAR",  // set correct value
+            "plateNumber": _normalizePlate(plateController.text),
+            "plateCategory":
+                v.vehicleType == "MOTORBIKE" ? v.motoPlateType : v.carPlateType,
+                //TODO include plateSubCategory
+            // "plateSubCategory": v.vehicleType == "MOTORBIKE"
+            //     ? v.motoPlateSubcategory
+            //     : v.carPlateSubcategory,
           },
           "color": v.color.text.trim(),
           "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
@@ -1115,7 +1258,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     "color": v.color.text.trim(),
                     "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
                     "vehicleType": v.vehicleType,
-                    "plateNumber": v.plate.text.trim(),
+                    "plateNumber": plateController.text.trim(),
                   })
               .toList(),
         },
@@ -1350,6 +1493,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       hint: "បញ្ចូលម៉ាក",
                                       controller: v.brand),
                                   plateRow(v),
+                                  oneInput(
+                                      label: "ផ្លាកលេខ",
+                                      hint:
+                                          "សូមបញ្ចូលផ្លាកលេខអោយត្រូវតាមទម្រង់",
+                                      controller: plateController),
+                                  SizedBox(
+                                    height: 10,
+                                  ),
+                                  Center(
+                                    child: plateBox(
+                                        label: getSubcategoryKey(v),
+                                        code:
+                                            "2A-XXXX", // TODO: replace with actual plate number
+                                        keyText: getPlateKey(v)),
+                                  ),
                                   twoInputRow(
                                     "ពណ៌",
                                     "ឆ្នាំផលិត",
@@ -1488,7 +1646,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget plateRow(_VehicleForm v) {
     final isMoto = v.vehicleType == "MOTORBIKE";
     final items = isMoto ? motoPlateTypes : plateCategory;
-    final currentType = isMoto ? v.motoPlateType : v.carPlateType;
+
+    // Use the form's values as current selection
+    String currentType = isMoto ? v.motoPlateType : v.carPlateType;
+    String? currentSubcategory =
+        isMoto ? v.motoPlateSubcategory : v.carPlateSubcategory;
+
+    // Compute the subcategory list safely
+    final subcategoryList = currentType.isNotEmpty
+        ? (items.firstWhere((t) => t["key"] == currentType)["subcategory"]
+            as List<String>)
+        : <String>[];
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -1499,6 +1667,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 6),
           Row(
             children: [
+              // Category Dropdown
               Flexible(
                 flex: 2,
                 child: DropdownButtonFormField<String>(
@@ -1518,35 +1687,106 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   onChanged: (x) {
                     if (x == null) return;
                     setState(() {
+                      // Update selection in the form
                       if (isMoto) {
                         v.motoPlateType = x;
+                        v.motoPlateSubcategory = null;
                       } else {
                         v.carPlateType = x;
+                        v.carPlateSubcategory = null;
                       }
                     });
                   },
                 ),
               ),
               const SizedBox(width: 10),
+              // Subcategory Dropdown
               Flexible(
-                flex: 3,
-                child: TextFormField(
-                  controller: v.plate,
-                  decoration: inputDecoration("បញ្ចូលស្លាកលេខ"),
-                  textCapitalization: TextCapitalization.characters,
-                  inputFormatters: [
-                    LengthLimitingTextInputFormatter(12),
-                    TextInputFormatter.withFunction((oldValue, newValue) {
-                      final up = newValue.text.toUpperCase();
-                      return newValue.copyWith(
-                        text: up,
-                        selection: newValue.selection,
-                      );
-                    }),
-                  ],
+                flex: 2,
+                child: DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  value: (currentSubcategory != null &&
+                          subcategoryList.contains(currentSubcategory))
+                      ? currentSubcategory
+                      : null, // only valid value
+                  decoration: inputDecoration("ក្រុមផ្លាកលេខ"),
+                  items: subcategoryList
+                      .map((sub) => DropdownMenuItem<String>(
+                            value: sub,
+                            child: Text(
+                              sub,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() {
+                      // Update form
+                      if (isMoto) {
+                        v.motoPlateSubcategory = value;
+                      } else {
+                        v.carPlateSubcategory = value;
+                      }
+                    });
+                  },
+                  validator: (value) => (value == null || value.isEmpty)
+                      ? "សូមជ្រើសរើសប្រភេទរង"
+                      : null,
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget plateBox({
+    required String label,
+    required String code,
+    required String keyText,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.blue, width: 2),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      width: 200, // adjust as needed
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Top label
+          Text(
+            label,
+            style: const TextStyle(
+                fontSize: 20, fontWeight: FontWeight.w500, color: Colors.blue),
+            textAlign: TextAlign.center,
+          ),
+
+          // Middle code
+          Text(
+            code,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.blue,
+              letterSpacing: 4,
+            ),
+          ),
+          Container(
+            height: 2,
+            color: Colors.blue,
+          ),
+          Text(
+            keyText,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.red,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
