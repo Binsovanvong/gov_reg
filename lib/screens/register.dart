@@ -1,14 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gov_reg/routes/approute.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:image/image.dart' as img;
 
 /// ✅ MUST be top-level (NOT inside State class)
 class _VehicleForm {
@@ -164,8 +165,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final positionController = TextEditingController();
   final phoneController = TextEditingController();
 
-  final plateController = TextEditingController();
-
   /// calendar date (yyyy-MM-dd) - only for NON duration types
   final requestDateController = TextEditingController();
 
@@ -204,7 +203,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       "key": "ROYAL_PALACE",
       "label": "រាជវាំង",
       "subcategory": ["រាជវាំង"],
-      // "pattern": r"^2[A-Z]{2}-\d{4}$"
     },
     {
       "key": "STATE",
@@ -213,13 +211,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         61,
         (i) => "រដ្ឋ-${(i + 1).toString().padLeft(2, '0')}",
       ),
-      // "pattern": r"^2-\d{4}$"
     },
     {
       "key": "POLICE",
       "label": "នគរបាល",
       "subcategory": ["នគរបាល"],
-      // "pattern": r"^L-\d{4}$"
     },
     {
       "key": "ARMY_FORCE",
@@ -228,31 +224,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
         9,
         (i) => "ខេមរភូមិន្ទ-${(i + 1).toString().padLeft(2, '0')}",
       ),
-      // "pattern": r"^CD\.\d{2}\.\d{3}$"
     },
     {
       "key": "ORGANIZATION",
       "label": "អង្គការ",
       "subcategory": ["OI", 'ONG1', 'ONG2'],
-      // "pattern": r"^3[A-Z]-\d{4}$"
     },
     {
       "key": "EMBASSY",
       "label": "អង្គទូត",
       "subcategory": ["CMD01-1", "CD01"],
-      // "pattern": r"^3[A-Z]-\d{4}$"
     },
     {
       "key": "UNITED_NATIONS",
       "label": "អង្គការសហប្រជាជាតិ",
       "subcategory": ['OUN01-1', 'ONU01'],
-      // "pattern": r"^3[A-Z]-\d{4}$"
     },
     {
       "key": "TEMPORARY",
       "label": "បណ្តោះអាសន្ន",
       "subcategory": ["AT18"],
-      // "pattern": r"^3[A-Z]-\d{4}$"
     },
     {
       "key": "REGULAR",
@@ -284,13 +275,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         "ត្បូងឃ្មុំ",
         "រតនគិរី",
       ],
-      // "pattern": r"^3[A-Z]-\d{4}$"
     },
     {
       "key": "CAMBODIA",
       "label": "កម្ពុជា",
       "subcategory": ["កម្ពុជា"],
-      // "pattern": r"^3[A-Z]-\d{4}$"
     },
   ];
 
@@ -299,7 +288,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     {
       "key": "MOTORBIKE_REGULAR",
       "label": "ម៉ូតូធម្មតា",
-      // "pattern": r"^1[A-Z]{2}-\d{4}$"
       "subcategory": [
         "ភ្នំពេញ",
         "កណ្តាល",
@@ -331,19 +319,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
     {
       "key": "MOTORBIKE_CAMBODIA",
       "label": "ម៉ូតូកម្ពុជា",
-      // "pattern": r"^1-\d{4}$"
       "subcategory": ["កម្ពុជា"]
     },
     {
       "key": "MOTORBIKE_POLICE",
       "label": "ម៉ូតូនគរបាល",
-      // "pattern": r"^M-\d{4}$"
       "subcategory": ["នគរបាល"]
     },
     {
       "key": "MOTORBIKE_ARMY_FORCE",
       "label": "ម៉ូតូខេមរភូមិន្ទ",
-      // "pattern": r"^M-\d{4}$"
       "subcategory": List.generate(
         9,
         (i) => "ខេមរភូមិន្ទ-${(i + 1).toString().padLeft(2, '0')}",
@@ -356,15 +341,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final items = isMoto ? motoPlateTypes : plateCategory;
     final type = isMoto ? v.motoPlateType : v.carPlateType;
 
-    if (type == null) return "UNKNOWN";
-
-    // Find the map in the list that matches the selected type
     final found = items.firstWhere(
       (item) => item["key"] == type,
       orElse: () => {"key": "UNKNOWN"},
     );
 
-    return found["key"]!;
+    return (found["key"] ?? "UNKNOWN").toString();
   }
 
   String getSubcategoryKey(_VehicleForm v) {
@@ -373,20 +355,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final type = isMoto ? v.motoPlateType : v.carPlateType;
     final sub = isMoto ? v.motoPlateSubcategory : v.carPlateSubcategory;
 
-    // Find the type map
     final found = items.firstWhere(
       (item) => item["key"] == type,
       orElse: () => items.isNotEmpty ? items[0] : {"label": "N/A"},
     );
 
-    final typeLabel = found["label"]!;
+    final typeLabel = (found["label"] ?? "N/A").toString();
 
-    // If sub is null or doesn't contain Khmer, fallback to type label
     if (sub == null || !RegExp(r'[\u1780-\u17FF]').hasMatch(sub)) {
       return typeLabel;
     }
 
-    return sub; // subcategory contains Khmer → return it
+    return sub;
   }
 
   // ----------------------------
@@ -512,7 +492,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     await prefs.clear();
     if (!mounted) return;
     _snack("Session expired. Please login again.");
-    // Navigator.pushReplacementNamed(context, Approute.loginScreen);
   }
 
   Future<http.Response> _getWithAuthRetry(Uri uri) async {
@@ -565,8 +544,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         .toList();
   }
 
-  Future<List<DepartmentItem>> fetchDepartmentsByGeneralDepartment(
-      int gdId) async {
+  Future<List<DepartmentItem>> fetchDepartmentsByGeneralDepartment(int gdId) async {
     final uri =
         Uri.parse("$baseUrl/api/v1/departments/general-department/$gdId");
     final res = await _getWithAuthRetry(uri);
@@ -781,7 +759,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final XFile? xfile = await _imagePicker.pickImage(
       source: ImageSource.camera,
-      imageQuality: 85, // initial capture quality
+      imageQuality: 85,
       maxWidth: 2000,
       maxHeight: 2000,
     );
@@ -790,7 +768,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     File file = File(xfile.path);
 
-    // Maximum size check (5MB)
     const maxBytes = 5 * 1024 * 1024;
     int bytes = await file.length();
     if (bytes > maxBytes) {
@@ -798,10 +775,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    // Minimum size check (150KB) + guarantee
     const minBytes = 153600;
     if (bytes < minBytes) {
-      // Decode the image
       img.Image? decoded = img.decodeImage(await file.readAsBytes());
 
       if (decoded == null) {
@@ -809,20 +784,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
 
-      // Slightly upscale until we reach minimum bytes
       int quality = 100;
       int attempt = 0;
       const maxAttempts = 5;
 
       while (bytes < minBytes && attempt < maxAttempts) {
-        // Slightly upscale by 10% each attempt
         decoded = img.copyResize(
           decoded!,
           width: (decoded.width * 1.1).toInt(),
           height: (decoded.height * 1.1).toInt(),
         );
 
-        // Encode at max quality
         final newBytes = img.encodeJpg(decoded, quality: quality);
         await file.writeAsBytes(newBytes);
         bytes = await file.length();
@@ -835,16 +807,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     }
 
-    // ✅ File is valid
     setState(() {
       cameraFile = file;
       cameraFileName = xfile.name;
       cameraError = null;
-    });
-
-    setState(() {
-      cameraFile = file;
-      cameraFileName = xfile.name;
     });
   }
 
@@ -874,38 +840,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       v.dispose();
     }
     super.dispose();
-  }
-
-  // ----------------------------
-  // Plate validation helper
-  // ----------------------------
-  //TODO Refactor this
-  bool _isPlateValid(_VehicleForm v) {
-    final plateValue = _normalizePlate(v.plate.text);
-
-    if (v.vehicleType == "MOTORBIKE") {
-      final selected =
-          motoPlateTypes.firstWhere((t) => t["key"] == v.motoPlateType);
-      final reg = RegExp(selected["pattern"]!);
-      return reg.hasMatch(plateValue);
-    } else {
-      final selected =
-          plateCategory.firstWhere((t) => t["key"] == v.carPlateType);
-      final reg = RegExp(selected["pattern"]!);
-      return reg.hasMatch(plateValue);
-    }
-  }
-
-  String _plateHint(_VehicleForm v) {
-    if (v.vehicleType == "MOTORBIKE") {
-      final selected =
-          motoPlateTypes.firstWhere((t) => t["key"] == v.motoPlateType);
-      return selected["label"]!;
-    } else {
-      final selected =
-          plateCategory.firstWhere((t) => t["key"] == v.carPlateType);
-      return selected["label"]!;
-    }
   }
 
   // ----------------------------
@@ -941,7 +875,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return false;
     }
 
-    // ✅ GUEST + NATIONAL use duration
     if (useDurationDays) {
       final durText = durationDaysController.text.trim();
       if (durText.isEmpty) {
@@ -1015,16 +948,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return false;
       }
 
-      // if (_normalizePlate(v.plate.text).isEmpty) {
-      //   _snack("សូមបញ្ចូលស្លាកលេខ (#${i + 1})");
-      //   return false;
-      // }
-      //TODO Refactor this
-      // if (!_isPlateValid(v)) {
-      //   _snack("ស្លាកលេខ (#${i + 1}) មិនត្រឹមត្រូវ: ${_plateHint(v)}");
-      //   return false;
-      // }
-
       if (v.color.text.trim().isEmpty) {
         _snack("សូមបញ្ចូលពណ៌ (#${i + 1})");
         return false;
@@ -1057,21 +980,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
     DateTime requestAt;
     DateTime requestEnd;
 
-    // ✅ duration for GUEST + NATIONAL
     if (useDurationDays) {
       final dur = int.parse(durationDaysController.text.trim());
       requestAt = today;
       requestEnd = today.add(Duration(days: dur));
     } else {
-      final chosen =
-          DateTime.parse(requestDateController.text.trim()); // yyyy-MM-dd
+      final chosen = DateTime.parse(requestDateController.text.trim());
       requestAt = chosen;
       requestEnd = chosen;
     }
 
     final int requestDateInt = _fmtYmdInt(requestEnd);
-
-    // ✅ FIX: backend expects dd-MM-yyyy for LocalDate
     final String requestAtDateStr = _fmtDmy(requestAt);
 
     final dto = <String, dynamic>{
@@ -1088,13 +1007,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return <String, dynamic>{
           "brand": v.brand.text.trim(),
           "plate": <String, dynamic>{
-            "plateNumber": _normalizePlate(plateController.text),
+            "plateNumber": _normalizePlate(v.plate.text),
             "plateCategory":
                 v.vehicleType == "MOTORBIKE" ? v.motoPlateType : v.carPlateType,
-                //TODO include plateSubCategory
-            // "plateSubCategory": v.vehicleType == "MOTORBIKE"
-            //     ? v.motoPlateSubcategory
-            //     : v.carPlateSubcategory,
           },
           "color": v.color.text.trim(),
           "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
@@ -1103,12 +1018,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }).toList(),
     };
 
-    /// ✅ GUEST -> DO NOT send requestAtDate (only requestDate)
     if (_userType != "GUEST") {
       dto["requestAtDate"] = requestAtDateStr;
     }
 
-    // workingInfo
     final wi = <String, dynamic>{};
     if (showIdNumber) wi["policeId"] = idNumberController.text.trim();
 
@@ -1127,12 +1040,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       (dto["user"] as Map<String, dynamic>)["workingInfo"] = wi;
     }
 
-    // ✅ Token OPTIONAL (guest can submit without login)
-    final token = await _getToken(); // may be null/empty
+    final token = await _getToken();
 
-    // ✅ Collect files (multi + camera only)
     final List<Map<String, String>> fileList = [];
-
     for (int i = 0; i < attachFiles.length; i++) {
       fileList.add({"path": attachFiles[i].path, "name": attachFileNames[i]});
     }
@@ -1144,13 +1054,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
     }
 
-    // ✅ attachmentTypes count must match file count
     Uri uri = base;
     if (fileList.isNotEmpty) {
       uri = base.replace(
         queryParameters: <String, dynamic>{
-          "attachmentTypes":
-              List<String>.filled(fileList.length, attachmentTypeValue),
+          "attachmentTypes": List<String>.filled(fileList.length, attachmentTypeValue),
         },
       );
     }
@@ -1158,7 +1066,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final request = http.MultipartRequest("POST", uri);
     request.headers["Accept"] = "*/*";
 
-    // ✅ Only send Authorization if token exists
     if (token != null && token.isNotEmpty) {
       request.headers["Authorization"] = "Bearer $token";
     }
@@ -1189,94 +1096,102 @@ class _RegisterScreenState extends State<RegisterScreen> {
       throw "HTTP ${resp.statusCode}: ${resp.body.isEmpty ? '(empty body)' : resp.body}";
     }
 
-    if (resp.body.isEmpty) return {};
-    final decoded = jsonDecode(resp.body);
-    return decoded is Map<String, dynamic> ? decoded : {};
+    // ✅ Decode response
+    final decoded = resp.body.isEmpty ? {} : jsonDecode(resp.body);
+    final map = decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
+
+    // ✅ Return API response + your computed dates
+    return {
+      ...map,
+      "requestDateInt": requestDateInt,
+      "requestAtDateStr": requestAtDateStr,
+    };
   }
+
 
   // ----------------------------
   // Submit
   // ----------------------------
-  Future<void> submitRegister() async {
-    await _login(
-      baseUrl: "http://10.0.2.2:8080",
-      email: "user@moi.com",
-      password: "Moi@2026\$",
-    );
+ Future<void> submitRegister() async {
+  await _login(
+    baseUrl: "http://10.0.2.2:8080",
+    email: "user@moi.com",
+    password: "Moi@2026\$",
+  );
 
-    if (!validateForm()) return;
+  if (!validateForm()) return;
 
-    setState(() => isLoading = true);
-    try {
-      final res = await createParkingCardRequest();
-      final code = (res["code"] ?? "").toString();
-      debugPrint("DEBUG,$code");
+  setState(() => isLoading = true);
+  try {
+    final res = await createParkingCardRequest();
+    debugPrint("DEBUG,${(res["code"] ?? "").toString()}");
 
-      String token = "";
-      final t = res["token"];
-      if (t is String) token = t;
-      if (t is Map) token = (t["accessToken"] ?? t["token"] ?? "").toString();
+    if (!mounted) return;
 
-      if (!mounted) return;
-
-      // ✅ read selfie bytes (BEST)
-      Uint8List? selfieBytes;
-      if (cameraFile != null) {
-        selfieBytes = await cameraFile!.readAsBytes();
-      }
-      // TODO change all to take from response
-      Navigator.pushNamed(
-        context,
-        Approute.verifySuccessScreen,
-        arguments: {
-          "code": res["code"],
-          "token": res["token"],
-          "parkingRequestStatus": res["parkingRequestStatus"],
-          // ✅ personal
-          "fullName": fullNameController.text.trim(),
-          "phone": phoneController.text.trim(),
-          "userType": _userType,
-
-          // ✅ selfie (TOP LEVEL ✅)
-          "selfieBytes": selfieBytes,
-          "selfiePath": cameraFile?.path, // optional backup
-
-          // ✅ working info (texts)
-          "workingInfo": {
-            "generalDepartmentText": ministryController.text.trim(),
-            "departmentText": departmentController.text.trim(),
-            "burauText": officeController.text.trim(),
-            "positionText": positionController.text.trim(),
-            "policeId": idNumberController.text.trim(),
-            "provinceCity": provinceCityController.text.trim(),
-          },
-
-          // ✅ vehicles list (NO selfie here)
-          "vehicles": vehicles
-              .map((v) => {
-                    "brand": v.brand.text.trim(),
-                    "color": v.color.text.trim(),
-                    "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
-                    "vehicleType": v.vehicleType,
-                    "plateNumber": plateController.text.trim(),
-                  })
-              .toList(),
-        },
-      );
-    } catch (e, st) {
-      debugPrint("SUBMIT ERROR: $e");
-      debugPrint("STACK: $st");
-      if (!mounted) return;
-
-      final msg = e.toString().contains("401") || e.toString().contains("403")
-          ? "Backend still requires login (401/403). You must allow guest POST /parking-card-requests in backend."
-          : "Error: $e";
-
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-    } finally {
-      if (mounted) setState(() => isLoading = false);
+    Uint8List? selfieBytes;
+    if (cameraFile != null) {
+      selfieBytes = await cameraFile!.readAsBytes();
     }
+
+    // ✅ Get computed dates from response map
+    final int requestDateInt = (res["requestDateInt"] ?? 0) as int;
+    final String requestAtDateStr = (res["requestAtDateStr"] ?? "").toString();
+
+    final args = <String, dynamic>{
+      "code": res["code"],
+      "token": res["token"],
+      "parkingRequestStatus": res["parkingRequestStatus"],
+
+      "fullName": fullNameController.text.trim(),
+      "phone": phoneController.text.trim(),
+      "userType": _userType,
+
+      "selfieBytes": selfieBytes,
+      "selfiePath": cameraFile?.path,
+
+      // ✅ Now available here
+      "requestDate": requestDateInt,
+      "requestAtDate": _userType == "GUEST" ? null : requestAtDateStr,
+
+      "workingInfo": {
+        "generalDepartmentText": ministryController.text.trim(),
+        "departmentText": departmentController.text.trim(),
+        "burauText": officeController.text.trim(),
+        "positionText": positionController.text.trim(),
+        "policeId": idNumberController.text.trim(),
+        "provinceCity": provinceCityController.text.trim(),
+      },
+
+      "vehicles": vehicles
+          .map((v) => {
+                "brand": v.brand.text.trim(),
+                "color": v.color.text.trim(),
+                "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
+                "vehicleType": v.vehicleType,
+                "plateNumber": v.plate.text.trim(),
+              })
+          .toList(),
+    };
+    Navigator.pushNamed(
+      context,
+      Approute.verifySuccessScreen,
+      arguments: args,
+    );
+  } catch (e, st) {
+    debugPrint("SUBMIT ERROR: $e");
+    debugPrint("STACK: $st");
+    if (!mounted) return;
+
+    final msg = e.toString().contains("401") || e.toString().contains("403")
+        ? "Backend still requires login (401/403). You must allow guest POST /parking-card-requests in backend."
+        : "Error: $e";
+
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  } finally {
+    if (mounted) setState(() => isLoading = false);
   }
+}
+
 
   // ----------------------------
   // Date picker (NON duration)
@@ -1290,8 +1205,61 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
 
     if (d != null) {
-      requestDateController.text = _fmtYmd(d); // yyyy-MM-dd
+      requestDateController.text = _fmtYmd(d);
     }
+  }
+
+  // ----------------------------
+  // ✅ UI BLOCKS (LIKE SCREENSHOT)
+  // ----------------------------
+  Widget fieldBlock({
+    required String label,
+    required Widget child,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 6),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget textFieldBlock({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+    TextInputType keyboardType = TextInputType.text,
+    TextCapitalization textCapitalization = TextCapitalization.none,
+    bool readOnly = false,
+    VoidCallback? onTap,
+    Widget? suffixIcon,
+    List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
+  }) {
+    return fieldBlock(
+      label: label,
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        readOnly: readOnly,
+        onTap: onTap,
+        textCapitalization: textCapitalization,
+        inputFormatters: inputFormatters,
+        maxLength: maxLength,
+        buildCounter: (context,
+                {required currentLength, required isFocused, maxLength}) =>
+            null,
+        decoration: inputDecoration(hint).copyWith(suffixIcon: suffixIcon),
+      ),
+    );
   }
 
   // ----------------------------
@@ -1327,28 +1295,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             dropdownUserType(),
                             const SizedBox(height: 15),
 
-                            if (showIdNumber)
-                              twoInputRow(
-                                "គោត្តនាម និងនាម",
-                                "អត្តលេខ",
-                                "បញ្ចូលឈ្មោះពេញ",
-                                "បញ្ចូលអត្តលេខ",
-                                fullNameController,
-                                idNumberController,
-                                leftIsPlate: false,
-                                rightIsPlate: false,
-                              )
-                            else
+                            if (showIdNumber) ...[
                               oneInput(
                                 label: "គោត្តនាម និងនាម",
                                 hint: "បញ្ចូលឈ្មោះពេញ",
                                 controller: fullNameController,
                               ),
+                              textFieldBlock(
+                                label: "អត្តលេខ",
+                                hint: "បញ្ចូលអត្តលេខ",
+                                controller: idNumberController,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(10),
+                                ],
+                                maxLength: 10,
+                              ),
+                            ] else ...[
+                              oneInput(
+                                label: "គោត្តនាម និងនាម",
+                                hint: "បញ្ចូលឈ្មោះពេញ",
+                                controller: fullNameController,
+                              ),
+                            ],
 
                             if (showWorkFields) ...[
                               sectionTitle("ព័ត៌មានការងារ"),
 
-                              /// ✅ Officers -> dropdown
                               if (useWorkDropdown) ...[
                                 if (dropdownLoading)
                                   const Padding(
@@ -1361,26 +1335,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 _ddBurau(),
                                 _ddPosition(),
                               ] else ...[
-                                /// ✅ Guest + National -> text fields
-                                twoInputRow(
-                                  "ក្រសួង/ស្ថាប័ន",
-                                  "នាយកដ្ឋាន/អង្គភាព",
-                                  "បញ្ចូលក្រសួង",
-                                  "បញ្ចូលនាយកដ្ឋាន",
-                                  ministryController,
-                                  departmentController,
-                                  leftIsPlate: false,
-                                  rightIsPlate: false,
+                                oneInput(
+                                  label: "ក្រសួង/ស្ថាប័ន",
+                                  hint: "បញ្ចូលក្រសួង",
+                                  controller: ministryController,
                                 ),
-                                twoInputRow(
-                                  "ការិយាល័យ",
-                                  "តួនាទី",
-                                  "បញ្ចូលការិយាល័យ",
-                                  "បញ្ចូលតួនាទី",
-                                  officeController,
-                                  positionController,
-                                  leftIsPlate: false,
-                                  rightIsPlate: false,
+                                oneInput(
+                                  label: "នាយកដ្ឋាន/អង្គភាព",
+                                  hint: "បញ្ចូលនាយកដ្ឋាន",
+                                  controller: departmentController,
+                                ),
+                                oneInput(
+                                  label: "ការិយាល័យ",
+                                  hint: "បញ្ចូលការិយាល័យ",
+                                  controller: officeController,
+                                ),
+                                oneInput(
+                                  label: "តួនាទី",
+                                  hint: "បញ្ចូលតួនាទី",
+                                  controller: positionController,
                                 ),
                               ],
                             ],
@@ -1394,50 +1367,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                             const SizedBox(height: 10),
 
-                            /// ✅ If duration: phone + duration days
                             if (useDurationDays) ...[
-                              Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 20),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text("លេខទូរស័ព្ទ"),
-                                    const SizedBox(height: 6),
-                                    TextFormField(
-                                      controller: phoneController,
-                                      keyboardType: TextInputType.phone,
-                                      decoration:
-                                          inputDecoration("លេខទូរស័ព្ទ"),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    const Text("រយៈពេលស្នើរ (ចំនួនថ្ងៃ)"),
-                                    const SizedBox(height: 6),
-                                    TextFormField(
-                                      controller: durationDaysController,
-                                      keyboardType: TextInputType.number,
-                                      inputFormatters: [
-                                        FilteringTextInputFormatter.digitsOnly,
-                                        LengthLimitingTextInputFormatter(3),
-                                      ],
-                                      decoration:
-                                          inputDecoration("ឧ: 2 ឬ 4 ឬ 7")
-                                              .copyWith(
-                                        suffixText: "ថ្ងៃ",
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              textFieldBlock(
+                                label: "លេខទូរស័ព្ទ",
+                                hint: "លេខទូរស័ព្ទ",
+                                controller: phoneController,
+                                keyboardType: TextInputType.phone,
+                              ),
+                              textFieldBlock(
+                                label: "រយៈពេលស្នើរ (ចំនួនថ្ងៃ)",
+                                hint: "ឧ: 2 ឬ 4 ឬ 7",
+                                controller: durationDaysController,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(3),
+                                ],
                               ),
                             ] else ...[
-                              Rowlabel(),
-                              const SizedBox(height: 10),
-                              phoneAndDate(),
+                              phoneAndDate(), // ✅ now vertical like screenshot
                             ],
 
                             sectionTitle("ព័ត៌មានរថយន្ត/ម៉ូតូ"),
                             ...List.generate(vehicles.length, (i) {
                               final v = vehicles[i];
+
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -1488,36 +1442,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       ),
                                     ],
                                   ),
+
                                   oneInput(
-                                      label: "ម៉ាក",
-                                      hint: "បញ្ចូលម៉ាក",
-                                      controller: v.brand),
-                                  plateRow(v),
-                                  oneInput(
-                                      label: "ផ្លាកលេខ",
-                                      hint:
-                                          "សូមបញ្ចូលផ្លាកលេខអោយត្រូវតាមទម្រង់",
-                                      controller: plateController),
-                                  SizedBox(
-                                    height: 10,
+                                    label: "ម៉ាក",
+                                    hint: "បញ្ចូលម៉ាក",
+                                    controller: v.brand,
                                   ),
+
+                                  plateRow(v), // ✅ dropdowns vertical
+
+                                  oneInput(
+                                    label: "ផ្លាកលេខ",
+                                    hint: "សូមបញ្ចូលផ្លាកលេខអោយត្រូវតាមទម្រង់",
+                                    controller: v.plate, // ✅ FIXED
+                                  ),
+
+                                  const SizedBox(height: 10),
+
                                   Center(
                                     child: plateBox(
-                                        label: getSubcategoryKey(v),
-                                        code:
-                                            "2A-XXXX", // TODO: replace with actual plate number
-                                        keyText: getPlateKey(v)),
+                                      label: getSubcategoryKey(v),
+                                      code: _normalizePlate(v.plate.text).isEmpty
+                                          ? "----"
+                                          : _normalizePlate(v.plate.text),
+                                      keyText: getPlateKey(v),
+                                    ),
                                   ),
-                                  twoInputRow(
-                                    "ពណ៌",
-                                    "ឆ្នាំផលិត",
-                                    "ពណ៌រថយន្ត",
-                                    "ឆ្នាំផលិត",
-                                    v.color,
-                                    v.year,
-                                    leftIsPlate: false,
-                                    rightIsPlate: false,
+
+                                  oneInput(
+                                    label: "ពណ៌",
+                                    hint: "ពណ៌រថយន្ត",
+                                    controller: v.color,
                                   ),
+                                  oneInput(
+                                    label: "ឆ្នាំផលិត",
+                                    hint: "ឆ្នាំផលិត",
+                                    controller: v.year,
+                                  ),
+
                                   const Divider(height: 24),
                                 ],
                               );
@@ -1538,208 +1500,201 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ----------------------------
-  // Work dropdown widgets
+  // Work dropdown widgets (label on top)
   // ----------------------------
   Widget _ddGeneralDepartment() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("ក្រសួង/ស្ថាប័ន"),
-          const SizedBox(height: 6),
-          DropdownButtonFormField<GeneralDepartmentItem>(
-            isExpanded: true,
-            value: selectedGD,
-            decoration: inputDecoration("ជ្រើសក្រសួង/ស្ថាប័ន"),
-            items: gdList
-                .map((x) => DropdownMenuItem(
-                      value: x,
-                      child: Text(x.name, overflow: TextOverflow.ellipsis),
-                    ))
-                .toList(),
-            onChanged: (x) => onSelectGD(x),
-          ),
-        ],
+    return fieldBlock(
+      label: "ក្រសួង/ស្ថាប័ន",
+      child: DropdownButtonFormField<GeneralDepartmentItem>(
+        isExpanded: true,
+        value: selectedGD,
+        decoration: inputDecoration("ជ្រើសក្រសួង/ស្ថាប័ន"),
+        items: gdList
+            .map((x) => DropdownMenuItem(
+                  value: x,
+                  child: Text(x.name, overflow: TextOverflow.ellipsis),
+                ))
+            .toList(),
+        onChanged: (x) => onSelectGD(x),
       ),
     );
   }
 
   Widget _ddDepartment() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("នាយកដ្ឋាន/អង្គភាព"),
-          const SizedBox(height: 6),
-          DropdownButtonFormField<DepartmentItem>(
-            isExpanded: true,
-            value: selectedDept,
-            decoration: inputDecoration("ជ្រើសនាយកដ្ឋាន/អង្គភាព"),
-            items: deptList
-                .map((x) => DropdownMenuItem(
-                      value: x,
-                      child: Text(x.name, overflow: TextOverflow.ellipsis),
-                    ))
-                .toList(),
-            onChanged: (x) => onSelectDept(x),
-          ),
-        ],
+    return fieldBlock(
+      label: "នាយកដ្ឋាន/អង្គភាព",
+      child: DropdownButtonFormField<DepartmentItem>(
+        isExpanded: true,
+        value: selectedDept,
+        decoration: inputDecoration("ជ្រើសនាយកដ្ឋាន/អង្គភាព"),
+        items: deptList
+            .map((x) => DropdownMenuItem(
+                  value: x,
+                  child: Text(x.name, overflow: TextOverflow.ellipsis),
+                ))
+            .toList(),
+        onChanged: (x) => onSelectDept(x),
       ),
     );
   }
 
   Widget _ddBurau() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("ការិយាល័យ"),
-          const SizedBox(height: 6),
-          DropdownButtonFormField<BurauItem>(
-            isExpanded: true,
-            value: selectedBurau,
-            decoration: inputDecoration("ជ្រើសការិយាល័យ"),
-            items: burauFiltered
-                .map((x) => DropdownMenuItem(
-                      value: x,
-                      child: Text(x.name, overflow: TextOverflow.ellipsis),
-                    ))
-                .toList(),
-            onChanged: (x) => onSelectBurau(x),
-          ),
-        ],
+    return fieldBlock(
+      label: "ការិយាល័យ",
+      child: DropdownButtonFormField<BurauItem>(
+        isExpanded: true,
+        value: selectedBurau,
+        decoration: inputDecoration("ជ្រើសការិយាល័យ"),
+        items: burauFiltered
+            .map((x) => DropdownMenuItem(
+                  value: x,
+                  child: Text(x.name, overflow: TextOverflow.ellipsis),
+                ))
+            .toList(),
+        onChanged: (x) => onSelectBurau(x),
       ),
     );
   }
 
   Widget _ddPosition() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("តួនាទី"),
-          const SizedBox(height: 6),
-          DropdownButtonFormField<PositionItem>(
-            isExpanded: true,
-            value: selectedPos,
-            decoration: inputDecoration("ជ្រើសតួនាទី"),
-            items: posList
-                .map((x) => DropdownMenuItem(
-                      value: x,
-                      child: Text(x.name, overflow: TextOverflow.ellipsis),
-                    ))
-                .toList(),
-            onChanged: (x) => onSelectPosition(x),
-          ),
-        ],
+    return fieldBlock(
+      label: "តួនាទី",
+      child: DropdownButtonFormField<PositionItem>(
+        isExpanded: true,
+        value: selectedPos,
+        decoration: inputDecoration("ជ្រើសតួនាទី"),
+        items: posList
+            .map((x) => DropdownMenuItem(
+                  value: x,
+                  child: Text(x.name, overflow: TextOverflow.ellipsis),
+                ))
+            .toList(),
+        onChanged: (x) => onSelectPosition(x),
       ),
     );
   }
 
   // ----------------------------
-  // Plate UI: CAR & MOTO
+  // Phone/date vertical (like screenshot)
+  // ----------------------------
+  Widget phoneAndDate() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        textFieldBlock(
+          label: "លេខទូរស័ព្ទ",
+          hint: "លេខទូរស័ព្ទ",
+          controller: phoneController,
+          keyboardType: TextInputType.phone,
+        ),
+        textFieldBlock(
+          label: "កាលបរិច្ឆេទស្នើរ",
+          hint: "ថ្ងៃស្នើរ",
+          controller: requestDateController,
+          readOnly: true,
+          suffixIcon: const Icon(Icons.calendar_month),
+          onTap: pickDate,
+        ),
+      ],
+    );
+  }
+
+  // ----------------------------
+  // oneInput uses screenshot style
+  // ----------------------------
+  Widget oneInput({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+  }) {
+    return textFieldBlock(
+      label: label,
+      hint: hint,
+      controller: controller,
+    );
+  }
+
+  // ----------------------------
+  // Plate UI: CAR & MOTO (dropdowns vertical)
   // ----------------------------
   Widget plateRow(_VehicleForm v) {
     final isMoto = v.vehicleType == "MOTORBIKE";
     final items = isMoto ? motoPlateTypes : plateCategory;
 
-    // Use the form's values as current selection
-    String currentType = isMoto ? v.motoPlateType : v.carPlateType;
-    String? currentSubcategory =
+    final currentType = isMoto ? v.motoPlateType : v.carPlateType;
+    final currentSubcategory =
         isMoto ? v.motoPlateSubcategory : v.carPlateSubcategory;
 
-    // Compute the subcategory list safely
     final subcategoryList = currentType.isNotEmpty
         ? (items.firstWhere((t) => t["key"] == currentType)["subcategory"]
             as List<String>)
         : <String>[];
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(isMoto ? "ស្លាកលេខម៉ូតូ" : "ស្លាកលេខរថយន្ត"),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              // Category Dropdown
-              Flexible(
-                flex: 2,
-                child: DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  value: currentType,
-                  decoration: inputDecoration("ប្រភេទស្លាក"),
-                  items: items.map((t) {
-                    return DropdownMenuItem<String>(
-                      value: t["key"],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        fieldBlock(
+          label: isMoto ? "ប្រភេទស្លាកលេខម៉ូតូ" : "ប្រភេទស្លាកលេខរថយន្ត",
+          child: DropdownButtonFormField<String>(
+            isExpanded: true,
+            value: currentType,
+            decoration: inputDecoration("ប្រភេទស្លាក"),
+            items: items.map((t) {
+              return DropdownMenuItem<String>(
+                value: t["key"],
+                child: Text(
+                  t["label"]!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            }).toList(),
+            onChanged: (x) {
+              if (x == null) return;
+              setState(() {
+                if (isMoto) {
+                  v.motoPlateType = x;
+                  v.motoPlateSubcategory = null;
+                } else {
+                  v.carPlateType = x;
+                  v.carPlateSubcategory = null;
+                }
+              });
+            },
+          ),
+        ),
+        fieldBlock(
+          label: "ក្រុមផ្លាកលេខ",
+          child: DropdownButtonFormField<String>(
+            isExpanded: true,
+            value: (currentSubcategory != null &&
+                    subcategoryList.contains(currentSubcategory))
+                ? currentSubcategory
+                : null,
+            decoration: inputDecoration("ជ្រើសក្រុមផ្លាកលេខ"),
+            items: subcategoryList
+                .map((sub) => DropdownMenuItem<String>(
+                      value: sub,
                       child: Text(
-                        t["label"]!,
+                        sub,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    );
-                  }).toList(),
-                  onChanged: (x) {
-                    if (x == null) return;
-                    setState(() {
-                      // Update selection in the form
-                      if (isMoto) {
-                        v.motoPlateType = x;
-                        v.motoPlateSubcategory = null;
-                      } else {
-                        v.carPlateType = x;
-                        v.carPlateSubcategory = null;
-                      }
-                    });
-                  },
-                ),
-              ),
-              const SizedBox(width: 10),
-              // Subcategory Dropdown
-              Flexible(
-                flex: 2,
-                child: DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  value: (currentSubcategory != null &&
-                          subcategoryList.contains(currentSubcategory))
-                      ? currentSubcategory
-                      : null, // only valid value
-                  decoration: inputDecoration("ក្រុមផ្លាកលេខ"),
-                  items: subcategoryList
-                      .map((sub) => DropdownMenuItem<String>(
-                            value: sub,
-                            child: Text(
-                              sub,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ))
-                      .toList(),
-                  onChanged: (value) {
-                    if (value == null) return;
-                    setState(() {
-                      // Update form
-                      if (isMoto) {
-                        v.motoPlateSubcategory = value;
-                      } else {
-                        v.carPlateSubcategory = value;
-                      }
-                    });
-                  },
-                  validator: (value) => (value == null || value.isEmpty)
-                      ? "សូមជ្រើសរើសប្រភេទរង"
-                      : null,
-                ),
-              ),
-            ],
+                    ))
+                .toList(),
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() {
+                if (isMoto) {
+                  v.motoPlateSubcategory = value;
+                } else {
+                  v.carPlateSubcategory = value;
+                }
+              });
+            },
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -1753,32 +1708,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
         border: Border.all(color: Colors.blue, width: 2),
         borderRadius: BorderRadius.circular(8),
       ),
-      width: 200, // adjust as needed
+      width: 220,
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Top label
           Text(
             label,
             style: const TextStyle(
-                fontSize: 20, fontWeight: FontWeight.w500, color: Colors.blue),
+                fontSize: 18, fontWeight: FontWeight.w500, color: Colors.blue),
             textAlign: TextAlign.center,
           ),
-
-          // Middle code
+          const SizedBox(height: 4),
           Text(
             code,
             style: const TextStyle(
-              fontSize: 24,
+              fontSize: 22,
               fontWeight: FontWeight.bold,
               color: Colors.blue,
-              letterSpacing: 4,
+              letterSpacing: 3,
             ),
           ),
-          Container(
-            height: 2,
-            color: Colors.blue,
-          ),
+          const SizedBox(height: 6),
+          Container(height: 2, color: Colors.blue),
+          const SizedBox(height: 6),
           Text(
             keyText,
             style: const TextStyle(
@@ -1843,8 +1796,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             return Row(
               children: [
                 Expanded(
-                    child: Text(attachFileNames[i],
-                        overflow: TextOverflow.ellipsis)),
+                  child: Text(attachFileNames[i],
+                      overflow: TextOverflow.ellipsis),
+                ),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.red),
                   onPressed: () => removeAttachFileAt(i),
@@ -1907,8 +1861,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             Row(
               children: [
                 Expanded(
-                    child:
-                        Text(cameraFileName!, overflow: TextOverflow.ellipsis)),
+                  child: Text(cameraFileName!,
+                      overflow: TextOverflow.ellipsis),
+                ),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.red),
                   onPressed: clearCamera,
@@ -2042,12 +1997,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           setState(() {
             _userType = v;
 
-            // reset ids
             if (!(v == "INSIDE_OFFICER" || v == "OUTSIDE_OFFICER")) {
               idNumberController.clear();
             }
 
-            // ✅ UPDATED: SECRETARY/DEPUTY should NOT show work fields
             final shouldShowWork = (v == "INSIDE_OFFICER" ||
                 v == "OUTSIDE_OFFICER" ||
                 v == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER" ||
@@ -2064,7 +2017,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               provinceCityController.clear();
             }
 
-            // duration types: NATIONAL + GUEST
             if (v == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER" ||
                 v == "GUEST") {
               requestDateController.clear();
@@ -2072,7 +2024,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               durationDaysController.clear();
             }
 
-            // reset attachments
             attachFiles.clear();
             attachFileNames.clear();
             attachFilesError = null;
@@ -2081,171 +2032,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
             cameraFileName = null;
             cameraError = null;
 
-            // reset dropdown selections/controllers
             _resetWorkDropdownStateAndControllers();
           });
 
-          // ✅ load dropdown data only for OFFICERS
           await _loadWorkDropdownsIfNeeded();
         },
-      ),
-    );
-  }
-
-  Widget Rowlabel() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        children: [
-          Text("លេខទូរស័ព្ទ"),
-          Spacer(),
-          Text("កាលបរិច្ឆេទស្នើរ"),
-        ],
-      ),
-    );
-  }
-
-  Widget phoneAndDate() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextFormField(
-              controller: phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: inputDecoration("លេខទូរស័ព្ទ"),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextFormField(
-              controller: requestDateController,
-              readOnly: true,
-              decoration: inputDecoration("ថ្ងៃស្នើរ").copyWith(
-                suffixIcon: const Icon(Icons.calendar_month),
-              ),
-              onTap: pickDate,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget oneInput({
-    required String label,
-    required String hint,
-    required TextEditingController controller,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label),
-          const SizedBox(height: 6),
-          TextFormField(
-              controller: controller, decoration: inputDecoration(hint)),
-        ],
-      ),
-    );
-  }
-
-  Widget twoInputRow(
-    String lLabel,
-    String rLabel,
-    String lHint,
-    String rHint,
-    TextEditingController lCtrl,
-    TextEditingController rCtrl, {
-    required bool leftIsPlate,
-    required bool rightIsPlate,
-  }) {
-    final isLeftId = lCtrl == idNumberController;
-    final isRightId = rCtrl == idNumberController;
-
-    const plateMaxLen = 18;
-
-    List<TextInputFormatter>? formatters(bool isId, bool isPlate) {
-      if (isId) {
-        return <TextInputFormatter>[
-          FilteringTextInputFormatter.digitsOnly,
-          LengthLimitingTextInputFormatter(10),
-        ];
-      }
-      if (isPlate) {
-        return <TextInputFormatter>[
-          LengthLimitingTextInputFormatter(plateMaxLen),
-          TextInputFormatter.withFunction((oldValue, newValue) {
-            final up = newValue.text.toUpperCase();
-            return newValue.copyWith(text: up, selection: newValue.selection);
-          }),
-        ];
-      }
-      return null;
-    }
-
-    int? maxLen(bool isId, bool isPlate) {
-      if (isId) return 10;
-      if (isPlate) return plateMaxLen;
-      return null;
-    }
-
-    TextCapitalization cap(bool isPlate) =>
-        isPlate ? TextCapitalization.characters : TextCapitalization.none;
-
-    TextInputType kbd(bool isId) =>
-        isId ? TextInputType.number : TextInputType.text;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Text(lLabel),
-              const Spacer(),
-              Text(rLabel),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: lCtrl,
-                  decoration: inputDecoration(lHint),
-                  keyboardType: kbd(isLeftId),
-                  textCapitalization: cap(leftIsPlate),
-                  maxLength: maxLen(isLeftId, leftIsPlate),
-                  buildCounter: (context,
-                          {required currentLength,
-                          required isFocused,
-                          maxLength}) =>
-                      null,
-                  inputFormatters: formatters(isLeftId, leftIsPlate),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextFormField(
-                  controller: rCtrl,
-                  decoration: inputDecoration(rHint),
-                  keyboardType: kbd(isRightId),
-                  textCapitalization: cap(rightIsPlate),
-                  maxLength: maxLen(isRightId, rightIsPlate),
-                  buildCounter: (context,
-                          {required currentLength,
-                          required isFocused,
-                          maxLength}) =>
-                      null,
-                  inputFormatters: formatters(isRightId, rightIsPlate),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

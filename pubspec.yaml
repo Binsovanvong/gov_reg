@@ -23,6 +23,7 @@ dependencies:
   share_plus: ^10.0.2
   photo_manager: ^3.0.0
   image: ^4.7.2
+  auto_size_text: ^3.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
