@@ -19,17 +19,18 @@ class RegisterSuccessMixedScreen extends StatefulWidget {
 class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen> {
   static const String baseUrl = "http://10.0.2.2:8080";
 
-  late Future<Uint8List?> _qrFuture;
+  Future<Uint8List?> _qrFuture = Future.value(null);
 
-  late String code;
-  late String token;
+  // ✅ safe defaults (no LateInitializationError)
+  String code = "";
+  String token = "";
+  String vehicleType = "";
+  String fullName = "";
+  String phone = "";
+  String userType = "";
+  String parkingRequestStatus = "";
 
-  late String fullName;
-  late String phone;
-  late String userType;
-  late String parkingRequestStatus;
-
-  late int requestDate; // yyyymmdd
+  int requestDate = 0; // yyyymmdd
   String? requestAtDate; // dd-MM-yyyy or null
 
   List vehicles = [];
@@ -43,7 +44,6 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
   bool _showExportForCapture = false;
 
   // ---------- RULES ----------
-  bool get isGuest => userType == "GUEST";
   bool get isNational =>
       userType == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER";
   bool get isSecretaryOrDeputy =>
@@ -51,10 +51,10 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
   bool get isOfficer =>
       userType == "INSIDE_OFFICER" || userType == "OUTSIDE_OFFICER";
 
-  // ✅ Final flags per your requirement:
-  // - Guest + National: hide policeId
-  // - Secretary/Deputy: hide workInfo + hide policeId
-  // - Inside/Outside Officer: show all BUT hide province
+  // ✅ required behavior:
+  // Guest + National: hide policeId
+  // Secretary/Deputy: hide workinfo + hide policeId
+  // Inside/Outside officer: show all but hide province
   bool get showPoliceId => isOfficer;
   bool get showWorkInfo => !isSecretaryOrDeputy;
   bool get showProvince => isNational; // officers hide province
@@ -85,6 +85,8 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
     requestDate = int.tryParse((args["requestDate"] ?? 0).toString()) ?? 0;
     requestAtDate = args["requestAtDate"]?.toString();
 
+    vehicleType = (args["vehicleType"] ?? "").toString();
+
     vehicles = (args["vehicles"] is List) ? (args["vehicles"] as List) : [];
     workingInfo =
         (args["workingInfo"] is Map) ? (args["workingInfo"] as Map) : null;
@@ -94,8 +96,9 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
       selfiePath = ((vehicles.first as Map)["selfiePath"] ?? "").toString();
     }
 
-    selfieBytes =
-        (args["selfieBytes"] is Uint8List) ? (args["selfieBytes"] as Uint8List) : null;
+    selfieBytes = (args["selfieBytes"] is Uint8List)
+        ? (args["selfieBytes"] as Uint8List)
+        : null;
 
     precacheImage(const AssetImage("assets/img/about-moi-logo.png"), context);
     _qrFuture = _fetchQrPngOrNull();
@@ -114,13 +117,13 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
       case "GUEST":
         return "ភ្ញៀវ";
       case "INSIDE_OFFICER":
-        return "មន្រ្តីបំរើការងារនៅក្នុងទីស្តីការក្រសួងមហាឫ្ទៃ";
+        return "មន្រ្តីបំរើការងារនៅក្នុងទីស្តីការក្រសួងមហាផ្ទៃ";
       case "OUTSIDE_OFFICER":
-        return "មន្រ្តីបំរើការងារនៅក្រៅទីស្តីការក្រសួងមហាឫ្ទៃ";
+        return "មន្រ្តីបំរើការងារនៅក្រៅទីស្តីការក្រសួងមហាផ្ទៃ";
       case "SECRETARY":
-        return "រដ្ឋលេខាធិការក្រសួងមហាឫ្ទៃ";
+        return "រដ្ឋលេខាធិការក្រសួងមហាផ្ទៃ";
       case "DEPUTY_SECRETARY":
-        return "អនុរដ្ឋលេខាធិការ​ ក្រសួងមហាឫ្ទៃ";
+        return "អនុរដ្ឋលេខាធិការ​ ក្រសួងមហាផ្ទៃ";
       case "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER":
         return "មន្ត្រីរដ្ឋបាលថ្នាក់ក្រោមជាតិ";
       default:
@@ -157,7 +160,8 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
       if (!Platform.isAndroid && !Platform.isIOS) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Save to Photos supports only Android/iOS")),
+          const SnackBar(
+              content: Text("Save to Photos supports only Android/iOS")),
         );
         return;
       }
@@ -191,7 +195,8 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
         return;
       }
 
-      final filename = "parking_badge_${DateTime.now().millisecondsSinceEpoch}.png";
+      final filename =
+          "parking_badge_${DateTime.now().millisecondsSinceEpoch}.png";
 
       await PhotoManager.editor.saveImage(
         bytes,
@@ -231,6 +236,7 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
         phone: phone,
         code: code,
         token: token,
+        vehicleType: vehicleType,
         parkingRequestStatus: parkingRequestStatus,
         userTypeText: _userTypeKhmer(userType),
         vehicles: vehicles,
@@ -238,12 +244,8 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
         selfieBytes: selfieBytes,
         selfiePath: selfiePath,
         qrFuture: _qrFuture,
-
-        // ✅ pass dates
         issueDateStr: issueDateStr,
         expiryDateStr: expiryDateStr,
-
-        // ✅ pass rule flags
         showPoliceId: showPoliceId,
         showWorkInfo: showWorkInfo,
         showProvince: showProvince,
@@ -343,6 +345,7 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
                 final h = constraints.maxHeight;
                 final w = constraints.maxWidth;
 
+                // ✅ Fit by height to avoid bottom overflow
                 return Padding(
                   padding: const EdgeInsets.all(12),
                   child: SizedBox(
@@ -367,6 +370,8 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
                 );
               },
             ),
+
+            // hidden painted widget for capture (FULL SIZE, NOT SCALED)
             if (_showExportForCapture)
               Positioned(
                 left: -4000,
@@ -391,6 +396,7 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
                             parkingRequestStatus: parkingRequestStatus,
                             userTypeText: _userTypeKhmer(userType),
                             vehicles: vehicles,
+                            vehicleType: vehicleType,
                             workingInfo: workingInfo,
                             selfieBytes: selfieBytes,
                             selfiePath: selfiePath,
@@ -429,10 +435,9 @@ class _MoIStyleBadge extends StatelessWidget {
   final Uint8List? selfieBytes;
   final String selfiePath;
   final Future<Uint8List?> qrFuture;
-
   final String issueDateStr;
   final String expiryDateStr;
-
+  final String vehicleType;
   final bool showPoliceId;
   final bool showWorkInfo;
   final bool showProvince;
@@ -441,6 +446,7 @@ class _MoIStyleBadge extends StatelessWidget {
     required this.fullName,
     required this.phone,
     required this.code,
+    required this.vehicleType,
     required this.token,
     required this.userTypeText,
     required this.parkingRequestStatus,
@@ -472,12 +478,59 @@ class _MoIStyleBadge extends StatelessWidget {
     return list.isEmpty ? null : list.first;
   }
 
+  String vehicleTypeKh(String v) {
+    switch (v) {
+      case "CAR":
+        return "រថយន្ត";
+      case "MOTORBIKE":
+        return "ម៉ូតូ";
+      default:
+        return v.isEmpty ? "-" : v;
+    }
+  }
+  String provinceEn(String v) {
+    const map = {
+      "ភ្នំពេញ": "PHNOM PENH",
+      "កណ្តាល": "KANDAL",
+      "បន្ទាយមានជ័យ": "BANTEAY MEANCHEY",
+      "បាត់ដំបង": "BATTAMBANG",
+      "កំពង់ចាម": "KAMPONG CHAM",
+      "កំពង់ឆ្នាំង": "KAMPONG CHHNANG",
+      "កំពង់ស្ពឺ": "KAMPONG SPEU",
+      "កំពង់ធំ": "KAMPONG THOM",
+      "កំពត": "KAMPOT",
+      "កែប": "KEP",
+      "កោះកុង": "KOH KONG",
+      "ក្រចេះ": "KRATIE",
+      "មណ្ឌលគិរី": "MONDULKIRI",
+      "ឧត្តរមានជ័យ": "ODDAR MEANCHEY",
+      "ប៉ៃលិន": "PAILIN",
+      "ព្រះសីហនុ": "PREAH SIHANOUK",
+      "ព្រះវិហារ": "PREAH VIHEAR",
+      "ព្រៃវែង": "PREY VENG",
+      "ពោធិ៍សាត់": "PURSAT",
+      "សៀមរាប": "SIEM REAP",
+      "ស្ទឹងត្រែង": "STUNG TRENG",
+      "ស្វាយរៀង": "SVAY RIENG",
+      "តាកែវ": "TAKEO",
+      "ត្បូងឃ្មុំ": "TBOUNG KHMUM",
+      "រតនគិរី": "RATANAKIRI",
+      "កម្ពុជា": "CAMBODIA",
+      "នគរបាល": "POLICE",
+    };
+    return map[v] ?? v;
+  }
+
   @override
   Widget build(BuildContext context) {
     final v = _firstVehicle();
+
     final plate = s(v?["plateNumber"]);
     final brand = s(v?["brand"]);
     final year = s(v?["madeYear"]);
+
+    // ✅ THIS WORKS ONLY IF YOU SEND "subcategory" FROM RegisterScreen
+    final subcategory = s(v?["subcategory"]);
 
     final info = workingInfo ?? {};
     final ministry = s(info["generalDepartmentText"]);
@@ -512,6 +565,8 @@ class _MoIStyleBadge extends StatelessWidget {
                     ),
                   ),
                 ),
+
+                // watermark logo (center)
                 Positioned.fill(
                   child: Opacity(
                     opacity: 0.10,
@@ -527,7 +582,7 @@ class _MoIStyleBadge extends StatelessWidget {
                   ),
                 ),
 
-                // HEADER
+                // TOP HEADER: logo + title + QR
                 Positioned(
                   left: 36,
                   right: 36,
@@ -556,7 +611,7 @@ class _MoIStyleBadge extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              "ក្រសួងមហាឫ្ទៃ",
+                              "ក្រសួងមហាផ្ទៃ",
                               style: TextStyle(
                                 color: _gold,
                                 fontWeight: FontWeight.w900,
@@ -612,9 +667,14 @@ class _MoIStyleBadge extends StatelessWidget {
                   ),
                 ),
 
-                Positioned(left: 36, right: 36, top: 170, child: Container(height: 2, color: _line)),
+                Positioned(
+                  left: 36,
+                  right: 36,
+                  top: 170,
+                  child: Container(height: 2, color: _line),
+                ),
 
-                // PHOTO BOX
+                // LEFT PHOTO BOX
                 Positioned(
                   left: 46,
                   top: 210,
@@ -634,7 +694,7 @@ class _MoIStyleBadge extends StatelessWidget {
                   ),
                 ),
 
-                // PLATE BOX
+                // LEFT PLATE BOX
                 Positioned(
                   left: 46,
                   top: 550,
@@ -650,16 +710,21 @@ class _MoIStyleBadge extends StatelessWidget {
                     child: Column(
                       children: [
                         const SizedBox(height: 12),
-                        const Text(
-                          "ស្លាកលេខ",
-                          style: TextStyle(
+
+                        // 🔹 Top label = subcategory
+                        Text(
+                          subcategory.isEmpty ? "-" : provinceEn(subcategory),
+                          style: const TextStyle(
                             color: _navy,
                             fontWeight: FontWeight.w900,
                             fontSize: 22,
                             height: 1.0,
                           ),
                         ),
+
                         const SizedBox(height: 14),
+
+                        // 🔹 Big plate number
                         Text(
                           plate.isEmpty ? "-" : plate,
                           style: const TextStyle(
@@ -670,7 +735,10 @@ class _MoIStyleBadge extends StatelessWidget {
                             height: 1.0,
                           ),
                         ),
+
                         const Spacer(),
+
+                        // 🔹 Bottom red label (subcategory)
                         Container(
                           height: 46,
                           width: double.infinity,
@@ -680,13 +748,12 @@ class _MoIStyleBadge extends StatelessWidget {
                             ),
                           ),
                           alignment: Alignment.center,
-                          child: const Text(
-                            "PHNOM PENH",
-                            style: TextStyle(
+                          child: Text(
+                            subcategory.isEmpty ? "-" : subcategory,
+                            style: const TextStyle(
                               color: _footerRed,
                               fontWeight: FontWeight.w900,
                               fontSize: 26,
-                              letterSpacing: 3,
                               height: 1.0,
                             ),
                           ),
@@ -696,7 +763,7 @@ class _MoIStyleBadge extends StatelessWidget {
                   ),
                 ),
 
-                // RIGHT CONTENT
+                // RIGHT MAIN CONTENT
                 Positioned(
                   left: 380,
                   right: 46,
@@ -713,7 +780,7 @@ class _MoIStyleBadge extends StatelessWidget {
                           children: [
                             const Expanded(
                               child: Text(
-                                "ត្រួតពិនិត្យ",
+                                "ព័ត៌មានផ្ទាល់ខ្លួន",
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w900,
@@ -743,7 +810,6 @@ class _MoIStyleBadge extends StatelessWidget {
                       ),
                       const SizedBox(height: 14),
 
-                      // ✅ PoliceId & Province (conditional)
                       if (showPoliceId || showProvince) ...[
                         _twoColRowSafe(
                           leftLabel: showPoliceId ? "អត្តលេខ" : "",
@@ -754,7 +820,6 @@ class _MoIStyleBadge extends StatelessWidget {
                         const SizedBox(height: 14),
                       ],
 
-                      // ✅ WorkInfo (hide for Secretary/Deputy)
                       if (showWorkInfo) ...[
                         _twoColRowSafe(
                           leftLabel: "ក្រសួង/ស្ថាប័ន",
@@ -772,7 +837,8 @@ class _MoIStyleBadge extends StatelessWidget {
                         const SizedBox(height: 14),
                       ],
 
-                      _blueSectionTitle("ព័ត៌មានម៉ូតូ"),
+                      _blueSectionTitle("ព័ត៌មាន ${vehicleTypeKh(vehicleType)}"),
+
                       const SizedBox(height: 12),
                       _twoColRowSafe(
                         leftLabel: "ស្លាកលេខ",
@@ -784,12 +850,10 @@ class _MoIStyleBadge extends StatelessWidget {
                       _twoColRowSafe(
                         leftLabel: "ឆ្នាំផលិត",
                         leftValue: year,
-                        rightLabel: "ទូរស័ព្ទ",
+                        rightLabel: "លេខទូរស័ព្ទ",
                         rightValue: phone,
                       ),
-
                       const Spacer(),
-
                       SizedBox(
                         width: double.infinity,
                         child: Row(

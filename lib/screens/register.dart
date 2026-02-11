@@ -177,6 +177,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Vehicles list
   final List<_VehicleForm> vehicles = [_VehicleForm()];
 
+  // ✅ Save computed dates so we can pass to next screen
+  int _lastRequestDateInt = 0; // yyyymmdd
+  String? _lastRequestAtDateStr; // dd-MM-yyyy or null
+
   // ----------------------------
   // ✅ Work dropdown state
   // ----------------------------
@@ -370,7 +374,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ----------------------------
-  // ✅ Rules (UPDATED for SECRETARY/DEPUTY)
+  // ✅ Rules (UPDATED)
   // ----------------------------
   bool get isGuest => _userType == "GUEST";
   bool get isInsideOfficer => _userType == "INSIDE_OFFICER";
@@ -784,7 +788,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
 
-      int quality = 100;
       int attempt = 0;
       const maxAttempts = 5;
 
@@ -795,7 +798,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           height: (decoded.height * 1.1).toInt(),
         );
 
-        final newBytes = img.encodeJpg(decoded, quality: quality);
+        final newBytes = img.encodeJpg(decoded, quality: 100);
         await file.writeAsBytes(newBytes);
         bytes = await file.length();
         attempt++;
@@ -981,17 +984,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
     DateTime requestEnd;
 
     if (useDurationDays) {
+      // ✅ Guest + National: expiry = today + duration days
       final dur = int.parse(durationDaysController.text.trim());
       requestAt = today;
       requestEnd = today.add(Duration(days: dur));
     } else {
+      // ✅ Officer/Secretary/Deputy: issue = chosen date, expiry = +1 year
       final chosen = DateTime.parse(requestDateController.text.trim());
       requestAt = chosen;
-      requestEnd = chosen;
+      requestEnd = DateTime(chosen.year + 1, chosen.month, chosen.day);
     }
 
-    final int requestDateInt = _fmtYmdInt(requestEnd);
-    final String requestAtDateStr = _fmtDmy(requestAt);
+    final int requestDateInt = _fmtYmdInt(requestEnd); // yyyymmdd (expiry)
+    final String requestAtDateStr = _fmtDmy(requestAt); // dd-MM-yyyy (issue)
+
+    // ✅ Save for next screen
+    _lastRequestDateInt = requestDateInt;
+    _lastRequestAtDateStr = (_userType == "GUEST") ? null : requestAtDateStr;
 
     final dto = <String, dynamic>{
       "reason": reasonController.text.trim().isEmpty
@@ -1018,6 +1027,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }).toList(),
     };
 
+    // ✅ requestAtDate only for non-guest
     if (_userType != "GUEST") {
       dto["requestAtDate"] = requestAtDateStr;
     }
@@ -1043,6 +1053,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final token = await _getToken();
 
     final List<Map<String, String>> fileList = [];
+
     for (int i = 0; i < attachFiles.length; i++) {
       fileList.add({"path": attachFiles[i].path, "name": attachFileNames[i]});
     }
@@ -1058,7 +1069,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (fileList.isNotEmpty) {
       uri = base.replace(
         queryParameters: <String, dynamic>{
-          "attachmentTypes": List<String>.filled(fileList.length, attachmentTypeValue),
+          "attachmentTypes":
+              List<String>.filled(fileList.length, attachmentTypeValue),
         },
       );
     }
@@ -1096,102 +1108,86 @@ class _RegisterScreenState extends State<RegisterScreen> {
       throw "HTTP ${resp.statusCode}: ${resp.body.isEmpty ? '(empty body)' : resp.body}";
     }
 
-    // ✅ Decode response
-    final decoded = resp.body.isEmpty ? {} : jsonDecode(resp.body);
-    final map = decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
-
-    // ✅ Return API response + your computed dates
-    return {
-      ...map,
-      "requestDateInt": requestDateInt,
-      "requestAtDateStr": requestAtDateStr,
-    };
+    if (resp.body.isEmpty) return {};
+    final decoded = jsonDecode(resp.body);
+    return decoded is Map<String, dynamic> ? decoded : {};
   }
-
 
   // ----------------------------
   // Submit
   // ----------------------------
- Future<void> submitRegister() async {
-  await _login(
-    baseUrl: "http://10.0.2.2:8080",
-    email: "user@moi.com",
-    password: "Moi@2026\$",
-  );
-
-  if (!validateForm()) return;
-
-  setState(() => isLoading = true);
-  try {
-    final res = await createParkingCardRequest();
-    debugPrint("DEBUG,${(res["code"] ?? "").toString()}");
-
-    if (!mounted) return;
-
-    Uint8List? selfieBytes;
-    if (cameraFile != null) {
-      selfieBytes = await cameraFile!.readAsBytes();
-    }
-
-    // ✅ Get computed dates from response map
-    final int requestDateInt = (res["requestDateInt"] ?? 0) as int;
-    final String requestAtDateStr = (res["requestAtDateStr"] ?? "").toString();
-
-    final args = <String, dynamic>{
-      "code": res["code"],
-      "token": res["token"],
-      "parkingRequestStatus": res["parkingRequestStatus"],
-
-      "fullName": fullNameController.text.trim(),
-      "phone": phoneController.text.trim(),
-      "userType": _userType,
-
-      "selfieBytes": selfieBytes,
-      "selfiePath": cameraFile?.path,
-
-      // ✅ Now available here
-      "requestDate": requestDateInt,
-      "requestAtDate": _userType == "GUEST" ? null : requestAtDateStr,
-
-      "workingInfo": {
-        "generalDepartmentText": ministryController.text.trim(),
-        "departmentText": departmentController.text.trim(),
-        "burauText": officeController.text.trim(),
-        "positionText": positionController.text.trim(),
-        "policeId": idNumberController.text.trim(),
-        "provinceCity": provinceCityController.text.trim(),
-      },
-
-      "vehicles": vehicles
-          .map((v) => {
-                "brand": v.brand.text.trim(),
-                "color": v.color.text.trim(),
-                "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
-                "vehicleType": v.vehicleType,
-                "plateNumber": v.plate.text.trim(),
-              })
-          .toList(),
-    };
-    Navigator.pushNamed(
-      context,
-      Approute.verifySuccessScreen,
-      arguments: args,
+  Future<void> submitRegister() async {
+    await _login(
+      baseUrl: "http://10.0.2.2:8080",
+      email: "user@moi.com",
+      password: "Moi@2026\$",
     );
-  } catch (e, st) {
-    debugPrint("SUBMIT ERROR: $e");
-    debugPrint("STACK: $st");
-    if (!mounted) return;
 
-    final msg = e.toString().contains("401") || e.toString().contains("403")
-        ? "Backend still requires login (401/403). You must allow guest POST /parking-card-requests in backend."
-        : "Error: $e";
+    if (!validateForm()) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  } finally {
-    if (mounted) setState(() => isLoading = false);
+    setState(() => isLoading = true);
+    try {
+      final res = await createParkingCardRequest();
+
+      if (!mounted) return;
+
+      Uint8List? selfieBytes;
+      if (cameraFile != null) {
+        selfieBytes = await cameraFile!.readAsBytes();
+      }
+
+      Navigator.pushNamed(
+        context,
+        Approute.verifySuccessScreen,
+        arguments: {
+          "code": res["code"],
+          "token": res["token"],
+          "parkingRequestStatus": res["parkingRequestStatus"],
+
+          "fullName": fullNameController.text.trim(),
+          "phone": phoneController.text.trim(),
+          "userType": _userType,
+
+          "selfieBytes": selfieBytes,
+          "selfiePath": cameraFile?.path,
+
+          // ✅ dates for badge screen
+          "requestDate": _lastRequestDateInt,
+          "requestAtDate": _lastRequestAtDateStr,
+          "vehicleType": vehicles.isNotEmpty ? vehicles.first.vehicleType : "",
+          "workingInfo": {
+            "generalDepartmentText": ministryController.text.trim(),
+            "departmentText": departmentController.text.trim(),
+            "burauText": officeController.text.trim(),
+            "positionText": positionController.text.trim(),
+            "policeId": idNumberController.text.trim(),
+            "provinceCity": provinceCityController.text.trim(),
+          },
+          "vehicles": vehicles.map((v) => {
+            "brand": v.brand.text.trim(),
+            "color": v.color.text.trim(),
+            "plateNumber": v.plate.text.trim(),   // must be plateNumber
+            "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
+            "vehicleType": v.vehicleType,
+            "plateCategory": v.vehicleType == "MOTORBIKE" ? v.motoPlateType : v.carPlateType,
+            "subcategory": getSubcategoryKey(v),
+          }).toList(),
+        },
+      );
+    } catch (e, st) {
+      debugPrint("SUBMIT ERROR: $e");
+      debugPrint("STACK: $st");
+      if (!mounted) return;
+
+      final msg = e.toString().contains("401") || e.toString().contains("403")
+          ? "Backend still requires login (401/403). You must allow guest POST /parking-card-requests in backend."
+          : "Error: $e";
+
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
   }
-}
-
 
   // ----------------------------
   // Date picker (NON duration)
@@ -1385,7 +1381,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ],
                               ),
                             ] else ...[
-                              phoneAndDate(), // ✅ now vertical like screenshot
+                              phoneAndDate(),
                             ],
 
                             sectionTitle("ព័ត៌មានរថយន្ត/ម៉ូតូ"),
@@ -1449,12 +1445,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     controller: v.brand,
                                   ),
 
-                                  plateRow(v), // ✅ dropdowns vertical
+                                  plateRow(v),
 
                                   oneInput(
                                     label: "ផ្លាកលេខ",
                                     hint: "សូមបញ្ចូលផ្លាកលេខអោយត្រូវតាមទម្រង់",
-                                    controller: v.plate, // ✅ FIXED
+                                    controller: v.plate,
                                   ),
 
                                   const SizedBox(height: 10),
@@ -1575,7 +1571,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ----------------------------
-  // Phone/date vertical (like screenshot)
+  // Phone/date vertical
   // ----------------------------
   Widget phoneAndDate() {
     return Column(
@@ -1600,7 +1596,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ----------------------------
-  // oneInput uses screenshot style
+  // oneInput
   // ----------------------------
   Widget oneInput({
     required String label,
@@ -1615,7 +1611,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ----------------------------
-  // Plate UI: CAR & MOTO (dropdowns vertical)
+  // Plate UI
   // ----------------------------
   Widget plateRow(_VehicleForm v) {
     final isMoto = v.vehicleType == "MOTORBIKE";
