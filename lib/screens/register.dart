@@ -290,8 +290,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   /// ✅ MOTO plate types
   final List<Map<String, dynamic>> motoPlateTypes = [
     {
-      "key": "MOTORBIKE_REGULAR",
-      "label": "ម៉ូតូធម្មតា",
+      "key": "REGULAR",
+      "label": "ធម្មតា",
       "subcategory": [
         "ភ្នំពេញ",
         "កណ្តាល",
@@ -321,18 +321,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ],
     },
     {
-      "key": "MOTORBIKE_CAMBODIA",
-      "label": "ម៉ូតូកម្ពុជា",
+      "key": "CAMBODIA",
+      "label": "កម្ពុជា",
       "subcategory": ["កម្ពុជា"]
     },
     {
-      "key": "MOTORBIKE_POLICE",
-      "label": "ម៉ូតូនគរបាល",
+      "key": "POLICE",
+      "label": "នគរបាល",
       "subcategory": ["នគរបាល"]
     },
     {
-      "key": "MOTORBIKE_ARMY_FORCE",
-      "label": "ម៉ូតូខេមរភូមិន្ទ",
+      "key": "ARMY_FORCE",
+      "label": "ខេមរភូមិន្ទ",
       "subcategory": List.generate(
         9,
         (i) => "ខេមរភូមិន្ទ-${(i + 1).toString().padLeft(2, '0')}",
@@ -975,143 +975,144 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // API
   // ----------------------------
   Future<Map<String, dynamic>> createParkingCardRequest() async {
-    final base = Uri.parse("$baseUrl/api/v1/parking-card-requests");
+  final base = Uri.parse("$baseUrl/api/v1/parking-card-requests");
 
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+  final now = DateTime.now();
 
-    DateTime requestAt;
-    DateTime requestEnd;
+  DateTime requestAt;
+  DateTime requestEnd;
 
-    if (useDurationDays) {
-      // ✅ Guest + National: expiry = today + duration days
-      final dur = int.parse(durationDaysController.text.trim());
-      requestAt = today;
-      requestEnd = today.add(Duration(days: dur));
-    } else {
-      // ✅ Officer/Secretary/Deputy: issue = chosen date, expiry = +1 year
-      final chosen = DateTime.parse(requestDateController.text.trim());
-      requestAt = chosen;
-      requestEnd = DateTime(chosen.year + 1, chosen.month, chosen.day);
-    }
+  if (useDurationDays) {
+    // ✅ Guest + National: issue = NOW, expiry = NOW + duration days (keeps time)
+    final dur = int.parse(durationDaysController.text.trim());
+    requestAt = now;
+    requestEnd = requestAt.add(Duration(days: dur));
 
-    final int requestDateInt = _fmtYmdInt(requestEnd); // yyyymmdd (expiry)
-    final String requestAtDateStr = _fmtDmy(requestAt); // dd-MM-yyyy (issue)
+  } else {
+    // ✅ Officer/Secretary/Deputy: issue = chosen date (00:00), expiry = +1 year
+    final chosen = DateTime.parse(requestDateController.text.trim());
+    requestAt = chosen;
+    requestEnd = DateTime(chosen.year + 1, chosen.month, chosen.day);
+  }
 
-    // ✅ Save for next screen
-    _lastRequestDateInt = requestDateInt;
-    _lastRequestAtDateStr = (_userType == "GUEST") ? null : requestAtDateStr;
+  final int requestDateInt = _fmtYmdInt(requestEnd); // yyyymmdd (expiry)
+  final String requestAtDateStr = _fmtDmy(requestAt); // dd-MM-yyyy (issue)
 
-    final dto = <String, dynamic>{
-      "reason": reasonController.text.trim().isEmpty
-          ? "Parking card request"
-          : reasonController.text.trim(),
-      "requestDate": requestDateInt,
-      "user": <String, dynamic>{
-        "name": fullNameController.text.trim(),
-        "phone": phoneController.text.trim(),
-        "userType": _userType,
-      },
-      "vehicles": vehicles.map((v) {
-        return <String, dynamic>{
-          "brand": v.brand.text.trim(),
-          "plate": <String, dynamic>{
-            "plateNumber": _normalizePlate(v.plate.text),
-            "plateCategory":
-                v.vehicleType == "MOTORBIKE" ? v.motoPlateType : v.carPlateType,
-          },
-          "color": v.color.text.trim(),
-          "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
-          "vehicleType": v.vehicleType,
-        };
-      }).toList(),
-    };
+  // ✅ Save for next screen (IMPORTANT: do NOT null for guest)
+  _lastRequestDateInt = requestDateInt;
+  _lastRequestAtDateStr = requestAtDateStr; // ✅ ALWAYS set
 
-    // ✅ requestAtDate only for non-guest
-    if (_userType != "GUEST") {
-      dto["requestAtDate"] = requestAtDateStr;
-    }
-
-    final wi = <String, dynamic>{};
-    if (showIdNumber) wi["policeId"] = idNumberController.text.trim();
-
-    if (showWorkFields) {
-      wi["generalDepartmentText"] = ministryController.text.trim();
-      wi["departmentText"] = departmentController.text.trim();
-      wi["burauText"] = officeController.text.trim();
-      wi["positionText"] = positionController.text.trim();
-    }
-
-    if (showProvinceCity) {
-      wi["provinceCity"] = provinceCityController.text.trim();
-    }
-
-    if (wi.isNotEmpty) {
-      (dto["user"] as Map<String, dynamic>)["workingInfo"] = wi;
-    }
-
-    final token = await _getToken();
-
-    final List<Map<String, String>> fileList = [];
-
-    for (int i = 0; i < attachFiles.length; i++) {
-      fileList.add({"path": attachFiles[i].path, "name": attachFileNames[i]});
-    }
-
-    if (cameraFile != null) {
-      fileList.add({
-        "path": cameraFile!.path,
-        "name": cameraFileName ?? cameraFile!.path.split('/').last,
-      });
-    }
-
-    Uri uri = base;
-    if (fileList.isNotEmpty) {
-      uri = base.replace(
-        queryParameters: <String, dynamic>{
-          "attachmentTypes":
-              List<String>.filled(fileList.length, attachmentTypeValue),
+  final dto = <String, dynamic>{
+    "reason": reasonController.text.trim().isEmpty
+        ? "Parking card request"
+        : reasonController.text.trim(),
+    "requestDate": requestDateInt,
+    "user": <String, dynamic>{
+      "name": fullNameController.text.trim(),
+      "phone": phoneController.text.trim(),
+      "userType": _userType,
+    },
+    "vehicles": vehicles.map((v) {
+      return <String, dynamic>{
+        "brand": v.brand.text.trim(),
+        "plate": <String, dynamic>{
+          "plateNumber": _normalizePlate(v.plate.text),
+          "plateCategory":
+              v.vehicleType == "MOTORBIKE" ? v.motoPlateType : v.carPlateType,
         },
-      );
-    }
+        "color": v.color.text.trim(),
+        "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
+        "vehicleType": v.vehicleType,
+      };
+    }).toList(),
+  };
 
-    final request = http.MultipartRequest("POST", uri);
-    request.headers["Accept"] = "*/*";
+  // ✅ If backend must NOT receive requestAtDate for guest, keep this:
+  if (_userType != "GUEST") {
+    dto["requestAtDate"] = requestAtDateStr;
+  }
+  // If backend is OK with it for guest too, you can remove the if and always set it.
 
-    if (token != null && token.isNotEmpty) {
-      request.headers["Authorization"] = "Bearer $token";
-    }
+  final wi = <String, dynamic>{};
+  if (showIdNumber) wi["policeId"] = idNumberController.text.trim();
 
+  if (showWorkFields) {
+    wi["generalDepartmentText"] = ministryController.text.trim();
+    wi["departmentText"] = departmentController.text.trim();
+    wi["burauText"] = officeController.text.trim();
+    wi["positionText"] = positionController.text.trim();
+  }
+
+  if (showProvinceCity) {
+    wi["provinceCity"] = provinceCityController.text.trim();
+  }
+
+  if (wi.isNotEmpty) {
+    (dto["user"] as Map<String, dynamic>)["workingInfo"] = wi;
+  }
+
+  final token = await _getToken();
+
+  final List<Map<String, String>> fileList = [];
+
+  for (int i = 0; i < attachFiles.length; i++) {
+    fileList.add({"path": attachFiles[i].path, "name": attachFileNames[i]});
+  }
+
+  if (cameraFile != null) {
+    fileList.add({
+      "path": cameraFile!.path,
+      "name": cameraFileName ?? cameraFile!.path.split('/').last,
+    });
+  }
+
+  Uri uri = base;
+  if (fileList.isNotEmpty) {
+    uri = base.replace(
+      queryParameters: <String, dynamic>{
+        "attachmentTypes": List<String>.filled(fileList.length, attachmentTypeValue),
+      },
+    );
+  }
+
+  final request = http.MultipartRequest("POST", uri);
+  request.headers["Accept"] = "*/*";
+
+  if (token != null && token.isNotEmpty) {
+    request.headers["Authorization"] = "Bearer $token";
+  }
+
+  request.files.add(
+    http.MultipartFile.fromString(
+      "dto",
+      jsonEncode(dto),
+      filename: "dto.json",
+      contentType: MediaType('application', 'json'),
+    ),
+  );
+
+  for (final f in fileList) {
     request.files.add(
-      http.MultipartFile.fromString(
-        "dto",
-        jsonEncode(dto),
-        filename: "dto.json",
-        contentType: MediaType('application', 'json'),
+      await http.MultipartFile.fromPath(
+        "files",
+        f["path"]!,
+        filename: f["name"]!,
       ),
     );
-
-    for (final f in fileList) {
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          "files",
-          f["path"]!,
-          filename: f["name"]!,
-        ),
-      );
-    }
-
-    final streamed = await request.send();
-    final resp = await http.Response.fromStream(streamed);
-
-    if (resp.statusCode != 200 && resp.statusCode != 201) {
-      throw "HTTP ${resp.statusCode}: ${resp.body.isEmpty ? '(empty body)' : resp.body}";
-    }
-
-    if (resp.body.isEmpty) return {};
-    final decoded = jsonDecode(resp.body);
-    return decoded is Map<String, dynamic> ? decoded : {};
   }
+
+  final streamed = await request.send();
+  final resp = await http.Response.fromStream(streamed);
+
+  if (resp.statusCode != 200 && resp.statusCode != 201) {
+    throw "HTTP ${resp.statusCode}: ${resp.body.isEmpty ? '(empty body)' : resp.body}";
+  }
+
+  if (resp.body.isEmpty) return {};
+  final decoded = jsonDecode(resp.body);
+  return decoded is Map<String, dynamic> ? decoded : {};
+}
+
 
   // ----------------------------
   // Submit
