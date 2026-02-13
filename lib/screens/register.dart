@@ -20,7 +20,9 @@ class _VehicleForm {
 
   String vehicleType = "CAR";
   String carPlateType = "REGULAR";
-  String motoPlateType = "MOTORBIKE_REGULAR";
+
+  // ✅ FIX: must match motoPlateTypes keys (REGULAR/CAMBODIA/POLICE/ARMY_FORCE)
+  String motoPlateType = "REGULAR";
 
   String? carPlateSubcategory;
   String? motoPlateSubcategory;
@@ -242,7 +244,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     {
       "key": "UNITED_NATIONS",
       "label": "អង្គការសហប្រជាជាតិ",
-      "subcategory": ['OUN01-1', 'ONU01'],
+      // ✅ FIX: ONU01-1 (not OUN01-1)
+      "subcategory": ['ONU01-1', 'ONU01'],
     },
     {
       "key": "TEMPORARY",
@@ -353,6 +356,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return (found["key"] ?? "UNKNOWN").toString();
   }
 
+  /// ✅ FIXED: return selected subcategory even if English (OI/CD01/CMD01-1/ONU01-1)
   String getSubcategoryKey(_VehicleForm v) {
     final isMoto = v.vehicleType == "MOTORBIKE";
     final items = isMoto ? motoPlateTypes : plateCategory;
@@ -361,16 +365,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final found = items.firstWhere(
       (item) => item["key"] == type,
-      orElse: () => items.isNotEmpty ? items[0] : {"label": "N/A"},
+      orElse: () => items.isNotEmpty
+          ? items[0]
+          : {"label": "N/A", "subcategory": <String>[]},
     );
 
     final typeLabel = (found["label"] ?? "N/A").toString();
+    if (sub == null || sub.trim().isEmpty) return typeLabel;
 
-    if (sub == null || !RegExp(r'[\u1780-\u17FF]').hasMatch(sub)) {
-      return typeLabel;
-    }
+    final list =
+        (found["subcategory"] as List?)?.cast<String>() ?? const <String>[];
+    if (list.contains(sub)) return sub;
 
-    return sub;
+    return typeLabel;
   }
 
   // ----------------------------
@@ -408,6 +415,133 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   /// ✅ Dropdown ONLY for officers
   bool get useWorkDropdown => isOfficer;
+
+  // ----------------------------
+  // Helpers
+  // ----------------------------
+  String _normalizePlate(String s) =>
+      s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
+
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  /// ✅ yyyy-MM-dd (UI)
+  String _fmtYmd(DateTime d) =>
+      "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
+
+  /// yyyymmdd int
+  int _fmtYmdInt(DateTime d) => int.parse(
+      "${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}");
+
+  /// ✅ dd-MM-yyyy (Backend expects this for LocalDate)
+  String _fmtDmy(DateTime d) =>
+      "${d.day.toString().padLeft(2, '0')}-${d.month.toString().padLeft(2, '0')}-${d.year}";
+
+  // ----------------------------
+  // ✅ Plate Validation + Formatter
+  // ----------------------------
+  static final Map<String, List<RegExp>> _categoryRules = {
+    // CAR
+    "ROYAL_PALACE": [RegExp(r'^[0-9]{3}$')], // 001
+    "STATE": [RegExp(r'^[2-6]{1}-[0-9]{3,4}$')], // 2-123 / 2-1234
+    "POLICE": [RegExp(r'^[2-6]{1}-[0-9]{4}$')], // 2-1234
+    "ARMY_FORCE": [RegExp(r'^[2-6]{1}-[0-9]{4}$')], // 2-1234
+    "REGULAR": [RegExp(r'^[2-6]{1}[A-Z]{1,2}-[0-9]{4}$')], // 2AB-1234
+    "CAMBODIA": [RegExp(r'^[A-Z0-9.]{8,}$')], // ✅ min 8 (A-Z0-9.)
+
+    // MOTORBIKE
+    "MOTORBIKE_REGULAR": [RegExp(r'^1[A-Z]{1,2}-[0-9]{4}$')], // 1AB-1234
+    "MOTORBIKE_CAMBODIA": [RegExp(r'^[A-Z0-9.]{8,}$')], // min 8
+    "MOTORBIKE_POLICE": [RegExp(r'^1-[0-9]{4}$')], // 1-1234
+    "MOTORBIKE_ARMY_FORCE": [RegExp(r'^1-[0-9]{4}$')], // 1-1234
+  };
+
+  String _ruleKeyForVehicle(_VehicleForm v) {
+    final isMoto = v.vehicleType == "MOTORBIKE";
+    if (!isMoto) return v.carPlateType;
+
+    switch (v.motoPlateType) {
+      case "REGULAR":
+        return "MOTORBIKE_REGULAR";
+      case "CAMBODIA":
+        return "MOTORBIKE_CAMBODIA";
+      case "POLICE":
+        return "MOTORBIKE_POLICE";
+      case "ARMY_FORCE":
+        return "MOTORBIKE_ARMY_FORCE";
+      default:
+        return "MOTORBIKE_REGULAR";
+    }
+  }
+
+  bool _validatePlate(_VehicleForm v, String plate) {
+    final ruleKey = _ruleKeyForVehicle(v);
+    final p = _normalizePlate(plate);
+    final rules = _categoryRules[ruleKey];
+    if (rules == null) return true;
+    return rules.any((r) => r.hasMatch(p));
+  }
+
+  String _formatPlateLive(_VehicleForm v, String raw) {
+    final ruleKey = _ruleKeyForVehicle(v);
+    final upper = raw.toUpperCase();
+
+    // CAMBODIA: allow only A-Z 0-9 .
+    if (ruleKey.contains("CAMBODIA")) {
+      return upper.replaceAll(RegExp(r'[^A-Z0-9.]'), '');
+    }
+
+    // dash plates: keep A-Z 0-9 and reinsert dash
+    var cleaned = upper.replaceAll(RegExp(r'[^A-Z0-9-]'), '');
+    cleaned = cleaned.replaceAll('-', '');
+
+    final isGov =
+        ruleKey == "STATE" ||
+        ruleKey == "POLICE" ||
+        ruleKey == "ARMY_FORCE" ||
+        ruleKey == "MOTORBIKE_POLICE" ||
+        ruleKey == "MOTORBIKE_ARMY_FORCE";
+
+    if (isGov) {
+      if (cleaned.length <= 1) return cleaned;
+      final d = cleaned.substring(0, 1);
+      final nums = cleaned.substring(1);
+      return '$d-$nums';
+    }
+
+    // REGULAR: 2AB-1234 (or 2A-1234)
+    if (cleaned.isEmpty) return '';
+    final first = cleaned.substring(0, 1);
+    final rest = cleaned.substring(1);
+
+    final letters = (RegExp(r'^[A-Z]{0,2}').stringMatch(rest) ?? '');
+    final tail = rest.substring(letters.length);
+    final nums = tail.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (letters.isNotEmpty && nums.isNotEmpty) return '$first$letters-$nums';
+    return '$first$letters$nums';
+  }
+
+  List<TextInputFormatter> _plateFormatters(_VehicleForm v) {
+    final ruleKey = _ruleKeyForVehicle(v);
+
+    return [
+      FilteringTextInputFormatter.allow(
+        ruleKey.contains("CAMBODIA")
+            ? RegExp(r'[0-9A-Za-z.]')
+            : RegExp(r'[0-9A-Za-z-]'),
+      ),
+      LengthLimitingTextInputFormatter(ruleKey.contains("CAMBODIA") ? 20 : 12),
+      TextInputFormatter.withFunction((oldValue, newValue) {
+        final formatted = _formatPlateLive(v, newValue.text);
+        return TextEditingValue(
+          text: formatted,
+          selection: TextSelection.collapsed(offset: formatted.length),
+        );
+      }),
+    ];
+  }
 
   // ----------------------------
   // AUTH
@@ -548,7 +682,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         .toList();
   }
 
-  Future<List<DepartmentItem>> fetchDepartmentsByGeneralDepartment(int gdId) async {
+  Future<List<DepartmentItem>> fetchDepartmentsByGeneralDepartment(
+      int gdId) async {
     final uri =
         Uri.parse("$baseUrl/api/v1/departments/general-department/$gdId");
     final res = await _getWithAuthRetry(uri);
@@ -681,28 +816,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       positionController.text = p?.name ?? "";
     });
   }
-
-  // ----------------------------
-  // Helpers
-  // ----------------------------
-  String _normalizePlate(String s) =>
-      s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
-
-  void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
-
-  /// ✅ yyyy-MM-dd (UI)
-  String _fmtYmd(DateTime d) =>
-      "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
-
-  /// yyyymmdd int
-  int _fmtYmdInt(DateTime d) => int.parse(
-      "${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}");
-
-  /// ✅ dd-MM-yyyy (Backend expects this for LocalDate)
-  String _fmtDmy(DateTime d) =>
-      "${d.day.toString().padLeft(2, '0')}-${d.month.toString().padLeft(2, '0')}-${d.year}";
 
   // ✅ Multi-file picker (max 5)
   Future<void> pickAttachFiles() async {
@@ -961,6 +1074,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _snack("ឆ្នាំផលិតមិនត្រឹមត្រូវ (#${i + 1})");
         return false;
       }
+
+      // ✅ Plate validation
+      if (v.plate.text.trim().isEmpty) {
+        _snack("សូមបញ្ចូលផ្លាកលេខ (#${i + 1})");
+        return false;
+      }
+      if (!_validatePlate(v, v.plate.text)) {
+        _snack("ផ្លាកលេខមិនត្រឹមត្រូវ (#${i + 1})");
+        return false;
+      }
     }
 
     if (selfieRequired && cameraFile == null) {
@@ -975,144 +1098,142 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // API
   // ----------------------------
   Future<Map<String, dynamic>> createParkingCardRequest() async {
-  final base = Uri.parse("$baseUrl/api/v1/parking-card-requests");
+    final base = Uri.parse("$baseUrl/api/v1/parking-card-requests");
 
-  final now = DateTime.now();
+    final now = DateTime.now();
 
-  DateTime requestAt;
-  DateTime requestEnd;
+    DateTime requestAt;
+    DateTime requestEnd;
 
-  if (useDurationDays) {
-    // ✅ Guest + National: issue = NOW, expiry = NOW + duration days (keeps time)
-    final dur = int.parse(durationDaysController.text.trim());
-    requestAt = now;
-    requestEnd = requestAt.add(Duration(days: dur));
+    if (useDurationDays) {
+      // ✅ Guest + National: issue = NOW, expiry = NOW + duration days (keeps time)
+      final dur = int.parse(durationDaysController.text.trim());
+      requestAt = now;
+      requestEnd = requestAt.add(Duration(days: dur));
+    } else {
+      // ✅ Officer/Secretary/Deputy: issue = chosen date (00:00), expiry = +1 year
+      final chosen = DateTime.parse(requestDateController.text.trim());
+      requestAt = chosen;
+      requestEnd = DateTime(chosen.year + 1, chosen.month, chosen.day);
+    }
 
-  } else {
-    // ✅ Officer/Secretary/Deputy: issue = chosen date (00:00), expiry = +1 year
-    final chosen = DateTime.parse(requestDateController.text.trim());
-    requestAt = chosen;
-    requestEnd = DateTime(chosen.year + 1, chosen.month, chosen.day);
-  }
+    final int requestDateInt = _fmtYmdInt(requestEnd); // yyyymmdd (expiry)
+    final String requestAtDateStr = _fmtDmy(requestAt); // dd-MM-yyyy (issue)
 
-  final int requestDateInt = _fmtYmdInt(requestEnd); // yyyymmdd (expiry)
-  final String requestAtDateStr = _fmtDmy(requestAt); // dd-MM-yyyy (issue)
+    // ✅ Save for next screen (IMPORTANT: do NOT null for guest)
+    _lastRequestDateInt = requestDateInt;
+    _lastRequestAtDateStr = requestAtDateStr; // ✅ ALWAYS set
 
-  // ✅ Save for next screen (IMPORTANT: do NOT null for guest)
-  _lastRequestDateInt = requestDateInt;
-  _lastRequestAtDateStr = requestAtDateStr; // ✅ ALWAYS set
-
-  final dto = <String, dynamic>{
-    "reason": reasonController.text.trim().isEmpty
-        ? "Parking card request"
-        : reasonController.text.trim(),
-    "requestDate": requestDateInt,
-    "user": <String, dynamic>{
-      "name": fullNameController.text.trim(),
-      "phone": phoneController.text.trim(),
-      "userType": _userType,
-    },
-    "vehicles": vehicles.map((v) {
-      return <String, dynamic>{
-        "brand": v.brand.text.trim(),
-        "plate": <String, dynamic>{
-          "plateNumber": _normalizePlate(v.plate.text),
-          "plateCategory":
-              v.vehicleType == "MOTORBIKE" ? v.motoPlateType : v.carPlateType,
-        },
-        "color": v.color.text.trim(),
-        "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
-        "vehicleType": v.vehicleType,
-      };
-    }).toList(),
-  };
-
-  // ✅ If backend must NOT receive requestAtDate for guest, keep this:
-  if (_userType != "GUEST") {
-    dto["requestAtDate"] = requestAtDateStr;
-  }
-  // If backend is OK with it for guest too, you can remove the if and always set it.
-
-  final wi = <String, dynamic>{};
-  if (showIdNumber) wi["policeId"] = idNumberController.text.trim();
-
-  if (showWorkFields) {
-    wi["generalDepartmentText"] = ministryController.text.trim();
-    wi["departmentText"] = departmentController.text.trim();
-    wi["burauText"] = officeController.text.trim();
-    wi["positionText"] = positionController.text.trim();
-  }
-
-  if (showProvinceCity) {
-    wi["provinceCity"] = provinceCityController.text.trim();
-  }
-
-  if (wi.isNotEmpty) {
-    (dto["user"] as Map<String, dynamic>)["workingInfo"] = wi;
-  }
-
-  final token = await _getToken();
-
-  final List<Map<String, String>> fileList = [];
-
-  for (int i = 0; i < attachFiles.length; i++) {
-    fileList.add({"path": attachFiles[i].path, "name": attachFileNames[i]});
-  }
-
-  if (cameraFile != null) {
-    fileList.add({
-      "path": cameraFile!.path,
-      "name": cameraFileName ?? cameraFile!.path.split('/').last,
-    });
-  }
-
-  Uri uri = base;
-  if (fileList.isNotEmpty) {
-    uri = base.replace(
-      queryParameters: <String, dynamic>{
-        "attachmentTypes": List<String>.filled(fileList.length, attachmentTypeValue),
+    final dto = <String, dynamic>{
+      "reason": reasonController.text.trim().isEmpty
+          ? "Parking card request"
+          : reasonController.text.trim(),
+      "requestDate": requestDateInt,
+      "user": <String, dynamic>{
+        "name": fullNameController.text.trim(),
+        "phone": phoneController.text.trim(),
+        "userType": _userType,
       },
-    );
-  }
+      "vehicles": vehicles.map((v) {
+        return <String, dynamic>{
+          "brand": v.brand.text.trim(),
+          "plate": <String, dynamic>{
+            "plateNumber": _normalizePlate(v.plate.text),
+            "plateCategory":
+                v.vehicleType == "MOTORBIKE" ? v.motoPlateType : v.carPlateType,
+          },
+          "color": v.color.text.trim(),
+          "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
+          "vehicleType": v.vehicleType,
+        };
+      }).toList(),
+    };
 
-  final request = http.MultipartRequest("POST", uri);
-  request.headers["Accept"] = "*/*";
+    // ✅ If backend must NOT receive requestAtDate for guest, keep this:
+    if (_userType != "GUEST") {
+      dto["requestAtDate"] = requestAtDateStr;
+    }
 
-  if (token != null && token.isNotEmpty) {
-    request.headers["Authorization"] = "Bearer $token";
-  }
+    final wi = <String, dynamic>{};
+    if (showIdNumber) wi["policeId"] = idNumberController.text.trim();
 
-  request.files.add(
-    http.MultipartFile.fromString(
-      "dto",
-      jsonEncode(dto),
-      filename: "dto.json",
-      contentType: MediaType('application', 'json'),
-    ),
-  );
+    if (showWorkFields) {
+      wi["generalDepartmentText"] = ministryController.text.trim();
+      wi["departmentText"] = departmentController.text.trim();
+      wi["burauText"] = officeController.text.trim();
+      wi["positionText"] = positionController.text.trim();
+    }
 
-  for (final f in fileList) {
+    if (showProvinceCity) {
+      wi["provinceCity"] = provinceCityController.text.trim();
+    }
+
+    if (wi.isNotEmpty) {
+      (dto["user"] as Map<String, dynamic>)["workingInfo"] = wi;
+    }
+
+    final token = await _getToken();
+
+    final List<Map<String, String>> fileList = [];
+
+    for (int i = 0; i < attachFiles.length; i++) {
+      fileList.add({"path": attachFiles[i].path, "name": attachFileNames[i]});
+    }
+
+    if (cameraFile != null) {
+      fileList.add({
+        "path": cameraFile!.path,
+        "name": cameraFileName ?? cameraFile!.path.split('/').last,
+      });
+    }
+
+    Uri uri = base;
+    if (fileList.isNotEmpty) {
+      uri = base.replace(
+        queryParameters: <String, dynamic>{
+          "attachmentTypes":
+              List<String>.filled(fileList.length, attachmentTypeValue),
+        },
+      );
+    }
+
+    final request = http.MultipartRequest("POST", uri);
+    request.headers["Accept"] = "*/*";
+
+    if (token != null && token.isNotEmpty) {
+      request.headers["Authorization"] = "Bearer $token";
+    }
+
     request.files.add(
-      await http.MultipartFile.fromPath(
-        "files",
-        f["path"]!,
-        filename: f["name"]!,
+      http.MultipartFile.fromString(
+        "dto",
+        jsonEncode(dto),
+        filename: "dto.json",
+        contentType: MediaType('application', 'json'),
       ),
     );
+
+    for (final f in fileList) {
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          "files",
+          f["path"]!,
+          filename: f["name"]!,
+        ),
+      );
+    }
+
+    final streamed = await request.send();
+    final resp = await http.Response.fromStream(streamed);
+
+    if (resp.statusCode != 200 && resp.statusCode != 201) {
+      throw "HTTP ${resp.statusCode}: ${resp.body.isEmpty ? '(empty body)' : resp.body}";
+    }
+
+    if (resp.body.isEmpty) return {};
+    final decoded = jsonDecode(resp.body);
+    return decoded is Map<String, dynamic> ? decoded : {};
   }
-
-  final streamed = await request.send();
-  final resp = await http.Response.fromStream(streamed);
-
-  if (resp.statusCode != 200 && resp.statusCode != 201) {
-    throw "HTTP ${resp.statusCode}: ${resp.body.isEmpty ? '(empty body)' : resp.body}";
-  }
-
-  if (resp.body.isEmpty) return {};
-  final decoded = jsonDecode(resp.body);
-  return decoded is Map<String, dynamic> ? decoded : {};
-}
-
 
   // ----------------------------
   // Submit
@@ -1144,15 +1265,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
           "code": res["code"],
           "token": res["token"],
           "parkingRequestStatus": res["parkingRequestStatus"],
-
           "fullName": fullNameController.text.trim(),
           "phone": phoneController.text.trim(),
           "userType": _userType,
-
           "selfieBytes": selfieBytes,
           "selfiePath": cameraFile?.path,
-
-          // ✅ dates for badge screen
           "requestDate": _lastRequestDateInt,
           "requestAtDate": _lastRequestAtDateStr,
           "vehicleType": vehicles.isNotEmpty ? vehicles.first.vehicleType : "",
@@ -1164,15 +1281,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
             "policeId": idNumberController.text.trim(),
             "provinceCity": provinceCityController.text.trim(),
           },
-          "vehicles": vehicles.map((v) => {
-            "brand": v.brand.text.trim(),
-            "color": v.color.text.trim(),
-            "plateNumber": v.plate.text.trim(),   // must be plateNumber
-            "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
-            "vehicleType": v.vehicleType,
-            "plateCategory": v.vehicleType == "MOTORBIKE" ? v.motoPlateType : v.carPlateType,
-            "subcategory": getSubcategoryKey(v),
-          }).toList(),
+          "vehicles": vehicles
+              .map((v) => {
+                    "brand": v.brand.text.trim(),
+                    "color": v.color.text.trim(),
+                    "plateNumber": v.plate.text.trim(),
+                    "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
+                    "vehicleType": v.vehicleType,
+                    "plateCategory": v.vehicleType == "MOTORBIKE"
+                        ? v.motoPlateType
+                        : v.carPlateType,
+                    "subcategory": getSubcategoryKey(v),
+                  })
+              .toList(),
         },
       );
     } catch (e, st) {
@@ -1207,7 +1328,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ----------------------------
-  // ✅ UI BLOCKS (LIKE SCREENSHOT)
+  // ✅ UI BLOCKS
   // ----------------------------
   Widget fieldBlock({
     required String label,
@@ -1291,7 +1412,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             sectionTitle("ព័ត៌មានផ្ទាល់ខ្លួន"),
                             dropdownUserType(),
                             const SizedBox(height: 15),
-
                             if (showIdNumber) ...[
                               oneInput(
                                 label: "គោត្តនាម និងនាម",
@@ -1316,10 +1436,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 controller: fullNameController,
                               ),
                             ],
-
                             if (showWorkFields) ...[
                               sectionTitle("ព័ត៌មានការងារ"),
-
                               if (useWorkDropdown) ...[
                                 if (dropdownLoading)
                                   const Padding(
@@ -1354,16 +1472,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ),
                               ],
                             ],
-
                             if (showProvinceCity)
                               oneInput(
                                 label: "ខេត្ត/រាជធានី",
                                 hint: "បញ្ចូលខេត្ត/រាជធានី",
                                 controller: provinceCityController,
                               ),
-
                             const SizedBox(height: 10),
-
                             if (useDurationDays) ...[
                               textFieldBlock(
                                 label: "លេខទូរស័ព្ទ",
@@ -1384,7 +1499,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ] else ...[
                               phoneAndDate(),
                             ],
-
                             sectionTitle("ព័ត៌មានរថយន្ត/ម៉ូតូ"),
                             ...List.generate(vehicles.length, (i) {
                               final v = vehicles[i];
@@ -1439,23 +1553,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       ),
                                     ],
                                   ),
-
                                   oneInput(
                                     label: "ម៉ាក",
                                     hint: "បញ្ចូលម៉ាក",
                                     controller: v.brand,
                                   ),
-
                                   plateRow(v),
 
-                                  oneInput(
+                                  // ✅ Plate input with formatter
+                                  textFieldBlock(
                                     label: "ផ្លាកលេខ",
-                                    hint: "សូមបញ្ចូលផ្លាកលេខអោយត្រូវតាមទម្រង់",
+                                    hint:
+                                        "សូមបញ្ចូលផ្លាកលេខអោយត្រូវតាមទម្រង់",
                                     controller: v.plate,
+                                    inputFormatters: _plateFormatters(v),
                                   ),
 
                                   const SizedBox(height: 10),
-
                                   Center(
                                     child: plateBox(
                                       label: getSubcategoryKey(v),
@@ -1465,7 +1579,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       keyText: getPlateKey(v),
                                     ),
                                   ),
-
                                   oneInput(
                                     label: "ពណ៌",
                                     hint: "ពណ៌រថយន្ត",
@@ -1476,12 +1589,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     hint: "ឆ្នាំផលិត",
                                     controller: v.year,
                                   ),
-
                                   const Divider(height: 24),
                                 ],
                               );
                             }),
-
                             uploadMultiAttachment(),
                             uploadCameraAttachment(),
                             bottom(),
@@ -1656,6 +1767,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   v.carPlateType = x;
                   v.carPlateSubcategory = null;
                 }
+
+                // ✅ reformat after changing type
+                v.plate.text = _formatPlateLive(v, v.plate.text);
               });
             },
           ),
@@ -1822,9 +1936,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(selfieRequired
-              ? "ថតរូប Selfie (ចាំបាច់)"
-              : "ថតរូប Selfie (ជាជម្រើស)"),
+          Text(selfieRequired ? "ថតរូប Selfie (ចាំបាច់)" : "ថតរូប Selfie (ជាជម្រើស)"),
           const SizedBox(height: 8),
           GestureDetector(
             onTap: pickCameraImage,
@@ -1835,8 +1947,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 color: Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(
-                  color:
-                      cameraError != null ? Colors.red : Colors.grey.shade400,
+                  color: cameraError != null ? Colors.red : Colors.grey.shade400,
                   width: 1.5,
                 ),
               ),
@@ -2065,8 +2176,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       SizedBox(width: 6),
                       Text(
                         "បន្ថែមរថយន្ត",
-                        style:
-                            TextStyle(fontSize: 16, color: Color(0xffDFB73B)),
+                        style: TextStyle(fontSize: 16, color: Color(0xffDFB73B)),
                       ),
                     ],
                   ),
