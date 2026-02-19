@@ -166,6 +166,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final officeController = TextEditingController();
   final positionController = TextEditingController();
   final phoneController = TextEditingController();
+  final searchController = TextEditingController();
 
   /// calendar date (yyyy-MM-dd) - only for NON duration types
   final requestDateController = TextEditingController();
@@ -496,8 +497,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     var cleaned = upper.replaceAll(RegExp(r'[^A-Z0-9-]'), '');
     cleaned = cleaned.replaceAll('-', '');
 
-    final isGov =
-        ruleKey == "STATE" ||
+    final isGov = ruleKey == "STATE" ||
         ruleKey == "POLICE" ||
         ruleKey == "ARMY_FORCE" ||
         ruleKey == "MOTORBIKE_POLICE" ||
@@ -566,6 +566,100 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
 
     return res;
+  }
+
+  //TODO Remove static login
+  Future<http.Response> _search({
+    required String search,
+  }) async {
+    final uri =
+        Uri.parse("$baseUrl/api/v1/parking-card-requests/search/$search");
+
+    // 1. Login Logic
+    final loginRes = await _login(
+      baseUrl: "http://10.0.2.2:8080",
+      email: "user@moi.com",
+      password: "Moi@2026\$",
+    );
+
+    if (loginRes.statusCode == 200) {
+      final loginData = jsonDecode(loginRes.body);
+      final String newToken =
+          loginData['accessToken'] ?? loginData['token'] ?? "";
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString("accessToken", newToken);
+    } else {
+      _snack("Login Failed: ${loginRes.statusCode}");
+      return loginRes;
+    }
+    final token = await _getToken();
+
+    // 3. Perform Search
+    try {
+      final res = await http.get(
+        uri,
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "Authorization": "Bearer $token",
+        },
+      );
+      if (res.statusCode == 200) {
+        _snack("ស្វែងរកជោគជ័យ (Search Successful)");
+        
+        final Map<String, dynamic> responseData = jsonDecode(res.body);
+
+        if (!mounted) return res;
+
+        Navigator.pushNamed(
+          context,
+          Approute.verifySuccessScreen,
+          arguments: {
+            "code": responseData["code"],
+            "token": responseData["token"],
+            "parkingRequestStatus": responseData["parkingRequestStatus"],
+            // Use server-returned data to ensure it matches the database
+            "fullName": responseData["name"], 
+            "phone": responseData["phone"],
+            "userType": responseData["userType"],
+            "selfieBytes": null, // Search doesn't usually return the raw selfie bytes
+            "selfiePath": null,
+            "requestDate": responseData["requestDate"],
+            "requestAtDate": responseData["requestAtDate"],
+            "vehicleType": (responseData["vehicles"] as List).isNotEmpty 
+                ? responseData["vehicles"][0]["vehicleType"] 
+                : "",
+            "workingInfo": {
+              "generalDepartmentText": responseData["generalDepartmentText"],
+              "departmentText": responseData["departmentText"],
+              "burauText": responseData["burauText"],
+              "positionText": responseData["positionText"],
+              "policeId": responseData["policeId"],
+              "provinceCity": responseData["provinceCity"],
+            },
+            "vehicles": responseData["vehicles"], // Returns the list of vehicle maps from backend
+          },
+        );
+      
+      } else if (res.statusCode == 500) {
+        if (res.body.contains("IncorrectResultSizeDataAccessException") ||
+            res.body.contains("non-unique result")) {
+          //TODO dup phone number
+          _snack("មានទិន្នន័យស្ទួន (Found duplicate phone numbers)");
+        } else {
+          _snack("កំហុសម៉ាស៊ីនបម្រើ (Server Error: 500)");
+        }
+      } else if (res.statusCode == 404 || res.body.contains("not found")) {
+        _snack("រកមិនឃើញទិន្នន័យ (Request not found)");
+      } else {
+        _snack("មានបញ្ហាអ្វីមួយ (Error: ${res.statusCode})");
+      }
+      debugPrint("Response Body: ${res.body}");
+      return res;
+    } catch (e) {
+      _snack("(Connection Error)");
+      return http.Response('{"error": "Connection failed"}', 500);
+    }
   }
 
   Future<String?> _getToken() async {
@@ -1409,6 +1503,56 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: oneInput(
+                                    label: "ស្វែងរក",
+                                    hint: "តាមរយះ លេខកូដ ឬលេខទូរស័ព្ទ",
+                                    controller: searchController,
+                                  ),
+                                ),
+                                Column(
+                                  children: [
+                                    SizedBox(
+                                      height: 20,
+                                    ),
+                                    Row(
+                                      children: [
+                                        SizedBox(
+                                          height: 48,
+                                          width: 48,
+                                          child: ElevatedButton(
+                                            onPressed: () {
+                                              _search(
+                                                  search:
+                                                      searchController.text);
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.white,
+                                              foregroundColor: Colors.black,
+                                              side: BorderSide(
+                                                  color: Colors.grey.shade400),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
+                                              ),
+                                              elevation: 0,
+                                              padding: EdgeInsets.zero,
+                                            ),
+                                            child: Icon(Icons.search,
+                                                size: 24, color: Colors.black),
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          width: 20,
+                                        )
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                             sectionTitle("ព័ត៌មានផ្ទាល់ខ្លួន"),
                             dropdownUserType(),
                             const SizedBox(height: 15),
@@ -1563,8 +1707,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   // ✅ Plate input with formatter
                                   textFieldBlock(
                                     label: "ផ្លាកលេខ",
-                                    hint:
-                                        "សូមបញ្ចូលផ្លាកលេខអោយត្រូវតាមទម្រង់",
+                                    hint: "សូមបញ្ចូលផ្លាកលេខអោយត្រូវតាមទម្រង់",
                                     controller: v.plate,
                                     inputFormatters: _plateFormatters(v),
                                   ),
@@ -1573,9 +1716,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   Center(
                                     child: plateBox(
                                       label: getSubcategoryKey(v),
-                                      code: _normalizePlate(v.plate.text).isEmpty
-                                          ? "----"
-                                          : _normalizePlate(v.plate.text),
+                                      code:
+                                          _normalizePlate(v.plate.text).isEmpty
+                                              ? "----"
+                                              : _normalizePlate(v.plate.text),
                                       keyText: getPlateKey(v),
                                     ),
                                   ),
@@ -1907,8 +2051,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             return Row(
               children: [
                 Expanded(
-                  child: Text(attachFileNames[i],
-                      overflow: TextOverflow.ellipsis),
+                  child:
+                      Text(attachFileNames[i], overflow: TextOverflow.ellipsis),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.red),
@@ -1936,7 +2080,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(selfieRequired ? "ថតរូប Selfie (ចាំបាច់)" : "ថតរូប Selfie (ជាជម្រើស)"),
+          Text(selfieRequired
+              ? "ថតរូប Selfie (ចាំបាច់)"
+              : "ថតរូប Selfie (ជាជម្រើស)"),
           const SizedBox(height: 8),
           GestureDetector(
             onTap: pickCameraImage,
@@ -1947,7 +2093,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 color: Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(
-                  color: cameraError != null ? Colors.red : Colors.grey.shade400,
+                  color:
+                      cameraError != null ? Colors.red : Colors.grey.shade400,
                   width: 1.5,
                 ),
               ),
@@ -1969,8 +2116,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             Row(
               children: [
                 Expanded(
-                  child: Text(cameraFileName!,
-                      overflow: TextOverflow.ellipsis),
+                  child: Text(cameraFileName!, overflow: TextOverflow.ellipsis),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.red),
@@ -2176,7 +2322,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       SizedBox(width: 6),
                       Text(
                         "បន្ថែមរថយន្ត",
-                        style: TextStyle(fontSize: 16, color: Color(0xffDFB73B)),
+                        style:
+                            TextStyle(fontSize: 16, color: Color(0xffDFB73B)),
                       ),
                     ],
                   ),
