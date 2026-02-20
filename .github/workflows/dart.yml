@@ -1,4 +1,4 @@
-name: ANPR
+name: ANP
 
 on:
   workflow_dispatch:
