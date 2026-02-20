@@ -1482,7 +1482,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!allowedUserTypes.contains(_userType)) _userType = "GUEST";
 
     return Scaffold(
-      backgroundColor: const Color(0xFFDFB73B),
+      backgroundColor: const Color(0xFFFFCA28),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -2143,13 +2143,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ----------------------------
   Widget _header() {
     return Container(
-      height: 225,
+      height: 265,
       width: double.infinity,
       color: Colors.white,
       child: Column(
         children: const [
           SizedBox(height: 55),
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Padding(
                 padding: EdgeInsets.all(8.0),
@@ -2182,9 +2183,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ],
           ),
+          SizedBox(height: 15),
+          Text(
+            "ទម្រង់ការស្នើរសំុបំពេញបែបបទចេញចូល​",
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
           SizedBox(height: 10),
           Text(
-            "ប័ណ្ណស្នើរចំណតរថយន្ត",
+            "ទីស្តីការក្រសួងមហាផ្ទៃ",
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
         ],
@@ -2307,7 +2313,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 height: 48,
                 child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xffDFB73B)),
+                    side: const BorderSide(color: Color(0xFFFFCA28)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(15),
                     ),
@@ -2318,12 +2324,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: const [
-                      Icon(Icons.add, color: Color(0xffDFB73B), size: 20),
+                      Icon(Icons.add, color: Color(0xFFFFCA28), size: 20),
                       SizedBox(width: 6),
                       Text(
                         "បន្ថែមរថយន្ត",
                         style:
-                            TextStyle(fontSize: 16, color: Color(0xffDFB73B)),
+                            TextStyle(fontSize: 16, color: Color(0xFFFFCA28)),
                       ),
                     ],
                   ),
@@ -2336,7 +2342,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 height: 48,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xffDFB73B),
+                    backgroundColor: Color(0xFFFFCA28),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(15),
                     ),

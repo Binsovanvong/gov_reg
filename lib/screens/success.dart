@@ -321,7 +321,7 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
                 child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: gold),
+                    side: const BorderSide(color: Color(0xFFFFCA28)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -337,7 +337,7 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
               Expanded(
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: gold,
+                    backgroundColor: Color(0xFFFFCA28),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -374,7 +374,7 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
               Expanded(
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: gold,
+                    backgroundColor:  Color(0xFFFFCA28),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
