@@ -1,4 +1,6 @@
+
 name: ANPR
+
 
 on:
   workflow_dispatch:
@@ -12,6 +14,7 @@ jobs:
     runs-on: macos-latest
     env:
       APP_NAME: "ANPR"  # Set the app name here
+
 
     steps:
       - uses: actions/checkout@v3
