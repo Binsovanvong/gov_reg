@@ -1,14 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gov_reg/routes/approute.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:image/image.dart' as img;
 
 /// ✅ MUST be top-level (NOT inside State class)
 class _VehicleForm {
@@ -17,14 +18,14 @@ class _VehicleForm {
   final color = TextEditingController();
   final year = TextEditingController();
 
-  /// ✅ already exists in your app
   String vehicleType = "CAR";
+  String carPlateType = "REGULAR";
 
-  /// ✅ CAR plate types
-  String carPlateType = "NORMAL_CAR";
+  // ✅ FIX: must match motoPlateTypes keys (REGULAR/CAMBODIA/POLICE/ARMY_FORCE)
+  String motoPlateType = "REGULAR";
 
-  /// ✅ MOTO plate types
-  String motoPlateType = "NORMAL_MOTO";
+  String? carPlateSubcategory;
+  String? motoPlateSubcategory;
 
   void dispose() {
     brand.dispose();
@@ -165,6 +166,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final officeController = TextEditingController();
   final positionController = TextEditingController();
   final phoneController = TextEditingController();
+  final searchController = TextEditingController();
 
   /// calendar date (yyyy-MM-dd) - only for NON duration types
   final requestDateController = TextEditingController();
@@ -177,6 +179,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // Vehicles list
   final List<_VehicleForm> vehicles = [_VehicleForm()];
+
+  // ✅ Save computed dates so we can pass to next screen
+  int _lastRequestDateInt = 0; // yyyymmdd
+  String? _lastRequestAtDateStr; // dd-MM-yyyy or null
 
   // ----------------------------
   // ✅ Work dropdown state
@@ -198,61 +204,269 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Plate Types
   // ----------------------------
 
-  /// ✅ CAR plate types
-  final List<Map<String, String>> plateCategory = [
+  /// ✅ CAR plate types — subcategory values must match DB `code` column (used by backend lookup)
+  final List<Map<String, dynamic>> plateCategory = [
     {
-      "key": "NORMAL_CAR",
-      "label": "រថយន្តធម្មតា (2AB-1234)",
-      // "plateCode":,
-      "pattern": r"^2[A-Z]{2}-\d{4}$"
+      "key": "ROYAL_PALACE",
+      "label": "រាជវាំង",
+      "subcategory": ["ROYAL_PALACE"],
     },
     {
-      "key": "CAR_STATE",
-      "label": "រដ្ឋ (2-0369)",
-      // "plateCode":,
-      "pattern": r"^2-\d{4}$"
+      "key": "STATE",
+      "label": "រដ្ឋ",
+      "subcategory": List.generate(
+        61,
+        (i) => "STATE_${i + 1}",
+      ),
     },
     {
-      "key": "CAR_POLICE",
-      "label": "ប៉ូលីស (L-1077)",
-      // "plateCode":,
-      "pattern": r"^L-\d{4}$"
+      "key": "POLICE",
+      "label": "នគរបាល",
+      "subcategory": ["POLICE"],
     },
     {
-      "key": "CAR_DIPLOMAT",
-      "label": "ការទូត (CD.76.002)",
-      // "plateCode":,
-      "pattern": r"^CD\.\d{2}\.\d{3}$"
+      "key": "ARMY_FORCE",
+      "label": "ខេមរភូមិន្ទ",
+      "subcategory": List.generate(
+        9,
+        (i) => "R C A F_${i + 1}",
+      ),
     },
     {
-      "key": "CAR_TRUCK",
-      "label": "ឡានធំ (3A-1070)",
-      // "plateCode":,
-      "pattern": r"^3[A-Z]-\d{4}$"
+      "key": "ORGANIZATION",
+      "label": "អង្គការ",
+      "subcategory": ["OI", "ONG1", "ONG2"],
+    },
+    {
+      "key": "EMBASSY",
+      "label": "អង្គទូត",
+      "subcategory": ["CMD01-1", "CD01"],
+    },
+    {
+      "key": "UNITED_NATIONS",
+      "label": "អង្គការសហប្រជាជាតិ",
+      // ✅ FIX: DB code is "OUN01-1" not "ONU01-1"
+      "subcategory": ["OUN01-1", "ONU01"],
+    },
+    {
+      "key": "TEMPORARY",
+      "label": "បណ្តោះអាសន្ន",
+      "subcategory": ["AT18"],
+    },
+    {
+      "key": "REGULAR",
+      "label": "ធម្មតា",
+      "subcategory": [
+        "PHNOM PENH",
+        "KANDAL",
+        "BANTEAY MEANCHEY",
+        "BATTAMBANG",
+        "KAMPONG CHAM",
+        "KAMPONG CHHNANG",
+        "KAMPONG SPEU",
+        "KAMPONG THOM",
+        "KAMPOT",
+        "KEP",
+        "KOH KONG",
+        "KRATIE",
+        "MONDULKIRI",
+        "ODDAR MEANCHEY",
+        "PAILIN",
+        "SIHANOUKVILLE",
+        "PREAH VIHEAR",
+        "PREY VENG",
+        "PURSAT",
+        "SIEM REAP",
+        "STUNG TRENG",
+        "SVAY RIENG",
+        "TAKEO",
+        "TBOUNG KHMUM",
+        "RATANAKIRI",
+      ],
+    },
+    {
+      "key": "CAMBODIA",
+      "label": "កម្ពុជា",
+      "subcategory": ["CAMBODIA"],
     },
   ];
 
-  /// ✅ MOTO plate types
-  final List<Map<String, String>> motoPlateTypes = [
+  /// ✅ MOTO plate types — subcategory values must match DB `code` column (used by backend lookup)
+  final List<Map<String, dynamic>> motoPlateTypes = [
     {
-      "key": "NORMAL_MOTO",
-      "label": "ម៉ូតូធម្មតា (1AB-1234)",
-      "pattern": r"^1[A-Z]{2}-\d{4}$"
+      "key": "REGULAR",
+      "label": "ធម្មតា",
+      "subcategory": [
+        "PHNOM PENH_M",
+        "KANDAL_M",
+        "BANTEAY MEANCHEY_M",
+        "BATTAMBANG_M",
+        "KAMPONG CHAM_M",
+        "KAMPONG CHHNANG_M",
+        "KAMPONG SPEU_M",
+        "KAMPONG THOM_M",
+        "KAMPOT_M",
+        "KEP_M",
+        "KOH KONG_M",
+        "KRATIE_M",
+        "MONDULKIRI_M",
+        "ODDAR MEANCHEY_M",
+        "PAILIN_M",
+        "SIHANOUKVILLE_M",
+        "PREAH VIHEAR_M",
+        "PREY VENG_M",
+        "PURSAT_M",
+        "SIEM REAP_M",
+        "STUNG TRENG_M",
+        "SVAY RIENG_M",
+        "TAKEO_M",
+        "TBOUNG KHMUM_M",
+        "RATANAKIRI_M",
+      ],
     },
     {
-      "key": "MOTO_STATE",
-      "label": "ម៉ូតូរដ្ឋ (1-0369)",
-      "pattern": r"^1-\d{4}$"
+      "key": "CAMBODIA",
+      "label": "កម្ពុជា",
+      "subcategory": ["CAMBODIA_M"],
     },
     {
-      "key": "MOTO_POLICE",
-      "label": "ម៉ូតូប៉ូលីស (M-1234)",
-      "pattern": r"^M-\d{4}$"
+      "key": "POLICE",
+      "label": "នគរបាល",
+      "subcategory": ["POLICE_M"],
+    },
+    {
+      "key": "ARMY_FORCE",
+      "label": "ខេមរភូមិន្ទ",
+      "subcategory": ["R C A F_M"],
     },
   ];
+
+  String getPlateKey(_VehicleForm v) {
+    final isMoto = v.vehicleType == "MOTORBIKE";
+    final items = isMoto ? motoPlateTypes : plateCategory;
+    final type = isMoto ? v.motoPlateType : v.carPlateType;
+
+    final found = items.firstWhere(
+      (item) => item["key"] == type,
+      orElse: () => {"key": "UNKNOWN"},
+    );
+
+    return (found["key"] ?? "UNKNOWN").toString();
+  }
+
+  /// Returns the DB code to send as plateSubCategory.
+  /// Subcategory values in the list ARE the DB codes (e.g. "PHNOM PENH", "STATE_1").
+  /// If user selected one, return it. If only one option exists, auto-select it.
+  /// Otherwise return null.
+  String? getSubcategoryKey(_VehicleForm v) {
+    final isMoto = v.vehicleType == "MOTORBIKE";
+    final items = isMoto ? motoPlateTypes : plateCategory;
+    final type = isMoto ? v.motoPlateType : v.carPlateType;
+    final sub = isMoto ? v.motoPlateSubcategory : v.carPlateSubcategory;
+
+    final found = items.firstWhere(
+      (item) => item["key"] == type,
+      orElse: () => <String, dynamic>{},
+    );
+
+    if (found.isEmpty) return null;
+
+    final list =
+        (found["subcategory"] as List?)?.cast<String>() ?? const <String>[];
+
+    // User explicitly selected a subcategory
+    if (sub != null && sub.trim().isNotEmpty && list.contains(sub)) return sub;
+
+    // Auto-select if only one option exists
+    if (list.length == 1) return list[0];
+
+    return null;
+  }
+
+  /// Maps DB code → Khmer display label
+  static const Map<String, String> _subcategoryLabels = {
+    // ROYAL_PALACE
+    "ROYAL_PALACE": "រាជវាំង",
+    // STATE
+    "STATE_1": "រដ្ឋ-01", "STATE_2": "រដ្ឋ-02", "STATE_3": "រដ្ឋ-03",
+    "STATE_4": "រដ្ឋ-04", "STATE_5": "រដ្ឋ-05", "STATE_6": "រដ្ឋ-06",
+    "STATE_7": "រដ្ឋ-07", "STATE_8": "រដ្ឋ-08", "STATE_9": "រដ្ឋ-09",
+    "STATE_10": "រដ្ឋ-10", "STATE_11": "រដ្ឋ-11", "STATE_12": "រដ្ឋ-12",
+    "STATE_13": "រដ្ឋ-13", "STATE_14": "រដ្ឋ-14", "STATE_15": "រដ្ឋ-15",
+    "STATE_16": "រដ្ឋ-16", "STATE_17": "រដ្ឋ-17", "STATE_18": "រដ្ឋ-18",
+    "STATE_19": "រដ្ឋ-19", "STATE_20": "រដ្ឋ-20", "STATE_21": "រដ្ឋ-21",
+    "STATE_22": "រដ្ឋ-22", "STATE_23": "រដ្ឋ-23", "STATE_24": "រដ្ឋ-24",
+    "STATE_25": "រដ្ឋ-25", "STATE_26": "រដ្ឋ-26", "STATE_27": "រដ្ឋ-27",
+    "STATE_28": "រដ្ឋ-28", "STATE_29": "រដ្ឋ-29", "STATE_30": "រដ្ឋ-30",
+    "STATE_31": "រដ្ឋ-31", "STATE_32": "រដ្ឋ-32", "STATE_33": "រដ្ឋ-33",
+    "STATE_34": "រដ្ឋ-34", "STATE_35": "រដ្ឋ-35", "STATE_36": "រដ្ឋ-36",
+    "STATE_37": "រដ្ឋ-37", "STATE_38": "រដ្ឋ-38", "STATE_39": "រដ្ឋ-39",
+    "STATE_40": "រដ្ឋ-40", "STATE_41": "រដ្ឋ-41", "STATE_42": "រដ្ឋ-42",
+    "STATE_43": "រដ្ឋ-43", "STATE_44": "រដ្ឋ-44", "STATE_45": "រដ្ឋ-45",
+    "STATE_46": "រដ្ឋ-46", "STATE_47": "រដ្ឋ-47", "STATE_48": "រដ្ឋ-48",
+    "STATE_49": "រដ្ឋ-49", "STATE_50": "រដ្ឋ-50", "STATE_51": "រដ្ឋ-51",
+    "STATE_52": "រដ្ឋ-52", "STATE_53": "រដ្ឋ-53", "STATE_54": "រដ្ឋ-54",
+    "STATE_55": "រដ្ឋ-55", "STATE_56": "រដ្ឋ-56", "STATE_57": "រដ្ឋ-57",
+    "STATE_58": "រដ្ឋ-58", "STATE_59": "រដ្ឋ-59", "STATE_60": "រដ្ឋ-60",
+    "STATE_61": "រដ្ឋ-61",
+    // POLICE
+    "POLICE": "នគរបាល",
+    "POLICE_M": "នគរបាល",
+    // ARMY_FORCE (car)
+    "R C A F_1": "ខេមរភូមិន្ទ-01", "R C A F_2": "ខេមរភូមិន្ទ-02",
+    "R C A F_3": "ខេមរភូមិន្ទ-03", "R C A F_4": "ខេមរភូមិន្ទ-04",
+    "R C A F_5": "ខេមរភូមិន្ទ-05", "R C A F_6": "ខេមរភូមិន្ទ-06",
+    "R C A F_7": "ខេមរភូមិន្ទ-07", "R C A F_8": "ខេមរភូមិន្ទ-08",
+    "R C A F_9": "ខេមរភូមិន្ទ-09",
+    // ARMY_FORCE (moto)
+    "R C A F_M": "ខេមរភូមិន្ទ",
+    // ORGANIZATION
+    "OI": "OI", "ONG1": "ONG1", "ONG2": "ONG2",
+    // EMBASSY
+    "CMD01-1": "CMD01-1", "CD01": "CD01",
+    // UNITED_NATIONS
+    "OUN01-1": "OUN01-1", "ONU01": "ONU01",
+    // TEMPORARY
+    "AT18": "AT18",
+    // REGULAR (car)
+    "PHNOM PENH": "ភ្នំពេញ", "KANDAL": "កណ្ដាល",
+    "BANTEAY MEANCHEY": "បន្ទាយមានជ័យ", "BATTAMBANG": "បាត់ដំបង",
+    "KAMPONG CHAM": "កំពង់ចាម", "KAMPONG CHHNANG": "កំពង់ឆ្នាំង",
+    "KAMPONG SPEU": "កំពង់ស្ពឺ", "KAMPONG THOM": "កំពង់ធំ",
+    "KAMPOT": "កំពត", "KEP": "កែប", "KOH KONG": "កោះកុង",
+    "KRATIE": "ក្រចេះ", "MONDULKIRI": "មណ្ឌលគិរី",
+    "ODDAR MEANCHEY": "ឧត្តរមានជ័យ", "PAILIN": "ប៉ៃលិន",
+    "SIHANOUKVILLE": "ព្រះសីហនុ", "PREAH VIHEAR": "ព្រះវិហារ",
+    "PREY VENG": "ព្រៃវែង", "PURSAT": "ពោធិ៍សាត់",
+    "SIEM REAP": "សៀមរាប", "STUNG TRENG": "ស្ទឹងត្រែង",
+    "SVAY RIENG": "ស្វាយរៀង", "TAKEO": "តាកែវ",
+    "TBOUNG KHMUM": "ត្បូងឃ្មុំ", "RATANAKIRI": "រតនគិរី",
+    // REGULAR (moto) — same but _M suffix
+    "PHNOM PENH_M": "ភ្នំពេញ", "KANDAL_M": "កណ្ដាល",
+    "BANTEAY MEANCHEY_M": "បន្ទាយមានជ័យ", "BATTAMBANG_M": "បាត់ដំបង",
+    "KAMPONG CHAM_M": "កំពង់ចាម", "KAMPONG CHHNANG_M": "កំពង់ឆ្នាំង",
+    "KAMPONG SPEU_M": "កំពង់ស្ពឺ", "KAMPONG THOM_M": "កំពង់ធំ",
+    "KAMPOT_M": "កំពត", "KEP_M": "កែប", "KOH KONG_M": "កោះកុង",
+    "KRATIE_M": "ក្រចេះ", "MONDULKIRI_M": "មណ្ឌលគិរី",
+    "ODDAR MEANCHEY_M": "ឧត្តរមានជ័យ", "PAILIN_M": "ប៉ៃលិន",
+    "SIHANOUKVILLE_M": "ព្រះសីហនុ", "PREAH VIHEAR_M": "ព្រះវិហារ",
+    "PREY VENG_M": "ព្រៃវែង", "PURSAT_M": "ពោធិ៍សាត់",
+    "SIEM REAP_M": "សៀមរាប", "STUNG TRENG_M": "ស្ទឹងត្រែង",
+    "SVAY RIENG_M": "ស្វាយរៀង", "TAKEO_M": "តាកែវ",
+    "TBOUNG KHMUM_M": "ត្បូងឃ្មុំ", "RATANAKIRI_M": "រតនគិរី",
+    // CAMBODIA
+    "CAMBODIA": "កម្ពុជា",
+    "CAMBODIA_M": "កម្ពុជា",
+  };
+
+  /// Returns the Khmer display label for a given DB code
+  String subcategoryLabel(String? code) {
+    if (code == null || code.isEmpty) return "";
+    return _subcategoryLabels[code] ?? code;
+  }
 
   // ----------------------------
-  // ✅ Rules (UPDATED for SECRETARY/DEPUTY)
+  // ✅ Rules (UPDATED)
   // ----------------------------
   bool get isGuest => _userType == "GUEST";
   bool get isInsideOfficer => _userType == "INSIDE_OFFICER";
@@ -288,6 +502,132 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool get useWorkDropdown => isOfficer;
 
   // ----------------------------
+  // Helpers
+  // ----------------------------
+  String _normalizePlate(String s) =>
+      s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
+
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  /// ✅ yyyy-MM-dd (UI)
+  String _fmtYmd(DateTime d) =>
+      "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
+
+  /// yyyymmdd int
+  int _fmtYmdInt(DateTime d) => int.parse(
+      "${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}");
+
+  /// ✅ dd-MM-yyyy (Backend expects this for LocalDate)
+  String _fmtDmy(DateTime d) =>
+      "${d.day.toString().padLeft(2, '0')}-${d.month.toString().padLeft(2, '0')}-${d.year}";
+
+  // ----------------------------
+  // ✅ Plate Validation + Formatter
+  // ----------------------------
+  static final Map<String, List<RegExp>> _categoryRules = {
+    // CAR
+    "ROYAL_PALACE": [RegExp(r'^[0-9]{3}$')], // 001
+    "STATE": [RegExp(r'^[2-6]{1}-[0-9]{3,4}$')], // 2-123 / 2-1234
+    "POLICE": [RegExp(r'^[2-6]{1}-[0-9]{4}$')], // 2-1234
+    "ARMY_FORCE": [RegExp(r'^[2-6]{1}-[0-9]{4}$')], // 2-1234
+    "REGULAR": [RegExp(r'^[2-6]{1}[A-Z]{1,2}-[0-9]{4}$')], // 2AB-1234
+    "CAMBODIA": [RegExp(r'^[A-Z0-9.]{8,}$')], // ✅ min 8 (A-Z0-9.)
+
+    // MOTORBIKE
+    "MOTORBIKE_REGULAR": [RegExp(r'^1[A-Z]{1,2}-[0-9]{4}$')], // 1AB-1234
+    "MOTORBIKE_CAMBODIA": [RegExp(r'^[A-Z0-9.]{8,}$')], // min 8
+    "MOTORBIKE_POLICE": [RegExp(r'^1-[0-9]{4}$')], // 1-1234
+    "MOTORBIKE_ARMY_FORCE": [RegExp(r'^1-[0-9]{4}$')], // 1-1234
+  };
+
+  String _ruleKeyForVehicle(_VehicleForm v) {
+    final isMoto = v.vehicleType == "MOTORBIKE";
+    if (!isMoto) return v.carPlateType;
+
+    switch (v.motoPlateType) {
+      case "REGULAR":
+        return "MOTORBIKE_REGULAR";
+      case "CAMBODIA":
+        return "MOTORBIKE_CAMBODIA";
+      case "POLICE":
+        return "MOTORBIKE_POLICE";
+      case "ARMY_FORCE":
+        return "MOTORBIKE_ARMY_FORCE";
+      default:
+        return "MOTORBIKE_REGULAR";
+    }
+  }
+
+  bool _validatePlate(_VehicleForm v, String plate) {
+    final ruleKey = _ruleKeyForVehicle(v);
+    final p = _normalizePlate(plate);
+    final rules = _categoryRules[ruleKey];
+    if (rules == null) return true;
+    return rules.any((r) => r.hasMatch(p));
+  }
+
+  String _formatPlateLive(_VehicleForm v, String raw) {
+    final ruleKey = _ruleKeyForVehicle(v);
+    final upper = raw.toUpperCase();
+
+    // CAMBODIA: allow only A-Z 0-9 .
+    if (ruleKey.contains("CAMBODIA")) {
+      return upper.replaceAll(RegExp(r'[^A-Z0-9.]'), '');
+    }
+
+    // dash plates: keep A-Z 0-9 and reinsert dash
+    var cleaned = upper.replaceAll(RegExp(r'[^A-Z0-9-]'), '');
+    cleaned = cleaned.replaceAll('-', '');
+
+    final isGov = ruleKey == "STATE" ||
+        ruleKey == "POLICE" ||
+        ruleKey == "ARMY_FORCE" ||
+        ruleKey == "MOTORBIKE_POLICE" ||
+        ruleKey == "MOTORBIKE_ARMY_FORCE";
+
+    if (isGov) {
+      if (cleaned.length <= 1) return cleaned;
+      final d = cleaned.substring(0, 1);
+      final nums = cleaned.substring(1);
+      return '$d-$nums';
+    }
+
+    // REGULAR: 2AB-1234 (or 2A-1234)
+    if (cleaned.isEmpty) return '';
+    final first = cleaned.substring(0, 1);
+    final rest = cleaned.substring(1);
+
+    final letters = (RegExp(r'^[A-Z]{0,2}').stringMatch(rest) ?? '');
+    final tail = rest.substring(letters.length);
+    final nums = tail.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (letters.isNotEmpty && nums.isNotEmpty) return '$first$letters-$nums';
+    return '$first$letters$nums';
+  }
+
+  List<TextInputFormatter> _plateFormatters(_VehicleForm v) {
+    final ruleKey = _ruleKeyForVehicle(v);
+
+    return [
+      FilteringTextInputFormatter.allow(
+        ruleKey.contains("CAMBODIA")
+            ? RegExp(r'[0-9A-Za-z.]')
+            : RegExp(r'[0-9A-Za-z-]'),
+      ),
+      LengthLimitingTextInputFormatter(ruleKey.contains("CAMBODIA") ? 20 : 12),
+      TextInputFormatter.withFunction((oldValue, newValue) {
+        final formatted = _formatPlateLive(v, newValue.text);
+        return TextEditingValue(
+          text: formatted,
+          selection: TextSelection.collapsed(offset: formatted.length),
+        );
+      }),
+    ];
+  }
+
+  // ----------------------------
   // AUTH
   // ----------------------------
   Future<http.Response> _login({
@@ -310,6 +650,101 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
 
     return res;
+  }
+
+  //TODO Remove static login
+  Future<http.Response> _search({
+    required String search,
+  }) async {
+    final uri =
+        Uri.parse("$baseUrl/api/v1/parking-card-requests/search/$search");
+
+    // 1. Login Logic
+    // final loginRes = await _login(
+    //   baseUrl: "http://10.0.2.2:8080",
+    //   email: "user@moi.com",
+    //   password: "Moi@2026\$",
+    // );
+
+    // if (loginRes.statusCode == 200) {
+    //   final loginData = jsonDecode(loginRes.body);
+    //   final String newToken =
+    //       loginData['accessToken'] ?? loginData['token'] ?? "";
+    //   final prefs = await SharedPreferences.getInstance();
+    //   await prefs.setString("accessToken", newToken);
+    // } else {
+    //   _snack("Login Failed: ${loginRes.statusCode}");
+    //   return loginRes;
+    // }
+    // final token = await _getToken();
+
+    // 3. Perform Search
+    try {
+      final res = await http.get(
+        uri,
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          // "Authorization": "Bearer $token",
+        },
+      );
+      if (res.statusCode == 200) {
+        _snack("ស្វែងរកជោគជ័យ (Search Successful)");
+
+        final Map<String, dynamic> responseData = jsonDecode(res.body);
+
+        if (!mounted) return res;
+
+        Navigator.pushNamed(
+          context,
+          Approute.verifySuccessScreen,
+          arguments: {
+            "code": responseData["code"],
+            "token": responseData["token"],
+            "parkingRequestStatus": responseData["parkingRequestStatus"],
+            // Use server-returned data to ensure it matches the database
+            "fullName": responseData["name"],
+            "phone": responseData["phone"],
+            "userType": responseData["userType"],
+            "selfieBytes":
+                null, // Search doesn't usually return the raw selfie bytes
+            "selfiePath": null,
+            "requestDate": responseData["requestDate"],
+            "requestAtDate": responseData["requestAtDate"],
+            "vehicleType": (responseData["vehicles"] as List).isNotEmpty
+                ? responseData["vehicles"][0]["vehicleType"]
+                : "",
+            "workingInfo": {
+              "generalDepartmentText": responseData["generalDepartmentText"],
+              "departmentText": responseData["departmentText"],
+              "burauText": responseData["burauText"],
+              "positionText": responseData["positionText"],
+              "policeId": responseData["policeId"],
+              "provinceCity": responseData["provinceCity"],
+            },
+            "vehicles": responseData[
+                "vehicles"], // Returns the list of vehicle maps from backend
+          },
+        );
+      } else if (res.statusCode == 500) {
+        if (res.body.contains("IncorrectResultSizeDataAccessException") ||
+            res.body.contains("non-unique result")) {
+          //TODO dup phone number
+          _snack("មានទិន្នន័យស្ទួន (Found duplicate phone numbers)");
+        } else {
+          _snack("កំហុសម៉ាស៊ីនបម្រើ (Server Error: 500)");
+        }
+      } else if (res.statusCode == 404 || res.body.contains("not found")) {
+        _snack("រកមិនឃើញទិន្នន័យ (Request not found)");
+      } else {
+        _snack("មានបញ្ហាអ្វីមួយ (Error: ${res.statusCode})");
+      }
+      debugPrint("Response Body: ${res.body}");
+      return res;
+    } catch (e) {
+      _snack("(Connection Error)");
+      return http.Response('{"error": "Connection failed"}', 500);
+    }
   }
 
   Future<String?> _getToken() async {
@@ -374,7 +809,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     await prefs.clear();
     if (!mounted) return;
     _snack("Session expired. Please login again.");
-    // Navigator.pushReplacementNamed(context, Approute.loginScreen);
   }
 
   Future<http.Response> _getWithAuthRetry(Uri uri) async {
@@ -562,28 +996,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
   }
 
-  // ----------------------------
-  // Helpers
-  // ----------------------------
-  String _normalizePlate(String s) =>
-      s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
-
-  void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
-
-  /// ✅ yyyy-MM-dd (UI)
-  String _fmtYmd(DateTime d) =>
-      "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
-
-  /// yyyymmdd int
-  int _fmtYmdInt(DateTime d) => int.parse(
-      "${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}");
-
-  /// ✅ dd-MM-yyyy (Backend expects this for LocalDate)
-  String _fmtDmy(DateTime d) =>
-      "${d.day.toString().padLeft(2, '0')}-${d.month.toString().padLeft(2, '0')}-${d.year}";
-
   // ✅ Multi-file picker (max 5)
   Future<void> pickAttachFiles() async {
     setState(() => attachFilesError = null);
@@ -643,7 +1055,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final XFile? xfile = await _imagePicker.pickImage(
       source: ImageSource.camera,
-      imageQuality: 85, // initial capture quality
+      imageQuality: 85,
       maxWidth: 2000,
       maxHeight: 2000,
     );
@@ -652,7 +1064,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     File file = File(xfile.path);
 
-    // Maximum size check (5MB)
     const maxBytes = 5 * 1024 * 1024;
     int bytes = await file.length();
     if (bytes > maxBytes) {
@@ -660,10 +1071,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    // Minimum size check (150KB) + guarantee
     const minBytes = 153600;
     if (bytes < minBytes) {
-      // Decode the image
       img.Image? decoded = img.decodeImage(await file.readAsBytes());
 
       if (decoded == null) {
@@ -671,21 +1080,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
 
-      // Slightly upscale until we reach minimum bytes
-      int quality = 100;
       int attempt = 0;
       const maxAttempts = 5;
 
       while (bytes < minBytes && attempt < maxAttempts) {
-        // Slightly upscale by 10% each attempt
         decoded = img.copyResize(
           decoded!,
           width: (decoded.width * 1.1).toInt(),
           height: (decoded.height * 1.1).toInt(),
         );
 
-        // Encode at max quality
-        final newBytes = img.encodeJpg(decoded, quality: quality);
+        final newBytes = img.encodeJpg(decoded, quality: 100);
         await file.writeAsBytes(newBytes);
         bytes = await file.length();
         attempt++;
@@ -697,16 +1102,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     }
 
-    // ✅ File is valid
     setState(() {
       cameraFile = file;
       cameraFileName = xfile.name;
       cameraError = null;
-    });
-
-    setState(() {
-      cameraFile = file;
-      cameraFileName = xfile.name;
     });
   }
 
@@ -736,37 +1135,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       v.dispose();
     }
     super.dispose();
-  }
-
-  // ----------------------------
-  // Plate validation helper
-  // ----------------------------
-  bool _isPlateValid(_VehicleForm v) {
-    final plateValue = _normalizePlate(v.plate.text);
-
-    if (v.vehicleType == "MOTORBIKE") {
-      final selected =
-          motoPlateTypes.firstWhere((t) => t["key"] == v.motoPlateType);
-      final reg = RegExp(selected["pattern"]!);
-      return reg.hasMatch(plateValue);
-    } else {
-      final selected =
-          plateCategory.firstWhere((t) => t["key"] == v.carPlateType);
-      final reg = RegExp(selected["pattern"]!);
-      return reg.hasMatch(plateValue);
-    }
-  }
-
-  String _plateHint(_VehicleForm v) {
-    if (v.vehicleType == "MOTORBIKE") {
-      final selected =
-          motoPlateTypes.firstWhere((t) => t["key"] == v.motoPlateType);
-      return selected["label"]!;
-    } else {
-      final selected =
-          plateCategory.firstWhere((t) => t["key"] == v.carPlateType);
-      return selected["label"]!;
-    }
   }
 
   // ----------------------------
@@ -802,7 +1170,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return false;
     }
 
-    // ✅ GUEST + NATIONAL use duration
     if (useDurationDays) {
       final durText = durationDaysController.text.trim();
       if (durText.isEmpty) {
@@ -876,16 +1243,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return false;
       }
 
-      if (_normalizePlate(v.plate.text).isEmpty) {
-        _snack("សូមបញ្ចូលស្លាកលេខ (#${i + 1})");
-        return false;
-      }
-
-      if (!_isPlateValid(v)) {
-        _snack("ស្លាកលេខ (#${i + 1}) មិនត្រឹមត្រូវ: ${_plateHint(v)}");
-        return false;
-      }
-
       if (v.color.text.trim().isEmpty) {
         _snack("សូមបញ្ចូលពណ៌ (#${i + 1})");
         return false;
@@ -894,6 +1251,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final year = int.tryParse(v.year.text.trim());
       if (year == null || year < 1900) {
         _snack("ឆ្នាំផលិតមិនត្រឹមត្រូវ (#${i + 1})");
+        return false;
+      }
+
+      // ✅ Plate validation
+      if (v.plate.text.trim().isEmpty) {
+        _snack("សូមបញ្ចូលផ្លាកលេខ (#${i + 1})");
+        return false;
+      }
+      if (!_validatePlate(v, v.plate.text)) {
+        _snack("ផ្លាកលេខមិនត្រឹមត្រូវ (#${i + 1})");
         return false;
       }
     }
@@ -913,27 +1280,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final base = Uri.parse("$baseUrl/api/v1/parking-card-requests");
 
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
 
     DateTime requestAt;
     DateTime requestEnd;
 
-    // ✅ duration for GUEST + NATIONAL
     if (useDurationDays) {
+      // ✅ Guest + National: issue = NOW, expiry = NOW + duration days (keeps time)
       final dur = int.parse(durationDaysController.text.trim());
-      requestAt = today;
-      requestEnd = today.add(Duration(days: dur));
+      requestAt = now;
+      requestEnd = requestAt.add(Duration(days: dur));
     } else {
-      final chosen =
-          DateTime.parse(requestDateController.text.trim()); // yyyy-MM-dd
+      // ✅ Officer/Secretary/Deputy: issue = chosen date (00:00), expiry = +1 year
+      final chosen = DateTime.parse(requestDateController.text.trim());
       requestAt = chosen;
-      requestEnd = chosen;
+      requestEnd = DateTime(chosen.year + 1, chosen.month, chosen.day);
     }
 
-    final int requestDateInt = _fmtYmdInt(requestEnd);
+    final int requestDateInt = _fmtYmdInt(requestEnd); // yyyymmdd (expiry)
+    final String requestAtDateStr = _fmtDmy(requestAt); // dd-MM-yyyy (issue)
 
-    // ✅ FIX: backend expects dd-MM-yyyy for LocalDate
-    final String requestAtDateStr = _fmtDmy(requestAt);
+    // ✅ Save for next screen (IMPORTANT: do NOT null for guest)
+    _lastRequestDateInt = requestDateInt;
+    _lastRequestAtDateStr = requestAtDateStr; // ✅ ALWAYS set
 
     final dto = <String, dynamic>{
       "reason": reasonController.text.trim().isEmpty
@@ -950,8 +1318,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           "brand": v.brand.text.trim(),
           "plate": <String, dynamic>{
             "plateNumber": _normalizePlate(v.plate.text),
-            "plateCategory": "REGULAR",
-            // "plateSubCategory": "REGULAR",  // set correct value
+            "plateCategory":
+                v.vehicleType == "MOTORBIKE" ? v.motoPlateType : v.carPlateType,
+            "plateSubCategory": getSubcategoryKey(v),
           },
           "color": v.color.text.trim(),
           "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
@@ -960,12 +1329,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }).toList(),
     };
 
-    /// ✅ GUEST -> DO NOT send requestAtDate (only requestDate)
+    // ✅ If backend must NOT receive requestAtDate for guest, keep this:
     if (_userType != "GUEST") {
       dto["requestAtDate"] = requestAtDateStr;
     }
 
-    // workingInfo
     final wi = <String, dynamic>{};
     if (showIdNumber) wi["policeId"] = idNumberController.text.trim();
 
@@ -984,10 +1352,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       (dto["user"] as Map<String, dynamic>)["workingInfo"] = wi;
     }
 
-    // ✅ Token OPTIONAL (guest can submit without login)
-    final token = await _getToken(); // may be null/empty
+    final token = await _getToken();
 
-    // ✅ Collect files (multi + camera only)
     final List<Map<String, String>> fileList = [];
 
     for (int i = 0; i < attachFiles.length; i++) {
@@ -1001,7 +1367,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
     }
 
-    // ✅ attachmentTypes count must match file count
     Uri uri = base;
     if (fileList.isNotEmpty) {
       uri = base.replace(
@@ -1015,7 +1380,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final request = http.MultipartRequest("POST", uri);
     request.headers["Accept"] = "*/*";
 
-    // ✅ Only send Authorization if token exists
     if (token != null && token.isNotEmpty) {
       request.headers["Authorization"] = "Bearer $token";
     }
@@ -1066,22 +1430,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => isLoading = true);
     try {
       final res = await createParkingCardRequest();
-      final code = (res["code"] ?? "").toString();
-      debugPrint("DEBUG,$code");
-
-      String token = "";
-      final t = res["token"];
-      if (t is String) token = t;
-      if (t is Map) token = (t["accessToken"] ?? t["token"] ?? "").toString();
 
       if (!mounted) return;
 
-      // ✅ read selfie bytes (BEST)
       Uint8List? selfieBytes;
       if (cameraFile != null) {
         selfieBytes = await cameraFile!.readAsBytes();
       }
-      // TODO change all to take from response
+
+      // ✅ Fetch selfie bytes from attachment URL if camera not available
+      Uint8List? attachmentBytes;
+      final attachments = res["attachments"] as List?;
+      if (selfieBytes == null && attachments != null && attachments.isNotEmpty) {
+        try {
+          final attachUrl = "$baseUrl${attachments[0]["url"]}";
+          final token = await _getToken();
+          final attachRes = await http.get(
+            Uri.parse(attachUrl),
+            headers: {
+              if (token != null && token.isNotEmpty) "Authorization": "Bearer $token",
+            },
+          );
+          if (attachRes.statusCode == 200) attachmentBytes = attachRes.bodyBytes;
+        } catch (_) {}
+      }
+
       Navigator.pushNamed(
         context,
         Approute.verifySuccessScreen,
@@ -1089,35 +1462,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
           "code": res["code"],
           "token": res["token"],
           "parkingRequestStatus": res["parkingRequestStatus"],
-          // ✅ personal
-          "fullName": fullNameController.text.trim(),
-          "phone": phoneController.text.trim(),
-          "userType": _userType,
-
-          // ✅ selfie (TOP LEVEL ✅)
-          "selfieBytes": selfieBytes,
-          "selfiePath": cameraFile?.path, // optional backup
-
-          // ✅ working info (texts)
+          // ✅ Use backend response for all fields
+          "fullName": res["name"] ?? fullNameController.text.trim(),
+          "phone": res["phone"] ?? phoneController.text.trim(),
+          "userType": res["userType"] ?? _userType,
+          "selfieBytes": selfieBytes ?? attachmentBytes,
+          "selfiePath": cameraFile?.path,
+          "requestDate": res["requestDate"] ?? _lastRequestDateInt,
+          "requestAtDate": res["requestAtDate"] ?? _lastRequestAtDateStr,
+          "vehicleType": (res["vehicles"] as List?)?.isNotEmpty == true
+              ? res["vehicles"][0]["vehicleType"]
+              : (vehicles.isNotEmpty ? vehicles.first.vehicleType : ""),
           "workingInfo": {
-            "generalDepartmentText": ministryController.text.trim(),
-            "departmentText": departmentController.text.trim(),
-            "burauText": officeController.text.trim(),
-            "positionText": positionController.text.trim(),
-            "policeId": idNumberController.text.trim(),
-            "provinceCity": provinceCityController.text.trim(),
+            "generalDepartmentText": res["generalDepartmentText"],
+            "departmentText": res["departmentText"],
+            "burauText": res["burauText"],
+            "positionText": res["positionText"],
+            "policeId": res["policeId"],
+            "provinceCity": res["provinceCity"],
           },
-
-          // ✅ vehicles list (NO selfie here)
-          "vehicles": vehicles
-              .map((v) => {
-                    "brand": v.brand.text.trim(),
-                    "color": v.color.text.trim(),
-                    "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
-                    "vehicleType": v.vehicleType,
-                    "plateNumber": v.plate.text.trim(),
-                  })
-              .toList(),
+          // ✅ Use backend vehicles — contains plateSubCategory (Khmer) and plateCode (English)
+          "vehicles": res["vehicles"] ?? [],
         },
       );
     } catch (e, st) {
@@ -1147,8 +1512,61 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
 
     if (d != null) {
-      requestDateController.text = _fmtYmd(d); // yyyy-MM-dd
+      requestDateController.text = _fmtYmd(d);
     }
+  }
+
+  // ----------------------------
+  // ✅ UI BLOCKS
+  // ----------------------------
+  Widget fieldBlock({
+    required String label,
+    required Widget child,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 6),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget textFieldBlock({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+    TextInputType keyboardType = TextInputType.text,
+    TextCapitalization textCapitalization = TextCapitalization.none,
+    bool readOnly = false,
+    VoidCallback? onTap,
+    Widget? suffixIcon,
+    List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
+  }) {
+    return fieldBlock(
+      label: label,
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        readOnly: readOnly,
+        onTap: onTap,
+        textCapitalization: textCapitalization,
+        inputFormatters: inputFormatters,
+        maxLength: maxLength,
+        buildCounter: (context,
+                {required currentLength, required isFocused, maxLength}) =>
+            null,
+        decoration: inputDecoration(hint).copyWith(suffixIcon: suffixIcon),
+      ),
+    );
   }
 
   // ----------------------------
@@ -1159,7 +1577,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!allowedUserTypes.contains(_userType)) _userType = "GUEST";
 
     return Scaffold(
-      backgroundColor: const Color(0xFFDFB73B),
+      backgroundColor: const Color(0xFFFFCA28),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -1180,32 +1598,85 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: oneInput(
+                                    label: "ស្វែងរក",
+                                    hint: "តាមរយះ លេខកូដ ឬលេខទូរស័ព្ទ",
+                                    controller: searchController,
+                                  ),
+                                ),
+                                Column(
+                                  children: [
+                                    SizedBox(
+                                      height: 20,
+                                    ),
+                                    Row(
+                                      children: [
+                                        SizedBox(
+                                          height: 48,
+                                          width: 48,
+                                          child: ElevatedButton(
+                                            onPressed: () {
+                                              _search(
+                                                  search:
+                                                      searchController.text);
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.white,
+                                              foregroundColor: Colors.black,
+                                              side: BorderSide(
+                                                  color: Colors.grey.shade400),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(16),
+                                              ),
+                                              elevation: 0,
+                                              padding: EdgeInsets.zero,
+                                            ),
+                                            child: Icon(Icons.search,
+                                                size: 24, color: Colors.black),
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          width: 20,
+                                        )
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                             sectionTitle("ព័ត៌មានផ្ទាល់ខ្លួន"),
                             dropdownUserType(),
                             const SizedBox(height: 15),
-
-                            if (showIdNumber)
-                              twoInputRow(
-                                "គោត្តនាម និងនាម",
-                                "អត្តលេខ",
-                                "បញ្ចូលឈ្មោះពេញ",
-                                "បញ្ចូលអត្តលេខ",
-                                fullNameController,
-                                idNumberController,
-                                leftIsPlate: false,
-                                rightIsPlate: false,
-                              )
-                            else
+                            if (showIdNumber) ...[
                               oneInput(
                                 label: "គោត្តនាម និងនាម",
                                 hint: "បញ្ចូលឈ្មោះពេញ",
                                 controller: fullNameController,
                               ),
-
+                              textFieldBlock(
+                                label: "អត្តលេខ",
+                                hint: "បញ្ចូលអត្តលេខ",
+                                controller: idNumberController,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(10),
+                                ],
+                                maxLength: 10,
+                              ),
+                            ] else ...[
+                              oneInput(
+                                label: "គោត្តនាម និងនាម",
+                                hint: "បញ្ចូលឈ្មោះពេញ",
+                                controller: fullNameController,
+                              ),
+                            ],
                             if (showWorkFields) ...[
                               sectionTitle("ព័ត៌មានការងារ"),
-
-                              /// ✅ Officers -> dropdown
                               if (useWorkDropdown) ...[
                                 if (dropdownLoading)
                                   const Padding(
@@ -1218,83 +1689,59 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 _ddBurau(),
                                 _ddPosition(),
                               ] else ...[
-                                /// ✅ Guest + National -> text fields
-                                twoInputRow(
-                                  "ក្រសួង/ស្ថាប័ន",
-                                  "នាយកដ្ឋាន/អង្គភាព",
-                                  "បញ្ចូលក្រសួង",
-                                  "បញ្ចូលនាយកដ្ឋាន",
-                                  ministryController,
-                                  departmentController,
-                                  leftIsPlate: false,
-                                  rightIsPlate: false,
+                                oneInput(
+                                  label: "ក្រសួង/ស្ថាប័ន",
+                                  hint: "បញ្ចូលក្រសួង",
+                                  controller: ministryController,
                                 ),
-                                twoInputRow(
-                                  "ការិយាល័យ",
-                                  "តួនាទី",
-                                  "បញ្ចូលការិយាល័យ",
-                                  "បញ្ចូលតួនាទី",
-                                  officeController,
-                                  positionController,
-                                  leftIsPlate: false,
-                                  rightIsPlate: false,
+                                oneInput(
+                                  label: "នាយកដ្ឋាន/អង្គភាព",
+                                  hint: "បញ្ចូលនាយកដ្ឋាន",
+                                  controller: departmentController,
+                                ),
+                                oneInput(
+                                  label: "ការិយាល័យ",
+                                  hint: "បញ្ចូលការិយាល័យ",
+                                  controller: officeController,
+                                ),
+                                oneInput(
+                                  label: "តួនាទី",
+                                  hint: "បញ្ចូលតួនាទី",
+                                  controller: positionController,
                                 ),
                               ],
                             ],
-
                             if (showProvinceCity)
                               oneInput(
                                 label: "ខេត្ត/រាជធានី",
                                 hint: "បញ្ចូលខេត្ត/រាជធានី",
                                 controller: provinceCityController,
                               ),
-
                             const SizedBox(height: 10),
-
-                            /// ✅ If duration: phone + duration days
                             if (useDurationDays) ...[
-                              Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 20),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text("លេខទូរស័ព្ទ"),
-                                    const SizedBox(height: 6),
-                                    TextFormField(
-                                      controller: phoneController,
-                                      keyboardType: TextInputType.phone,
-                                      decoration:
-                                          inputDecoration("លេខទូរស័ព្ទ"),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    const Text("រយៈពេលស្នើរ (ចំនួនថ្ងៃ)"),
-                                    const SizedBox(height: 6),
-                                    TextFormField(
-                                      controller: durationDaysController,
-                                      keyboardType: TextInputType.number,
-                                      inputFormatters: [
-                                        FilteringTextInputFormatter.digitsOnly,
-                                        LengthLimitingTextInputFormatter(3),
-                                      ],
-                                      decoration:
-                                          inputDecoration("ឧ: 2 ឬ 4 ឬ 7")
-                                              .copyWith(
-                                        suffixText: "ថ្ងៃ",
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              textFieldBlock(
+                                label: "លេខទូរស័ព្ទ",
+                                hint: "លេខទូរស័ព្ទ",
+                                controller: phoneController,
+                                keyboardType: TextInputType.phone,
+                              ),
+                              textFieldBlock(
+                                label: "រយៈពេលស្នើរ (ចំនួនថ្ងៃ)",
+                                hint: "ឧ: 2 ឬ 4 ឬ 7",
+                                controller: durationDaysController,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(3),
+                                ],
                               ),
                             ] else ...[
-                              Rowlabel(),
-                              const SizedBox(height: 10),
                               phoneAndDate(),
                             ],
-
                             sectionTitle("ព័ត៌មានរថយន្ត/ម៉ូតូ"),
                             ...List.generate(vehicles.length, (i) {
                               final v = vehicles[i];
+
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -1346,25 +1793,45 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     ],
                                   ),
                                   oneInput(
-                                      label: "ម៉ាក",
-                                      hint: "បញ្ចូលម៉ាក",
-                                      controller: v.brand),
+                                    label: "ម៉ាក",
+                                    hint: "បញ្ចូលម៉ាក",
+                                    controller: v.brand,
+                                  ),
                                   plateRow(v),
-                                  twoInputRow(
-                                    "ពណ៌",
-                                    "ឆ្នាំផលិត",
-                                    "ពណ៌រថយន្ត",
-                                    "ឆ្នាំផលិត",
-                                    v.color,
-                                    v.year,
-                                    leftIsPlate: false,
-                                    rightIsPlate: false,
+
+                                  // ✅ Plate input with formatter
+                                  textFieldBlock(
+                                    label: "ផ្លាកលេខ",
+                                    hint: "សូមបញ្ចូលផ្លាកលេខអោយត្រូវតាមទម្រង់",
+                                    controller: v.plate,
+                                    inputFormatters: _plateFormatters(v),
+                                  ),
+
+                                  const SizedBox(height: 10),
+                                  Center(
+                                    child: plateBox(
+                                      label: subcategoryLabel(getSubcategoryKey(v)),
+                                      code:
+                                          _normalizePlate(v.plate.text).isEmpty
+                                              ? "----"
+                                              : _normalizePlate(v.plate.text),
+                                      keyText: getPlateKey(v),
+                                    ),
+                                  ),
+                                  oneInput(
+                                    label: "ពណ៌",
+                                    hint: "ពណ៌រថយន្ត",
+                                    controller: v.color,
+                                  ),
+                                  oneInput(
+                                    label: "ឆ្នាំផលិត",
+                                    hint: "ឆ្នាំផលិត",
+                                    controller: v.year,
                                   ),
                                   const Divider(height: 24),
                                 ],
                               );
                             }),
-
                             uploadMultiAttachment(),
                             uploadCameraAttachment(),
                             bottom(),
@@ -1380,173 +1847,249 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ----------------------------
-  // Work dropdown widgets
+  // Work dropdown widgets (label on top)
   // ----------------------------
   Widget _ddGeneralDepartment() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("ក្រសួង/ស្ថាប័ន"),
-          const SizedBox(height: 6),
-          DropdownButtonFormField<GeneralDepartmentItem>(
-            isExpanded: true,
-            value: selectedGD,
-            decoration: inputDecoration("ជ្រើសក្រសួង/ស្ថាប័ន"),
-            items: gdList
-                .map((x) => DropdownMenuItem(
-                      value: x,
-                      child: Text(x.name, overflow: TextOverflow.ellipsis),
-                    ))
-                .toList(),
-            onChanged: (x) => onSelectGD(x),
-          ),
-        ],
+    return fieldBlock(
+      label: "ក្រសួង/ស្ថាប័ន",
+      child: DropdownButtonFormField<GeneralDepartmentItem>(
+        isExpanded: true,
+        value: selectedGD,
+        decoration: inputDecoration("ជ្រើសក្រសួង/ស្ថាប័ន"),
+        items: gdList
+            .map((x) => DropdownMenuItem(
+                  value: x,
+                  child: Text(x.name, overflow: TextOverflow.ellipsis),
+                ))
+            .toList(),
+        onChanged: (x) => onSelectGD(x),
       ),
     );
   }
 
   Widget _ddDepartment() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("នាយកដ្ឋាន/អង្គភាព"),
-          const SizedBox(height: 6),
-          DropdownButtonFormField<DepartmentItem>(
-            isExpanded: true,
-            value: selectedDept,
-            decoration: inputDecoration("ជ្រើសនាយកដ្ឋាន/អង្គភាព"),
-            items: deptList
-                .map((x) => DropdownMenuItem(
-                      value: x,
-                      child: Text(x.name, overflow: TextOverflow.ellipsis),
-                    ))
-                .toList(),
-            onChanged: (x) => onSelectDept(x),
-          ),
-        ],
+    return fieldBlock(
+      label: "នាយកដ្ឋាន/អង្គភាព",
+      child: DropdownButtonFormField<DepartmentItem>(
+        isExpanded: true,
+        value: selectedDept,
+        decoration: inputDecoration("ជ្រើសនាយកដ្ឋាន/អង្គភាព"),
+        items: deptList
+            .map((x) => DropdownMenuItem(
+                  value: x,
+                  child: Text(x.name, overflow: TextOverflow.ellipsis),
+                ))
+            .toList(),
+        onChanged: (x) => onSelectDept(x),
       ),
     );
   }
 
   Widget _ddBurau() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("ការិយាល័យ"),
-          const SizedBox(height: 6),
-          DropdownButtonFormField<BurauItem>(
-            isExpanded: true,
-            value: selectedBurau,
-            decoration: inputDecoration("ជ្រើសការិយាល័យ"),
-            items: burauFiltered
-                .map((x) => DropdownMenuItem(
-                      value: x,
-                      child: Text(x.name, overflow: TextOverflow.ellipsis),
-                    ))
-                .toList(),
-            onChanged: (x) => onSelectBurau(x),
-          ),
-        ],
+    return fieldBlock(
+      label: "ការិយាល័យ",
+      child: DropdownButtonFormField<BurauItem>(
+        isExpanded: true,
+        value: selectedBurau,
+        decoration: inputDecoration("ជ្រើសការិយាល័យ"),
+        items: burauFiltered
+            .map((x) => DropdownMenuItem(
+                  value: x,
+                  child: Text(x.name, overflow: TextOverflow.ellipsis),
+                ))
+            .toList(),
+        onChanged: (x) => onSelectBurau(x),
       ),
     );
   }
 
   Widget _ddPosition() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("តួនាទី"),
-          const SizedBox(height: 6),
-          DropdownButtonFormField<PositionItem>(
-            isExpanded: true,
-            value: selectedPos,
-            decoration: inputDecoration("ជ្រើសតួនាទី"),
-            items: posList
-                .map((x) => DropdownMenuItem(
-                      value: x,
-                      child: Text(x.name, overflow: TextOverflow.ellipsis),
-                    ))
-                .toList(),
-            onChanged: (x) => onSelectPosition(x),
-          ),
-        ],
+    return fieldBlock(
+      label: "តួនាទី",
+      child: DropdownButtonFormField<PositionItem>(
+        isExpanded: true,
+        value: selectedPos,
+        decoration: inputDecoration("ជ្រើសតួនាទី"),
+        items: posList
+            .map((x) => DropdownMenuItem(
+                  value: x,
+                  child: Text(x.name, overflow: TextOverflow.ellipsis),
+                ))
+            .toList(),
+        onChanged: (x) => onSelectPosition(x),
       ),
     );
   }
 
   // ----------------------------
-  // Plate UI: CAR & MOTO
+  // Phone/date vertical
+  // ----------------------------
+  Widget phoneAndDate() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        textFieldBlock(
+          label: "លេខទូរស័ព្ទ",
+          hint: "លេខទូរស័ព្ទ",
+          controller: phoneController,
+          keyboardType: TextInputType.phone,
+        ),
+        textFieldBlock(
+          label: "កាលបរិច្ឆេទស្នើរ",
+          hint: "ថ្ងៃស្នើរ",
+          controller: requestDateController,
+          readOnly: true,
+          suffixIcon: const Icon(Icons.calendar_month),
+          onTap: pickDate,
+        ),
+      ],
+    );
+  }
+
+  // ----------------------------
+  // oneInput
+  // ----------------------------
+  Widget oneInput({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+  }) {
+    return textFieldBlock(
+      label: label,
+      hint: hint,
+      controller: controller,
+    );
+  }
+
+  // ----------------------------
+  // Plate UI
   // ----------------------------
   Widget plateRow(_VehicleForm v) {
     final isMoto = v.vehicleType == "MOTORBIKE";
     final items = isMoto ? motoPlateTypes : plateCategory;
-    final currentType = isMoto ? v.motoPlateType : v.carPlateType;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(isMoto ? "ស្លាកលេខម៉ូតូ" : "ស្លាកលេខរថយន្ត"),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Flexible(
-                flex: 2,
-                child: DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  value: currentType,
-                  decoration: inputDecoration("ប្រភេទស្លាក"),
-                  items: items.map((t) {
-                    return DropdownMenuItem<String>(
-                      value: t["key"],
+    final currentType = isMoto ? v.motoPlateType : v.carPlateType;
+    final currentSubcategory =
+        isMoto ? v.motoPlateSubcategory : v.carPlateSubcategory;
+
+    final subcategoryList = currentType.isNotEmpty
+        ? (items.firstWhere((t) => t["key"] == currentType)["subcategory"]
+            as List<String>)
+        : <String>[];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        fieldBlock(
+          label: isMoto ? "ប្រភេទស្លាកលេខម៉ូតូ" : "ប្រភេទស្លាកលេខរថយន្ត",
+          child: DropdownButtonFormField<String>(
+            isExpanded: true,
+            value: currentType,
+            decoration: inputDecoration("ប្រភេទស្លាក"),
+            items: items.map((t) {
+              return DropdownMenuItem<String>(
+                value: t["key"],
+                child: Text(
+                  t["label"]!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            }).toList(),
+            onChanged: (x) {
+              if (x == null) return;
+              setState(() {
+                if (isMoto) {
+                  v.motoPlateType = x;
+                  v.motoPlateSubcategory = null;
+                } else {
+                  v.carPlateType = x;
+                  v.carPlateSubcategory = null;
+                }
+
+                // ✅ reformat after changing type
+                v.plate.text = _formatPlateLive(v, v.plate.text);
+              });
+            },
+          ),
+        ),
+        fieldBlock(
+          label: "ក្រុមផ្លាកលេខ",
+          child: DropdownButtonFormField<String>(
+            isExpanded: true,
+            value: (currentSubcategory != null &&
+                    subcategoryList.contains(currentSubcategory))
+                ? currentSubcategory
+                : null,
+            decoration: inputDecoration("ជ្រើសក្រុមផ្លាកលេខ"),
+            items: subcategoryList
+                .map((sub) => DropdownMenuItem<String>(
+                      value: sub,
                       child: Text(
-                        t["label"]!,
+                        subcategoryLabel(sub),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    );
-                  }).toList(),
-                  onChanged: (x) {
-                    if (x == null) return;
-                    setState(() {
-                      if (isMoto) {
-                        v.motoPlateType = x;
-                      } else {
-                        v.carPlateType = x;
-                      }
-                    });
-                  },
-                ),
-              ),
-              const SizedBox(width: 10),
-              Flexible(
-                flex: 3,
-                child: TextFormField(
-                  controller: v.plate,
-                  decoration: inputDecoration("បញ្ចូលស្លាកលេខ"),
-                  textCapitalization: TextCapitalization.characters,
-                  inputFormatters: [
-                    LengthLimitingTextInputFormatter(12),
-                    TextInputFormatter.withFunction((oldValue, newValue) {
-                      final up = newValue.text.toUpperCase();
-                      return newValue.copyWith(
-                        text: up,
-                        selection: newValue.selection,
-                      );
-                    }),
-                  ],
-                ),
-              ),
-            ],
+                    ))
+                .toList(),
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() {
+                if (isMoto) {
+                  v.motoPlateSubcategory = value;
+                } else {
+                  v.carPlateSubcategory = value;
+                }
+              });
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget plateBox({
+    required String label,
+    required String code,
+    required String keyText,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.blue, width: 2),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      width: 220,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+                fontSize: 18, fontWeight: FontWeight.w500, color: Colors.blue),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            code,
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.blue,
+              letterSpacing: 3,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(height: 2, color: Colors.blue),
+          const SizedBox(height: 6),
+          Text(
+            keyText,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Colors.red,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -1603,8 +2146,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             return Row(
               children: [
                 Expanded(
-                    child: Text(attachFileNames[i],
-                        overflow: TextOverflow.ellipsis)),
+                  child:
+                      Text(attachFileNames[i], overflow: TextOverflow.ellipsis),
+                ),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.red),
                   onPressed: () => removeAttachFileAt(i),
@@ -1667,8 +2211,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             Row(
               children: [
                 Expanded(
-                    child:
-                        Text(cameraFileName!, overflow: TextOverflow.ellipsis)),
+                  child: Text(cameraFileName!, overflow: TextOverflow.ellipsis),
+                ),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.red),
                   onPressed: clearCamera,
@@ -1694,13 +2238,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ----------------------------
   Widget _header() {
     return Container(
-      height: 225,
+      height: 265,
       width: double.infinity,
       color: Colors.white,
       child: Column(
         children: const [
           SizedBox(height: 55),
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Padding(
                 padding: EdgeInsets.all(8.0),
@@ -1733,9 +2278,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ],
           ),
+          SizedBox(height: 15),
+          Text(
+            "ទម្រង់ការស្នើរសំុបំពេញបែបបទចេញចូល​",
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
           SizedBox(height: 10),
           Text(
-            "ប័ណ្ណស្នើរចំណតរថយន្ត",
+            "ទីស្តីការក្រសួងមហាផ្ទៃ",
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
         ],
@@ -1802,12 +2352,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           setState(() {
             _userType = v;
 
-            // reset ids
             if (!(v == "INSIDE_OFFICER" || v == "OUTSIDE_OFFICER")) {
               idNumberController.clear();
             }
 
-            // ✅ UPDATED: SECRETARY/DEPUTY should NOT show work fields
             final shouldShowWork = (v == "INSIDE_OFFICER" ||
                 v == "OUTSIDE_OFFICER" ||
                 v == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER" ||
@@ -1824,7 +2372,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               provinceCityController.clear();
             }
 
-            // duration types: NATIONAL + GUEST
             if (v == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER" ||
                 v == "GUEST") {
               requestDateController.clear();
@@ -1832,7 +2379,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               durationDaysController.clear();
             }
 
-            // reset attachments
             attachFiles.clear();
             attachFileNames.clear();
             attachFilesError = null;
@@ -1841,171 +2387,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
             cameraFileName = null;
             cameraError = null;
 
-            // reset dropdown selections/controllers
             _resetWorkDropdownStateAndControllers();
           });
 
-          // ✅ load dropdown data only for OFFICERS
           await _loadWorkDropdownsIfNeeded();
         },
-      ),
-    );
-  }
-
-  Widget Rowlabel() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        children: [
-          Text("លេខទូរស័ព្ទ"),
-          Spacer(),
-          Text("កាលបរិច្ឆេទស្នើរ"),
-        ],
-      ),
-    );
-  }
-
-  Widget phoneAndDate() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextFormField(
-              controller: phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: inputDecoration("លេខទូរស័ព្ទ"),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextFormField(
-              controller: requestDateController,
-              readOnly: true,
-              decoration: inputDecoration("ថ្ងៃស្នើរ").copyWith(
-                suffixIcon: const Icon(Icons.calendar_month),
-              ),
-              onTap: pickDate,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget oneInput({
-    required String label,
-    required String hint,
-    required TextEditingController controller,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label),
-          const SizedBox(height: 6),
-          TextFormField(
-              controller: controller, decoration: inputDecoration(hint)),
-        ],
-      ),
-    );
-  }
-
-  Widget twoInputRow(
-    String lLabel,
-    String rLabel,
-    String lHint,
-    String rHint,
-    TextEditingController lCtrl,
-    TextEditingController rCtrl, {
-    required bool leftIsPlate,
-    required bool rightIsPlate,
-  }) {
-    final isLeftId = lCtrl == idNumberController;
-    final isRightId = rCtrl == idNumberController;
-
-    const plateMaxLen = 18;
-
-    List<TextInputFormatter>? formatters(bool isId, bool isPlate) {
-      if (isId) {
-        return <TextInputFormatter>[
-          FilteringTextInputFormatter.digitsOnly,
-          LengthLimitingTextInputFormatter(10),
-        ];
-      }
-      if (isPlate) {
-        return <TextInputFormatter>[
-          LengthLimitingTextInputFormatter(plateMaxLen),
-          TextInputFormatter.withFunction((oldValue, newValue) {
-            final up = newValue.text.toUpperCase();
-            return newValue.copyWith(text: up, selection: newValue.selection);
-          }),
-        ];
-      }
-      return null;
-    }
-
-    int? maxLen(bool isId, bool isPlate) {
-      if (isId) return 10;
-      if (isPlate) return plateMaxLen;
-      return null;
-    }
-
-    TextCapitalization cap(bool isPlate) =>
-        isPlate ? TextCapitalization.characters : TextCapitalization.none;
-
-    TextInputType kbd(bool isId) =>
-        isId ? TextInputType.number : TextInputType.text;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Text(lLabel),
-              const Spacer(),
-              Text(rLabel),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: lCtrl,
-                  decoration: inputDecoration(lHint),
-                  keyboardType: kbd(isLeftId),
-                  textCapitalization: cap(leftIsPlate),
-                  maxLength: maxLen(isLeftId, leftIsPlate),
-                  buildCounter: (context,
-                          {required currentLength,
-                          required isFocused,
-                          maxLength}) =>
-                      null,
-                  inputFormatters: formatters(isLeftId, leftIsPlate),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextFormField(
-                  controller: rCtrl,
-                  decoration: inputDecoration(rHint),
-                  keyboardType: kbd(isRightId),
-                  textCapitalization: cap(rightIsPlate),
-                  maxLength: maxLen(isRightId, rightIsPlate),
-                  buildCounter: (context,
-                          {required currentLength,
-                          required isFocused,
-                          maxLength}) =>
-                      null,
-                  inputFormatters: formatters(isRightId, rightIsPlate),
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -2022,7 +2408,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 height: 48,
                 child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xffDFB73B)),
+                    side: const BorderSide(color: Color(0xFFFFCA28)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(15),
                     ),
@@ -2033,12 +2419,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: const [
-                      Icon(Icons.add, color: Color(0xffDFB73B), size: 20),
+                      Icon(Icons.add, color: Color(0xFFFFCA28), size: 20),
                       SizedBox(width: 6),
                       Text(
                         "បន្ថែមរថយន្ត",
                         style:
-                            TextStyle(fontSize: 16, color: Color(0xffDFB73B)),
+                            TextStyle(fontSize: 16, color: Color(0xFFFFCA28)),
                       ),
                     ],
                   ),
@@ -2051,7 +2437,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 height: 48,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xffDFB73B),
+                    backgroundColor: Color(0xFFFFCA28),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(15),
                     ),

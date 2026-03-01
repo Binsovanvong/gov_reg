@@ -7,7 +7,7 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFDFB73B), // dark blue
+      backgroundColor: const Color(0xFFFFCA28), // dark blue
       body: SafeArea(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -19,6 +19,7 @@ class WelcomeScreen extends StatelessWidget {
             // Logo
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
                   height: 250,
@@ -39,8 +40,8 @@ class WelcomeScreen extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: Text(
-                    'សូមស្វាគមន៏មកកាន់កម្មវីធី',
-                    textAlign: TextAlign.left,
+                    'សូមស្វាគមន៏មកកាន់កម្មវីធីប័ណ្ណ',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 25,
@@ -51,8 +52,8 @@ class WelcomeScreen extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: Text(
-                    'ប័ណ្ណស្នើរចំណតរថយន្ត',
-                    textAlign: TextAlign.right,
+                    'ស្នើរសុំចេញចូលទីស្តីការក្រសួងមហាផ្ទៃ',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 25,

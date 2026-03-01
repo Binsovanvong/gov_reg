@@ -16,42 +16,94 @@ class RegisterSuccessMixedScreen extends StatefulWidget {
       _RegisterSuccessMixedScreenState();
 }
 
-class _RegisterSuccessMixedScreenState
-    extends State<RegisterSuccessMixedScreen> {
+class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen> {
   static const String baseUrl = "http://10.0.2.2:8080";
 
-  late Future<Uint8List?> _qrFuture;
+  Future<Uint8List?> _qrFuture = Future.value(null);
 
-  late String code;
-  late String token;
+  // ✅ safe defaults (no LateInitializationError)
+  String code = "";
+  String token = "";
+  String vehicleType = "";
+  String fullName = "";
+  String phone = "";
+  String userType = "";
+  String parkingRequestStatus = "";
 
-  late String fullName;
-  late String phone;
-  late String userType;
-  late String parkingRequestStatus;
+  int requestDate = 0; // yyyymmdd
+  String? requestAtDate; // dd-MM-yyyy or null
 
-
-  Map workingInfo = {};
   List vehicles = [];
+  Map? workingInfo;
 
-  // ✅ selfie
   String selfiePath = "";
   Uint8List? selfieBytes;
 
-  // ✅ capture key (screen UI card - optional)
-  final GlobalKey _captureKey = GlobalKey();
-
-  // ✅ export key (badge card for download)
   final GlobalKey _exportKey = GlobalKey();
-
   bool _saving = false;
-
-  // ✅ show export widget invisibly (painted) only during capture
   bool _showExportForCapture = false;
 
-  // ✅ Hide "ព័ត៌មានការងារ" for these user types
-  bool get hideWorkInfo =>
+  // ---------- RULES ----------
+  bool get isNational =>
+      userType == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER";
+  bool get isSecretaryOrDeputy =>
       userType == "SECRETARY" || userType == "DEPUTY_SECRETARY";
+  bool get isOfficer =>
+      userType == "INSIDE_OFFICER" || userType == "OUTSIDE_OFFICER";
+
+  // ✅ required behavior:
+  // Guest + National: hide policeId
+  // Secretary/Deputy: hide workinfo + hide policeId
+  // Inside/Outside officer: show all but hide province
+  bool get showPoliceId => isOfficer;
+  bool get showWorkInfo => !isSecretaryOrDeputy;
+  bool get showProvince => isNational; // officers hide province
+
+  // ---------------- KHMER DATE FORMAT ----------------
+
+  String _formatKhmerDate(DateTime d) {
+    const khMonths = [
+      "មករា",
+      "កុម្ភៈ",
+      "មីនា",
+      "មេសា",
+      "ឧសភា",
+      "មិថុនា",
+      "កក្កដា",
+      "សីហា",
+      "កញ្ញា",
+      "តុលា",
+      "វិច្ឆិកា",
+      "ធ្នូ",
+    ];
+
+    String toKhmerNumber(String input) {
+      const en = ['0','1','2','3','4','5','6','7','8','9'];
+      const kh = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
+
+      for (int i = 0; i < en.length; i++) {
+        input = input.replaceAll(en[i], kh[i]);
+      }
+      return input;
+    }
+
+    final day = toKhmerNumber(d.day.toString());
+    final year = toKhmerNumber(d.year.toString());
+    final month = khMonths[d.month - 1];
+
+    return "$day $month $year";
+  }
+
+  String _formatYmdIntToKhmer(int yyyymmdd) {
+    final s = yyyymmdd.toString().padLeft(8, '0');
+    if (s.length != 8) return "-";
+
+    final year = int.parse(s.substring(0, 4));
+    final month = int.parse(s.substring(4, 6));
+    final day = int.parse(s.substring(6, 8));
+
+    return _formatKhmerDate(DateTime(year, month, day));
+  }
 
   @override
   void didChangeDependencies() {
@@ -59,81 +111,38 @@ class _RegisterSuccessMixedScreenState
 
     final args = (ModalRoute.of(context)?.settings.arguments as Map?) ?? {};
 
-    code = (args["code"] ?? "").toString();
-    token = (args["token"] ?? "").toString();
+    setState(() {
+      code = (args["code"] ?? "").toString();
+      token = (args["token"] ?? "").toString();
 
-    fullName = (args["fullName"] ?? "").toString();
-    phone = (args["phone"] ?? "").toString();
-    userType = (args["userType"] ?? "").toString();
-    parkingRequestStatus = (args["parkingRequestStatus"] ?? "").toString();
+      fullName = (args["fullName"] ?? "").toString();
+      phone = (args["phone"] ?? "").toString();
+      userType = (args["userType"] ?? "").toString();
+      parkingRequestStatus = (args["parkingRequestStatus"] ?? "").toString();
 
-    workingInfo =
-        (args["workingInfo"] is Map) ? (args["workingInfo"] as Map) : {};
-    vehicles = (args["vehicles"] is List) ? (args["vehicles"] as List) : [];
+      requestDate = int.tryParse((args["requestDate"] ?? 0).toString()) ?? 0;
+      requestAtDate = args["requestAtDate"]?.toString();
 
-    selfiePath = (args["selfiePath"] ?? "").toString();
-    if (selfiePath.isEmpty && vehicles.isNotEmpty && vehicles.first is Map) {
-      selfiePath = ((vehicles.first as Map)["selfiePath"] ?? "").toString();
-    }
+      vehicleType = (args["vehicleType"] ?? "").toString();
 
-    selfieBytes = (args["selfieBytes"] is Uint8List)
-        ? args["selfieBytes"] as Uint8List
-        : null;
+      vehicles = (args["vehicles"] is List) ? (args["vehicles"] as List) : [];
+      workingInfo =
+          (args["workingInfo"] is Map) ? (args["workingInfo"] as Map) : null;
 
-    // ✅ preload logo (avoid blank on capture)
+      selfiePath = (args["selfiePath"] ?? "").toString();
+      if (selfiePath.isEmpty && vehicles.isNotEmpty && vehicles.first is Map) {
+        selfiePath = ((vehicles.first as Map)["selfiePath"] ?? "").toString();
+      }
+
+      selfieBytes = (args["selfieBytes"] is Uint8List)
+          ? (args["selfieBytes"] as Uint8List)
+          : null;
+    });
+
     precacheImage(const AssetImage("assets/img/about-moi-logo.png"), context);
-
     _qrFuture = _fetchQrPngOrNull();
   }
-  Color getStatusColor(String status) {
-  switch (status) {
-    case "NEW":
-      return Colors.blue;
-    case "ASSIGNED":
-      return Colors.orange;
-    case "ACTIVE":
-      return Colors.green;
-    case "IN_PROGRESS":
-      return Colors.lightBlue;
-    case "RESOLVED":
-      return Colors.teal;
-    case "APPROVED":
-      return Colors.greenAccent;
-    case "CLOSED":
-      return Colors.grey;
-    case "REJECTED":
-      return Colors.red;
-    case "WAITING_INFO":
-      return Colors.amber;
-    default:
-      return Colors.black;
-  }
-}
 
-String getStatusText(String status) {
-  switch (status) {
-    case "NEW":
-      return "សំណេីរថ្មី"; // New
-    case "ASSIGNED":
-      return "បានចាត់ចែង"; // Assigned
-    case "ACTIVE":
-      return "សកម្ម"; // Active
-    case "IN_PROGRESS":
-      return "កំពុងដំណើរការ"; // In Progress
-    case "RESOLVED":
-      return "បានដោះស្រាយ"; // Resolved
-    case "APPROVED":
-      return "អនុញ្ញាតអោយចូល"; // Approved
-    case "CLOSED":
-      return "បិទ"; // Closed
-    case "REJECTED":
-      return "មិនអនុញ្ញាតអោយចូល"; // Rejected
-    case "WAITING_INFO":
-      return "រង់ចាំព័ត៌មាន"; // Waiting Info
-    default:
-      return status; // fallback
-  }
-  }
 
   Future<Uint8List?> _fetchQrPngOrNull() async {
     if (token.isEmpty) return null;
@@ -143,33 +152,48 @@ String getStatusText(String status) {
     return res.bodyBytes;
   }
 
-  // ✅ Capture export badge as PNG bytes (FIXED: wait + must paint)
+  String _userTypeKhmer(String v) {
+    switch (v) {
+      case "GUEST":
+        return "ភ្ញៀវ";
+      case "INSIDE_OFFICER":
+        return "មន្រ្តីបំរើការងារនៅក្នុងទីស្តីការក្រសួងមហាផ្ទៃ";
+      case "OUTSIDE_OFFICER":
+        return "មន្រ្តីបំរើការងារនៅក្រៅទីស្តីការក្រសួងមហាផ្ទៃ";
+      case "SECRETARY":
+        return "រដ្ឋលេខាធិការក្រសួងមហាផ្ទៃ";
+      case "DEPUTY_SECRETARY":
+        return "អនុរដ្ឋលេខាធិការ​ ក្រសួងមហាផ្ទៃ";
+      case "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER":
+        return "មន្ត្រីរដ្ឋបាលថ្នាក់ក្រោមជាតិ";
+      default:
+        return v;
+    }
+  }
+
   Future<Uint8List?> _captureExportPng() async {
     final ctx = _exportKey.currentContext;
     if (ctx == null) return null;
 
-    final boundary = ctx.findRenderObject() as RenderRepaintBoundary;
+    final ro = ctx.findRenderObject();
+    if (ro is! RenderRepaintBoundary) return null;
+    final boundary = ro;
 
-    // ✅ wait until painted (up to 20 frames)
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 40; i++) {
       await WidgetsBinding.instance.endOfFrame;
-      if (!boundary.debugNeedsPaint) break;
-      await Future.delayed(const Duration(milliseconds: 30));
+      if (!boundary.debugNeedsPaint && boundary.hasSize) break;
+      await Future.delayed(const Duration(milliseconds: 25));
     }
 
-    if (boundary.debugNeedsPaint) return null;
+    if (boundary.debugNeedsPaint || !boundary.hasSize) return null;
 
     final ui.Image image = await boundary.toImage(pixelRatio: 3.5);
     final ByteData? bd = await image.toByteData(format: ui.ImageByteFormat.png);
-    if (bd == null) return null;
-
-    return bd.buffer.asUint8List();
+    return bd?.buffer.asUint8List();
   }
 
-  // ✅ Save badge into Photos/Gallery (FIXED: Stack clip none + Opacity 0.01)
   Future<void> _saveToPhotos() async {
     if (_saving) return;
-
     setState(() => _saving = true);
 
     try {
@@ -191,23 +215,22 @@ String getStatusText(String status) {
         return;
       }
 
-      // ✅ show export widget so it gets PAINTED
       setState(() => _showExportForCapture = true);
 
-      // ✅ give time for layout + FutureBuilder + decode
       await WidgetsBinding.instance.endOfFrame;
-      await Future.delayed(const Duration(milliseconds: 150));
+      await Future.delayed(const Duration(milliseconds: 250));
+      await WidgetsBinding.instance.endOfFrame;
+      await Future.delayed(const Duration(milliseconds: 250));
       await WidgetsBinding.instance.endOfFrame;
 
       final Uint8List? bytes = await _captureExportPng();
 
-      // ✅ hide it again
       if (mounted) setState(() => _showExportForCapture = false);
 
       if (bytes == null) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Capture failed (not painted) ❌")),
+          const SnackBar(content: Text("Capture failed ❌")),
         );
         return;
       }
@@ -227,11 +250,9 @@ String getStatusText(String status) {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
-      // ✅ ALWAYS reset flags
       if (mounted) {
         setState(() {
           _saving = false;
@@ -241,61 +262,207 @@ String getStatusText(String status) {
     }
   }
 
-  // ✅ Show userType in Khmer
-  String _userTypeKhmer(String v) {
-    switch (v) {
-      case "GUEST":
-        return "ភ្ញៀវ";
-      case "INSIDE_OFFICER":
-        return "មន្រ្តីបំរើការងារនៅក្នុងទីស្តីការក្រសួងមហាឫ្ទៃ";
-      case "OUTSIDE_OFFICER":
-        return "មន្រ្តីបំរើការងារនៅក្រៅទីស្តីការក្រសួងមហាឫ្ទៃ";
-      case "SECRETARY":
-        return "រដ្ឋលេខាធិការក្រសួងមហាឫ្ទៃ";
-      case "DEPUTY_SECRETARY":
-        return "អនុរដ្ឋលេខាធិការ​ ក្រសួងមហាឫ្ទៃ";
-      case "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER":
-        return "មន្ត្រីរដ្ឋបាលថ្នាក់ក្រោមជាតិ";
-      default:
-        return v;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    const gold = Color(0xFFDFB73B);
+
+    String issueDateStr = "-";
+    if (requestAtDate != null && requestAtDate!.isNotEmpty) {
+      try {
+        final parts = requestAtDate!.split("-");
+        if (parts.length == 3) {
+          final day = int.parse(parts[0]);
+          final month = int.parse(parts[1]);
+          final year = int.parse(parts[2]);
+          issueDateStr =
+              _formatKhmerDate(DateTime(year, month, day));
+        }
+      } catch (_) {
+        issueDateStr = "-";
+      }
+    }
+
+    final expiryDateStr =
+        requestDate > 0 ? _formatYmdIntToKhmer(requestDate) : "-";
+
+    final badgeWidget = MediaQuery(
+      data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
+      child: _MoIStyleBadge(
+        fullName: fullName,
+        phone: phone,
+        code: code,
+        token: token,
+        vehicleType: vehicleType,
+        parkingRequestStatus: parkingRequestStatus,
+        userTypeText: _userTypeKhmer(userType),
+        vehicles: vehicles,
+        workingInfo: workingInfo,
+        selfieBytes: selfieBytes,
+        selfiePath: selfiePath,
+        qrFuture: _qrFuture,
+        issueDateStr: issueDateStr,
+        expiryDateStr: expiryDateStr,
+        showPoliceId: showPoliceId,
+        showWorkInfo: showWorkInfo,
+        showProvince: showProvince,
+      ),
+    );
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FA),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: const BorderSide(color: Color(0xFFFFCA28)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    "ត្រឡប់ក្រោយ",
+                    style: TextStyle(fontWeight: FontWeight.w900, color: gold),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFFFFCA28),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: _saving ? null : _saveToPhotos,
+                  child: _saving
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.download_rounded,
+                                size: 18, color: Colors.white),
+                            SizedBox(width: 8),
+                            Text(
+                              "ទាញទុក",
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:  Color(0xFFFFCA28),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pushNamed(context, Approute.welcome),
+                  child: const Text(
+                    "ទៅទំព័រដើម",
+                    style: TextStyle(
+                        fontWeight: FontWeight.w900, color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
       body: SafeArea(
         child: Stack(
-          clipBehavior: Clip.none, // ✅ IMPORTANT (do not clip offscreen export)
+          clipBehavior: Clip.none,
           children: [
-            // ✅ SCREEN UI
-            _mainUi(context),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final h = constraints.maxHeight;
+                final w = constraints.maxWidth;
 
-            // ✅ Export widget (painted but invisible)
+                // ✅ Fit by height to avoid bottom overflow
+                return Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: SizedBox(
+                    height: h,
+                    width: w,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SizedBox(
+                        height: h,
+                        child: FittedBox(
+                          fit: BoxFit.fitHeight,
+                          alignment: Alignment.topLeft,
+                          child: SizedBox(
+                            width: _MoIStyleBadge.badgeW,
+                            height: _MoIStyleBadge.badgeH,
+                            child: badgeWidget,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+
+            // hidden painted widget for capture (FULL SIZE, NOT SCALED)
             if (_showExportForCapture)
               Positioned(
-                left: -2000, // off-screen
+                left: -4000,
                 top: 0,
                 child: IgnorePointer(
                   ignoring: true,
                   child: Opacity(
-                    opacity: 0.01, // ✅ NOT 0.0 (must paint!)
+                    opacity: 0.01,
                     child: SizedBox(
-                      width: 600,
-                      height: 980,
+                      width: _MoIStyleBadge.badgeW,
+                      height: _MoIStyleBadge.badgeH,
                       child: RepaintBoundary(
                         key: _exportKey,
-                        child: _ExportParkingBadge(
-                          fullName: fullName,
-                          phone: phone,
-                          code: code,
-                          parkingRequestStatus: parkingRequestStatus,
-                          userTypeText: _userTypeKhmer(userType),
-                          vehicles: vehicles, // ✅ supports 2 vehicles
-                          selfieBytes: selfieBytes,
-                          selfiePath: selfiePath,
-                          qrFuture: _qrFuture,
+                        child: MediaQuery(
+                          data: MediaQuery.of(context)
+                              .copyWith(textScaler: TextScaler.noScaling),
+                          child: _MoIStyleBadge(
+                            fullName: fullName,
+                            phone: phone,
+                            code: code,
+                            token: token,
+                            parkingRequestStatus: parkingRequestStatus,
+                            userTypeText: _userTypeKhmer(userType),
+                            vehicles: vehicles,
+                            vehicleType: vehicleType,
+                            workingInfo: workingInfo,
+                            selfieBytes: selfieBytes,
+                            selfiePath: selfiePath,
+                            qrFuture: _qrFuture,
+                            issueDateStr: issueDateStr,
+                            expiryDateStr: expiryDateStr,
+                            showPoliceId: showPoliceId,
+                            showWorkInfo: showWorkInfo,
+                            showProvince: showProvince,
+                          ),
                         ),
                       ),
                     ),
@@ -307,897 +474,669 @@ String getStatusText(String status) {
       ),
     );
   }
+}
 
-  /// ============================
-  /// ✅ Your original screen UI
-  /// ============================
-  Widget _mainUi(BuildContext context) {
-    const navy = Color(0xFF0A2D66);
-    const green = Color(0xFF00B26A);
-    const gold = Color(0xFFDFB73B);
+/// =========================
+/// ✅ Badge widget
+/// =========================
+class _MoIStyleBadge extends StatelessWidget {
+  final String fullName;
+  final String phone;
+  final String code;
+  final String token;
+  final String userTypeText;
+  final String parkingRequestStatus;
+  final List vehicles;
+  final Map? workingInfo;
+  final Uint8List? selfieBytes;
+  final String selfiePath;
+  final Future<Uint8List?> qrFuture;
+  final String issueDateStr;
+  final String expiryDateStr;
+  final String vehicleType;
+  final bool showPoliceId;
+  final bool showWorkInfo;
+  final bool showProvince;
 
-    return Column(
-      children: [
-        // header
-        Container(
-          color: gold,
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
-          child: Row(
-            children: [
-              Container(
-                width: 75,
-                height: 75,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: Image.asset(
-                    "assets/img/about-moi-logo.png",
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.high,
+  const _MoIStyleBadge({
+    required this.fullName,
+    required this.phone,
+    required this.code,
+    required this.vehicleType,
+    required this.token,
+    required this.userTypeText,
+    required this.parkingRequestStatus,
+    required this.vehicles,
+    required this.workingInfo,
+    required this.selfieBytes,
+    required this.selfiePath,
+    required this.qrFuture,
+    required this.issueDateStr,
+    required this.expiryDateStr,
+    required this.showPoliceId,
+    required this.showWorkInfo,
+    required this.showProvince,
+  });
+
+  static const double badgeW = 1180;
+  static const double badgeH = 950;
+
+  static const _navy = Color(0xFF0A2D66);
+  static const _gold = Color(0xFFDFB73B);
+  static const _line = Color(0xFFBBD4FF);
+  static const _footerRed = Color(0xFFF04444);
+  static const _cardBlue = Color(0xFF1E3A8A);
+
+  String s(dynamic x) => (x ?? "").toString().trim();
+
+  Map? _firstVehicle() {
+    final list = vehicles.whereType<Map>().toList();
+    return list.isEmpty ? null : list.first;
+  }
+
+  String vehicleTypeKh(String v) {
+    switch (v) {
+      case "CAR":
+        return "រថយន្ត";
+      case "MOTORBIKE":
+        return "ម៉ូតូ";
+      default:
+        return v.isEmpty ? "-" : v;
+    }
+  }
+  String provinceEn(String v) {
+    const map = {
+      "ភ្នំពេញ": "PHNOM PENH",
+      "កណ្តាល": "KANDAL",
+      "បន្ទាយមានជ័យ": "BANTEAY MEANCHEY",
+      "បាត់ដំបង": "BATTAMBANG",
+      "កំពង់ចាម": "KAMPONG CHAM",
+      "កំពង់ឆ្នាំង": "KAMPONG CHHNANG",
+      "កំពង់ស្ពឺ": "KAMPONG SPEU",
+      "កំពង់ធំ": "KAMPONG THOM",
+      "កំពត": "KAMPOT",
+      "កែប": "KEP",
+      "កោះកុង": "KOH KONG",
+      "ក្រចេះ": "KRATIE",
+      "មណ្ឌលគិរី": "MONDULKIRI",
+      "ឧត្តរមានជ័យ": "ODDAR MEANCHEY",
+      "ប៉ៃលិន": "PAILIN",
+      "ព្រះសីហនុ": "PREAH SIHANOUK",
+      "ព្រះវិហារ": "PREAH VIHEAR",
+      "ព្រៃវែង": "PREY VENG",
+      "ពោធិ៍សាត់": "PURSAT",
+      "សៀមរាប": "SIEM REAP",
+      "ស្ទឹងត្រែង": "STUNG TRENG",
+      "ស្វាយរៀង": "SVAY RIENG",
+      "តាកែវ": "TAKEO",
+      "ត្បូងឃ្មុំ": "TBOUNG KHMUM",
+      "រតនគិរី": "RATANAKIRI",
+      "កម្ពុជា": "CAMBODIA",
+      "នគរបាល": "POLICE",
+    };
+    return map[v] ?? v;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final v = _firstVehicle();
+
+    final plate = s(v?["plateNumber"]);
+    final brand = s(v?["brand"]);
+    final year = s(v?["madeYear"]);
+
+    // ✅ Backend returns plateSubCategory (Khmer name) and plateCode (English DB code)
+    final subcategory = s(v?["plateSubCategory"]);   // Khmer label e.g. "បាត់ដំបង"
+    final plateCode = s(v?["plateCode"]);             // English code e.g. "BATTAMBANG"
+
+    final info = workingInfo ?? {};
+    final ministry = s(info["generalDepartmentText"]);
+    final dept = s(info["departmentText"]);
+    final office = s(info["burauText"]);
+    final position = s(info["positionText"]);
+    final policeId = s(info["policeId"]);
+    final provinceCity = s(info["provinceCity"]);
+
+    return Material(
+      color: Colors.transparent,
+      child: Center(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(34),
+          child: Container(
+            width: badgeW,
+            height: badgeH,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: const Color(0xFFE6EEF9), width: 2),
+            ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0xFFFFFFFF), Color(0xFFF2F6FF)],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "ក្រសួងមហាឫ្ទៃ",
-                      style: TextStyle(
-                        color: Color(0xFFF4F6FA),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18,
-                      ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      "MINISTRY OF INTERIOR",
-                      style: TextStyle(
-                        color: Color(0xFFF4F6FA),
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.3,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
 
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: RepaintBoundary(
-                  key: _captureKey,
+                // watermark logo (center)
+                Positioned.fill(
+                  child: Opacity(
+                    opacity: 0.10,
+                    child: Center(
+                      child: Image.asset(
+                        "assets/img/about-moi-logo.png",
+                        width: 620,
+                        height: 620,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.high,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // TOP HEADER: logo + title + QR
+                Positioned(
+                  left: 36,
+                  right: 36,
+                  top: 26,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 88,
+                        height: 88,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: _gold, width: 3),
+                        ),
+                        padding: const EdgeInsets.all(12),
+                        child: Image.asset(
+                          "assets/img/about-moi-logo.png",
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.high,
+                        ),
+                      ),
+                      const SizedBox(width: 18),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "ក្រសួងមហាផ្ទៃ",
+                              style: TextStyle(
+                                color: _gold,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 36,
+                                height: 1.0,
+                              ),
+                            ),
+                            SizedBox(height: 6),
+                            Text(
+                              "MINISTRY OF INTERIOR",
+                              style: TextStyle(
+                                color: _gold,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 22,
+                                letterSpacing: 0.6,
+                                height: 1.0,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 130,
+                        height: 130,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border.all(color: Colors.black54, width: 2),
+                        ),
+                        padding: const EdgeInsets.all(6),
+                        child: FutureBuilder<Uint8List?>(
+                          future: qrFuture,
+                          builder: (_, snap) {
+                            if (!snap.hasData || snap.data == null) {
+                              return const Center(
+                                child: Text(
+                                  "NO QR",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.black54,
+                                  ),
+                                ),
+                              );
+                            }
+                            return Image.memory(
+                              snap.data!,
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.high,
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Positioned(
+                  left: 36,
+                  right: 36,
+                  top: 170,
+                  child: Container(height: 2, color: _line),
+                ),
+
+                // LEFT PHOTO BOX
+                Positioned(
+                  left: 46,
+                  top: 210,
                   child: Container(
+                    width: 300,
+                    height: 320,
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.06),
-                          blurRadius: 18,
-                          offset: const Offset(0, 8),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(color: _cardBlue, width: 5),
+                    ),
+                    padding: const EdgeInsets.all(10),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: _badgePhoto(selfieBytes, selfiePath),
+                    ),
+                  ),
+                ),
+
+                // LEFT PLATE BOX
+                Positioned(
+                  left: 46,
+                  top: 550,
+                  child: Container(
+                    width: 300,
+                    height: 160,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: _cardBlue, width: 3),
+                    ),
+                    clipBehavior: Clip.hardEdge,
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 12),
+
+                        // 🔹 Top label = subcategory
+                        Text(
+                          subcategory.isEmpty ? "-" : subcategory,
+                          style: const TextStyle(
+                            color: _navy,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 32,
+                            height: 1.0,
+                          ),
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // 🔹 Big plate number
+                        Text(
+                          plate.isEmpty ? "-" : plate,
+                          style: const TextStyle(
+                            color: _navy,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 40,
+                            letterSpacing: 2,
+                            height: 1.0,
+                          ),
+                        ),
+
+                        const Spacer(),
+
+                        // 🔹 Bottom red label (subcategory)
+                        Container(
+                          height: 46,
+                          width: double.infinity,
+                          decoration: const BoxDecoration(
+                            border: Border(
+                              top: BorderSide(color: _cardBlue, width: 2),
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            plateCode.isNotEmpty ? plateCode : (subcategory.isEmpty ? "-" : subcategory),
+                            
+                            style: const TextStyle(
+                              color: _footerRed,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 18,
+                              height: 1.0,
+                            ),
+                          ),
                         ),
                       ],
                     ),
-                    child: Column(
-                      children: [
-                        // title bar
-                        Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          color: getStatusColor(parkingRequestStatus),
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(18),
-                            topRight: Radius.circular(18),
-                          ),
-                        ),
-                        child: Text(
-                          getStatusText(parkingRequestStatus),
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 16,
-                          ),
+                  ),
+                ),
+
+                // RIGHT MAIN CONTENT
+                Positioned(
+                  left: 380,
+                  right: 46,
+                  top: 210,
+                  bottom: 130,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 62,
+                        color: _navy,
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        child: Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                "ព័ត៌មានផ្ទាល់ខ្លួន",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 24,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              code.isEmpty ? "GDDTM###########" : code,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 24,
+                                letterSpacing: 0.6,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                        const SizedBox(height: 16),
+                      const SizedBox(height: 18),
 
-                        _profileBlock(),
-                        const SizedBox(height: 10),
+                      _twoColRowSafe(
+                        leftLabel: "នាមត្រកូល និងនាមខ្លួន",
+                        leftValue: fullName,
+                        rightLabel: "ប្រភេទមន្ត្រី",
+                        rightValue: userTypeText,
+                      ),
+                      const SizedBox(height: 14),
 
-                        Text(
-                          fullName.isEmpty ? "Profile" : fullName,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: navy,
-                          ),
+                      if (showPoliceId || showProvince) ...[
+                        _twoColRowSafe(
+                          leftLabel: showPoliceId ? "អត្តលេខ" : "",
+                          leftValue: showPoliceId ? policeId : "",
+                          rightLabel: showProvince ? "ខេត្ត/រាជធានី" : "",
+                          rightValue: showProvince ? provinceCity : "",
                         ),
-
-                        if (userType.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            _userTypeKhmer(userType),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF6B7680),
-                            ),
-                          ),
-                        ],
-
-                        const SizedBox(height: 16),
-
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Column(
-                            children: [
-                              _infoCard(
-                                title: "ព័ត៌មានសំណើរ",
-                                rows: [
-                                  _row(
-                                      "លេខកូដស្នើរ", code.isEmpty ? "-" : code),
-                                  _row("លេខទូរស័ព្ទ",
-                                      phone.isEmpty ? "-" : phone),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              if (!hideWorkInfo) ...[
-                                _infoCard(
-                                  title: "ព័ត៌មានការងារ",
-                                  rows: [
-                                    if ((workingInfo["policeId"] ?? "")
-                                        .toString()
-                                        .isNotEmpty)
-                                      _row("អត្តលេខ",
-                                          workingInfo["policeId"].toString()),
-                                    if (_safe(workingInfo[
-                                            "generalDepartmentText"])
-                                        .isNotEmpty)
-                                      _row(
-                                          "ក្រសួង/ស្ថាប័ន",
-                                          _safe(workingInfo[
-                                              "generalDepartmentText"])),
-                                    if (_safe(workingInfo["departmentText"])
-                                        .isNotEmpty)
-                                      _row("នាយកដ្ឋាន/អង្គភាព",
-                                          _safe(workingInfo["departmentText"])),
-                                    if (_safe(workingInfo["burauText"])
-                                        .isNotEmpty)
-                                      _row("ការិយាល័យ",
-                                          _safe(workingInfo["burauText"])),
-                                    if (_safe(workingInfo["positionText"])
-                                        .isNotEmpty)
-                                      _row("តួនាទី",
-                                          _safe(workingInfo["positionText"])),
-                                    if (_safe(workingInfo["provinceCity"])
-                                        .isNotEmpty)
-                                      _row("ខេត្ត/រាជធានី",
-                                          _safe(workingInfo["provinceCity"])),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                              ],
-                              _vehicleCard(
-                                  title: "ព័ត៌មានរថយន្ត", vehicles: vehicles),
-                              const SizedBox(height: 12),
-                              FutureBuilder<Uint8List?>(
-                                future: _qrFuture,
-                                builder: (context, snap) {
-                                  if (snap.connectionState ==
-                                      ConnectionState.waiting) {
-                                    return const SizedBox(
-                                      height: 90,
-                                      child: Center(
-                                        child: CircularProgressIndicator(),
-                                      ),
-                                    );
-                                  }
-                                  if (!snap.hasData || snap.data == null) {
-                                    return _hintBox(
-                                        "មិនមាន QR Code (Guest submit ឬ token ទទេ)");
-                                  }
-                                  return Column(
-                                    children: [
-                                      const Text(
-                                        "QR Code",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                          color: Color(0xFFDD7B25),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Container(
-                                        padding: const EdgeInsets.all(10),
-                                        decoration: BoxDecoration(
-                                          border: Border.all(
-                                            color: Color(0xFFF0D9A2),
-                                          ),
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                        ),
-                                        child: Image.memory(
-                                          snap.data!,
-                                          width: 110,
-                                          height: 110,
-                                          fit: BoxFit.contain,
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 18),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: OutlinedButton(
-                                      style: OutlinedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 14),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(14),
-                                        ),
-                                        side: const BorderSide(color: gold),
-                                      ),
-                                      onPressed: () => Navigator.pop(context),
-                                      child: const Text(
-                                        "ត្រឡប់ក្រោយ",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          color: gold,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-
-                                  // ✅ download
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: gold,
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 14),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(14),
-                                        ),
-                                        elevation: 0,
-                                      ),
-                                      onPressed: _saving ? null : _saveToPhotos,
-                                      child: AnimatedSwitcher(
-                                        duration:
-                                            const Duration(milliseconds: 220),
-                                        child: _saving
-                                            ? const SizedBox(
-                                                key: ValueKey("loading"),
-                                                height: 18,
-                                                width: 18,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  color: Colors.white,
-                                                ),
-                                              )
-                                            : const Row(
-                                                key: ValueKey("text"),
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment.center,
-                                                children: [
-                                                  Icon(Icons.download_rounded,
-                                                      size: 18,
-                                                      color: Colors.white),
-                                                  SizedBox(width: 8),
-                                                  Text(
-                                                    "ទាញទុក",
-                                                    style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.w800,
-                                                      color: Colors.white,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                      ),
-                                    ),
-                                  ),
-
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: gold,
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 14),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(14),
-                                        ),
-                                      ),
-                                      onPressed: () => Navigator.pushNamed(
-                                        context,
-                                        Approute.welcome,
-                                      ),
-                                      child: const Text(
-                                        "ទៅទំព័រដើម",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 14),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 14),
                       ],
+
+                      if (showWorkInfo) ...[
+                        _twoColRowSafe(
+                          leftLabel: "ក្រសួង/ស្ថាប័ន",
+                          leftValue: ministry,
+                          rightLabel: "នាយកដ្ឋាន/អង្គភាព",
+                          rightValue: dept,
+                        ),
+                        const SizedBox(height: 14),
+                        _twoColRowSafe(
+                          leftLabel: "ការិយាល័យ",
+                          leftValue: office,
+                          rightLabel: "តួនាទី",
+                          rightValue: position,
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+
+                      _blueSectionTitle("ព័ត៌មាន ${vehicleTypeKh(vehicleType)}"),
+
+                      const SizedBox(height: 12),
+                      _twoColRowSafe(
+                        leftLabel: "ស្លាកលេខ",
+                        leftValue: plate,
+                        rightLabel: "ម៉ាក",
+                        rightValue: brand,
+                      ),
+                      const SizedBox(height: 14),
+                      _twoColRowSafe(
+                        leftLabel: "ឆ្នាំផលិត",
+                        leftValue: year,
+                        rightLabel: "លេខទូរស័ព្ទ",
+                        rightValue: phone,
+                      ),
+                      Spacer(),
+                      Row(
+                        children: [
+                          Text("សុពលភាពពី ", style: TextStyle(
+                            color: Color(0xFF8A94A6),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                            height: 1.0,
+                          )),
+                          Spacer(),
+                          Text("សុពលភាពដល់ ", style: TextStyle(
+                            color: Color(0xFF8A94A6),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                            height: 1.0,
+                          )),
+                        ],
+                      ),
+                      SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "ថ្ងៃទី $issueDateStr",
+                              style: const TextStyle(
+                                color: _footerRed,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 22,
+                                height: 1.0,
+                              ),
+                            ),
+                            Text(
+                              "ថ្ងៃទី $expiryDateStr",
+                              style: const TextStyle(
+                                color: _navy,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 22,
+                                height: 1.0,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: _parkingStatusFooter(parkingRequestStatus),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static Widget _blueSectionTitle(String title) {
+    return Container(
+      height: 58,
+      color: _navy,
+      alignment: Alignment.centerLeft,
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
+          fontSize: 22,
+        ),
+      ),
+    );
+  }
+
+  static Widget _twoColRowSafe({
+    required String leftLabel,
+    required String leftValue,
+    required String rightLabel,
+    required String rightValue,
+  }) {
+    Widget cell({
+      required String label,
+      required String value,
+      required CrossAxisAlignment align,
+      required TextAlign textAlign,
+    }) {
+      return Expanded(
+        child: Column(
+          crossAxisAlignment: align,
+          children: [
+            Text(
+              label,
+              textAlign: textAlign,
+              style: const TextStyle(
+                color: Color(0xFF8A94A6),
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+                height: 1.0,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              alignment: align == CrossAxisAlignment.end
+                  ? Alignment.centerRight
+                  : Alignment.centerLeft,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: align == CrossAxisAlignment.end
+                    ? Alignment.centerRight
+                    : Alignment.centerLeft,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Text(
+                    (value.trim().isEmpty) ? "-" : value.trim(),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: true,
+                    textAlign: textAlign,
+                    style: const TextStyle(
+                      color: _navy,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 30,
+                      height: 1.08,
                     ),
                   ),
                 ),
               ),
             ),
-          ),
+          ],
+        ),
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        cell(
+          label: leftLabel,
+          value: leftValue,
+          align: CrossAxisAlignment.start,
+          textAlign: TextAlign.left,
+        ),
+        const SizedBox(width: 32),
+        cell(
+          label: rightLabel,
+          value: rightValue,
+          align: CrossAxisAlignment.end,
+          textAlign: TextAlign.right,
         ),
       ],
     );
   }
 
-  Widget _profileBlock() {
-    Widget fallbackIcon() => const Center(
-          child: Icon(Icons.person, size: 54, color: Color(0xFF9AA6B2)),
-        );
+  static Widget _parkingStatusFooter(String? rawStatus) {
+    final status = (rawStatus ?? "").trim().toLowerCase();
 
-    if (selfieBytes != null && selfieBytes!.isNotEmpty) {
-      return Container(
-        width: 110,
-        height: 140,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF2F4F6),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFE3E7EC)),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Image.memory(
-          selfieBytes!,
-          fit: BoxFit.cover,
-          filterQuality: FilterQuality.high,
-          errorBuilder: (_, __, ___) => fallbackIcon(),
-        ),
-      );
+    Color bg;
+    String label;
+
+    if (status == "new" || status.isEmpty) {
+      bg = Colors.blueGrey;
+      label = "សំណើរកំពុងដាក់ស្នើរ";
+    } else if (status == "pending") {
+      bg = Colors.orange;
+      label = "កំពុងរង់ចាំពិនិត្យ";
+    } else if (status == "approve" || status == "approved") {
+      bg = Colors.blue;
+      label = "បានអនុម័ត";
+    } else if (status == "active") {
+      bg = Colors.green;
+      label = "កំពុងប្រើប្រាស់";
+    } else if (status == "reject" || status == "rejected") {
+      bg = Colors.red;
+      label = "បានបដិសេធ";
+    } else {
+      bg = Colors.blueGrey;
+      label = "សំណើរកំពុងដាក់ស្នើរ";
     }
 
-    final canReadFile = selfiePath.isNotEmpty && File(selfiePath).existsSync();
-
     return Container(
-      width: 110,
-      height: 140,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF2F4F6),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE3E7EC)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: canReadFile
-          ? Image.file(
-              File(selfiePath),
-              fit: BoxFit.cover,
-              filterQuality: FilterQuality.high,
-              errorBuilder: (_, __, ___) => fallbackIcon(),
-            )
-          : fallbackIcon(),
-    );
-  }
-
-  String _safe(dynamic v) => (v ?? "").toString().trim();
-  Widget _row(String label, String value) =>
-      _InfoRow(label: label, value: value);
-
-  Widget _infoCard({required String title, required List<Widget> rows}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFF0D9A2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              color: Color(0xFFDD7B25),
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ...rows,
-        ],
-      ),
-    );
-  }
-
-  Widget _vehicleCard({required String title, required List vehicles}) {
-    if (vehicles.isEmpty) return _hintBox("មិនមានព័ត៌មានរថយន្ត");
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFF0D9A2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              color: Color(0xFFDD7B25),
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ...List.generate(vehicles.length, (i) {
-            final v = vehicles[i] as Map;
-            final brand = (v["brand"] ?? "").toString();
-            final plate = (v["plateNumber"] ?? "").toString();
-            final color = (v["color"] ?? "").toString();
-            final year = (v["madeYear"] ?? "").toString();
-            final type = (v["vehicleType"] ?? "").toString();
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF7FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE6EDF5)),
-              ),
-              child: Column(
-                children: [
-                  _InfoRow(
-                      label: "រថយន្ត #${i + 1}",
-                      value: type.isEmpty ? "-" : type),
-                  _InfoRow(label: "ម៉ាក", value: brand.isEmpty ? "-" : brand),
-                  _InfoRow(
-                      label: "ស្លាកលេខ", value: plate.isEmpty ? "-" : plate),
-                  _InfoRow(label: "ពណ៌", value: color.isEmpty ? "-" : color),
-                  _InfoRow(
-                      label: "ឆ្នាំផលិត", value: year.isEmpty ? "-" : year),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _hintBox(String text) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7FAFC),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE6EDF5)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.info_outline, size: 18, color: Color(0xFF0A2D66)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                color: Color(0xFF334155),
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
-  const _InfoRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF4A5560),
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-              ),
-            ),
-          ),
-          const Text(" : "),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: Color(0xFF111827),
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// =========================
-/// ✅ Export Badge Card
-/// =========================
-class _ExportParkingBadge extends StatelessWidget {
-  final String fullName;
-  final String phone;
-  final String code;
-  final String userTypeText;
-  final String parkingRequestStatus;
-  final List vehicles;
-  final Uint8List? selfieBytes;
-  final String selfiePath;
-  final Future<Uint8List?> qrFuture;
-
-  const _ExportParkingBadge({
-    required this.fullName,
-    required this.phone,
-    required this.code,
-    required this.userTypeText,
-    required this.vehicles,
-    required this.selfieBytes,
-    required this.selfiePath,
-    required this.qrFuture,
-    required this.parkingRequestStatus,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    const navy = Color(0xFF0A2D66);
-    const gold = Color(0xFFDFB73B);
-    const light = Color(0xFFF8FAFC);
-    const border = Color(0xFFE2E8F0);
-
-    String s(dynamic x) => (x ?? "").toString().trim();
-
-    Widget row(String label, String value) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 3),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 88,
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF475569),
-                  ),
-                ),
-              ),
-              const Text(" : ", style: TextStyle(fontSize: 10)),
-              Expanded(
-                child: Text(
-                  value.isEmpty ? "-" : value,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-
-    Widget vehicleBox(int idx, Map v) {
-      return Container(
-        margin: const EdgeInsets.only(top: 10),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: light,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "Vehicle #${idx + 1}",
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                fontSize: 12,
-                color: navy,
-              ),
-            ),
-            const SizedBox(height: 6),
-            row("Type", s(v["vehicleType"])),
-            row("Brand", s(v["brand"])),
-            row("Plate", s(v["plateNumber"])),
-            row("Color", s(v["color"])),
-            row("Year", s(v["madeYear"])),
-          ],
-        ),
-      );
-    }
-
-    final List<Map> top2Vehicles =
-        vehicles.whereType<Map>().take(2).map((e) => e).toList();
-
-    return Material(
-      color: Colors.white,
-      child: Center(
-        child: Container(
-          width: 600,
-          height: 980,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: gold, width: 3),
-          ),
-          child: Column(
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                decoration: BoxDecoration(
-                  color: gold,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      padding: const EdgeInsets.all(6),
-                      child: Image.asset(
-                        "assets/img/about-moi-logo.png",
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.high,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "ក្រសួងមហាឫ្ទៃ",
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                            ),
-                          ),
-                          SizedBox(height: 2),
-                          Text(
-                            "MINISTRY OF INTERIOR",
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.22),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Text(
-                        "PARKING PASS",
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          letterSpacing: 0.6,
-                        ),
-                      ),
-                    )
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              _badgePhoto(selfieBytes, selfiePath),
-              const SizedBox(height: 10),
-              Text(
-                fullName.isEmpty ? "-" : fullName,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: navy,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                userTypeText,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF64748B),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: light,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: border),
-                ),
-                child: Column(
-                  children: [
-                    row("Code", code),
-                    row("Phone", phone),
-                  ],
-                ),
-              ),
-              if (top2Vehicles.isEmpty)
-                Container(
-                  margin: const EdgeInsets.only(top: 10),
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: light,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: border),
-                  ),
-                  child: const Text(
-                    "No vehicle information",
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF64748B),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                )
-              else ...[
-                for (int i = 0; i < top2Vehicles.length; i++)
-                  vehicleBox(i, top2Vehicles[i]),
-              ],
-              const Spacer(),
-              FutureBuilder<Uint8List?>(
-                future: qrFuture,
-                builder: (context, snap) {
-                  final bytes = snap.data;
-
-                  return Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: gold),
-                        ),
-                        child: bytes == null
-                            ? const SizedBox(
-                                width: 140,
-                                height: 140,
-                                child: Center(
-                                  child: Text(
-                                    "No QR",
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF64748B),
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : Image.memory(
-                                bytes,
-                                width: 200,
-                                height: 200,
-                                fit: BoxFit.contain,
-                                filterQuality: FilterQuality.high,
-                              ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        "Scan to Verify",
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF475569),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ],
-          ),
+      height: 90,
+      color: bg,
+      alignment: Alignment.center,
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
+          fontSize: 34,
+          letterSpacing: 0.6,
         ),
       ),
     );
   }
 
-  Widget _badgePhoto(Uint8List? bytes, String path) {
+  static Widget _badgePhoto(Uint8List? bytes, String path) {
     Widget fallback() => const Center(
-          child: Icon(Icons.person, size: 55, color: Color(0xFF94A3B8)),
+          child: Icon(Icons.person, size: 80, color: Color(0xFF9AA6B2)),
         );
 
     if (bytes != null && bytes.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: Image.memory(
-          bytes,
-          width: 140,
-          height: 180,
-          fit: BoxFit.cover,
-          filterQuality: FilterQuality.high,
-        ),
+      return Image.memory(
+        bytes,
+        fit: BoxFit.cover,
+        filterQuality: FilterQuality.high,
+        errorBuilder: (_, __, ___) => fallback(),
       );
     }
 
     final canRead = path.isNotEmpty && File(path).existsSync();
+    if (canRead) {
+      return Image.file(
+        File(path),
+        fit: BoxFit.cover,
+        filterQuality: FilterQuality.high,
+        errorBuilder: (_, __, ___) => fallback(),
+      );
+    }
 
-    return Container(
-      width: 140,
-      height: 180,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: canRead ? Image.file(File(path), fit: BoxFit.cover) : fallback(),
-    );
+    return fallback();
   }
 }

@@ -1,4 +1,6 @@
-name: Ey-kor-ban
+
+name: ANPR
+
 
 on:
   workflow_dispatch:
@@ -11,7 +13,8 @@ jobs:
     name: 🎉 iOS Build
     runs-on: macos-latest
     env:
-      APP_NAME: "Ey Kor Ban"  # Set the app name here
+      APP_NAME: "ANPR"  # Set the app name here
+
 
     steps:
       - uses: actions/checkout@v3
