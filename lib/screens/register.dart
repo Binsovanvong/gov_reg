@@ -660,23 +660,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
         Uri.parse("$baseUrl/api/v1/parking-card-requests/search/$search");
 
     // 1. Login Logic
-    final loginRes = await _login(
-      baseUrl: "http://10.0.2.2:8080",
-      email: "user@moi.com",
-      password: "Moi@2026\$",
-    );
+    // final loginRes = await _login(
+    //   baseUrl: "http://10.0.2.2:8080",
+    //   email: "user@moi.com",
+    //   password: "Moi@2026\$",
+    // );
 
-    if (loginRes.statusCode == 200) {
-      final loginData = jsonDecode(loginRes.body);
-      final String newToken =
-          loginData['accessToken'] ?? loginData['token'] ?? "";
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString("accessToken", newToken);
-    } else {
-      _snack("Login Failed: ${loginRes.statusCode}");
-      return loginRes;
-    }
-    final token = await _getToken();
+    // if (loginRes.statusCode == 200) {
+    //   final loginData = jsonDecode(loginRes.body);
+    //   final String newToken =
+    //       loginData['accessToken'] ?? loginData['token'] ?? "";
+    //   final prefs = await SharedPreferences.getInstance();
+    //   await prefs.setString("accessToken", newToken);
+    // } else {
+    //   _snack("Login Failed: ${loginRes.statusCode}");
+    //   return loginRes;
+    // }
+    // final token = await _getToken();
 
     // 3. Perform Search
     try {
@@ -685,7 +685,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
-          "Authorization": "Bearer $token",
+          // "Authorization": "Bearer $token",
         },
       );
       if (res.statusCode == 200) {
@@ -1438,6 +1438,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
         selfieBytes = await cameraFile!.readAsBytes();
       }
 
+      // ✅ Fetch selfie bytes from attachment URL if camera not available
+      Uint8List? attachmentBytes;
+      final attachments = res["attachments"] as List?;
+      if (selfieBytes == null && attachments != null && attachments.isNotEmpty) {
+        try {
+          final attachUrl = "$baseUrl${attachments[0]["url"]}";
+          final token = await _getToken();
+          final attachRes = await http.get(
+            Uri.parse(attachUrl),
+            headers: {
+              if (token != null && token.isNotEmpty) "Authorization": "Bearer $token",
+            },
+          );
+          if (attachRes.statusCode == 200) attachmentBytes = attachRes.bodyBytes;
+        } catch (_) {}
+      }
+
       Navigator.pushNamed(
         context,
         Approute.verifySuccessScreen,
@@ -1445,35 +1462,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
           "code": res["code"],
           "token": res["token"],
           "parkingRequestStatus": res["parkingRequestStatus"],
-          "fullName": fullNameController.text.trim(),
-          "phone": phoneController.text.trim(),
-          "userType": _userType,
-          "selfieBytes": selfieBytes,
+          // ✅ Use backend response for all fields
+          "fullName": res["name"] ?? fullNameController.text.trim(),
+          "phone": res["phone"] ?? phoneController.text.trim(),
+          "userType": res["userType"] ?? _userType,
+          "selfieBytes": selfieBytes ?? attachmentBytes,
           "selfiePath": cameraFile?.path,
-          "requestDate": _lastRequestDateInt,
-          "requestAtDate": _lastRequestAtDateStr,
-          "vehicleType": vehicles.isNotEmpty ? vehicles.first.vehicleType : "",
+          "requestDate": res["requestDate"] ?? _lastRequestDateInt,
+          "requestAtDate": res["requestAtDate"] ?? _lastRequestAtDateStr,
+          "vehicleType": (res["vehicles"] as List?)?.isNotEmpty == true
+              ? res["vehicles"][0]["vehicleType"]
+              : (vehicles.isNotEmpty ? vehicles.first.vehicleType : ""),
           "workingInfo": {
-            "generalDepartmentText": ministryController.text.trim(),
-            "departmentText": departmentController.text.trim(),
-            "burauText": officeController.text.trim(),
-            "positionText": positionController.text.trim(),
-            "policeId": idNumberController.text.trim(),
-            "provinceCity": provinceCityController.text.trim(),
+            "generalDepartmentText": res["generalDepartmentText"],
+            "departmentText": res["departmentText"],
+            "burauText": res["burauText"],
+            "positionText": res["positionText"],
+            "policeId": res["policeId"],
+            "provinceCity": res["provinceCity"],
           },
-          "vehicles": vehicles
-              .map((v) => {
-                    "brand": v.brand.text.trim(),
-                    "color": v.color.text.trim(),
-                    "plateNumber": v.plate.text.trim(),
-                    "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
-                    "vehicleType": v.vehicleType,
-                    "plateCategory": v.vehicleType == "MOTORBIKE"
-                        ? v.motoPlateType
-                        : v.carPlateType,
-                    "subcategory": getSubcategoryKey(v),
-                  })
-              .toList(),
+          // ✅ Use backend vehicles — contains plateSubCategory (Khmer) and plateCode (English)
+          "vehicles": res["vehicles"] ?? [],
         },
       );
     } catch (e, st) {
