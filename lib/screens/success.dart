@@ -17,7 +17,7 @@ class RegisterSuccessMixedScreen extends StatefulWidget {
 }
 
 class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen> {
-  static const String baseUrl = "http://10.0.2.2:8080";
+  static const String baseUrl = "http://172.18.70.200:8080";
 
   Future<Uint8List?> _qrFuture = Future.value(null);
 

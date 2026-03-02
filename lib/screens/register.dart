@@ -128,7 +128,7 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  static const String baseUrl = "http://10.0.2.2:8080";
+  static const String baseUrl = "http://172.18.70.200:8080";
 
   static const List<String> allowedUserTypes = [
     "GUEST",
@@ -577,7 +577,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     // 1. Login Logic
     final loginRes = await _login(
-      baseUrl: "http://10.0.2.2:8080",
+      baseUrl: "http://172.18.70.200:8080",
       email: "user@moi.com",
       password: "Moi@2026\$",
     );
@@ -1334,7 +1334,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ----------------------------
   Future<void> submitRegister() async {
     await _login(
-      baseUrl: "http://10.0.2.2:8080",
+      baseUrl: "http://172.18.70.200:8080",
       email: "user@moi.com",
       password: "Moi@2026\$",
     );
