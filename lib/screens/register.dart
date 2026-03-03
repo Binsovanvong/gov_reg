@@ -128,7 +128,7 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  static const String baseUrl = "http://172.18.70.200:8080";
+ static const String baseUrl = "http://10.0.2.2:8080";
 
   static const List<String> allowedUserTypes = [
     "GUEST",
@@ -204,38 +204,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Plate Types
   // ----------------------------
 
-  /// ✅ CAR plate types
+  /// ✅ CAR plate types — subcategory values must match DB `code` column (used by backend lookup)
   final List<Map<String, dynamic>> plateCategory = [
     {
       "key": "ROYAL_PALACE",
       "label": "រាជវាំង",
-      "subcategory": ["រាជវាំង"],
+      "subcategory": ["ROYAL_PALACE"],
     },
     {
       "key": "STATE",
       "label": "រដ្ឋ",
       "subcategory": List.generate(
         61,
-        (i) => "រដ្ឋ-${(i + 1).toString().padLeft(2, '0')}",
+        (i) => "STATE_${i + 1}",
       ),
     },
     {
       "key": "POLICE",
       "label": "នគរបាល",
-      "subcategory": ["នគរបាល"],
+      "subcategory": ["POLICE"],
     },
     {
       "key": "ARMY_FORCE",
       "label": "ខេមរភូមិន្ទ",
       "subcategory": List.generate(
         9,
-        (i) => "ខេមរភូមិន្ទ-${(i + 1).toString().padLeft(2, '0')}",
+        (i) => "R C A F_${i + 1}",
       ),
     },
     {
       "key": "ORGANIZATION",
       "label": "អង្គការ",
-      "subcategory": ["OI", 'ONG1', 'ONG2'],
+      "subcategory": ["OI", "ONG1", "ONG2"],
     },
     {
       "key": "EMBASSY",
@@ -245,8 +245,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     {
       "key": "UNITED_NATIONS",
       "label": "អង្គការសហប្រជាជាតិ",
-      // ✅ FIX: ONU01-1 (not OUN01-1)
-      "subcategory": ['ONU01-1', 'ONU01'],
+      // ✅ FIX: DB code is "OUN01-1" not "ONU01-1"
+      "subcategory": ["OUN01-1", "ONU01"],
     },
     {
       "key": "TEMPORARY",
@@ -257,90 +257,87 @@ class _RegisterScreenState extends State<RegisterScreen> {
       "key": "REGULAR",
       "label": "ធម្មតា",
       "subcategory": [
-        "ភ្នំពេញ",
-        "កណ្តាល",
-        "បន្ទាយមានជ័យ",
-        "បាត់ដំបង",
-        "កំពង់ចាម",
-        "កំពង់ឆ្នាំង",
-        "កំពង់ស្ពឺ",
-        "កំពង់ធំ",
-        "កំពត",
-        "កែប",
-        "កោះកុង",
-        "ក្រចេះ",
-        "មណ្ឌលគិរី",
-        "ឧត្តរមានជ័យ",
-        "ប៉ៃលិន",
-        "ព្រះសីហនុ",
-        "ព្រះវិហារ",
-        "ព្រៃវែង",
-        "ពោធិ៍សាត់",
-        "សៀមរាប",
-        "ស្ទឹងត្រែង",
-        "ស្វាយរៀង",
-        "តាកែវ",
-        "ត្បូងឃ្មុំ",
-        "រតនគិរី",
+        "PHNOM PENH",
+        "KANDAL",
+        "BANTEAY MEANCHEY",
+        "BATTAMBANG",
+        "KAMPONG CHAM",
+        "KAMPONG CHHNANG",
+        "KAMPONG SPEU",
+        "KAMPONG THOM",
+        "KAMPOT",
+        "KEP",
+        "KOH KONG",
+        "KRATIE",
+        "MONDULKIRI",
+        "ODDAR MEANCHEY",
+        "PAILIN",
+        "SIHANOUKVILLE",
+        "PREAH VIHEAR",
+        "PREY VENG",
+        "PURSAT",
+        "SIEM REAP",
+        "STUNG TRENG",
+        "SVAY RIENG",
+        "TAKEO",
+        "TBOUNG KHMUM",
+        "RATANAKIRI",
       ],
     },
     {
       "key": "CAMBODIA",
       "label": "កម្ពុជា",
-      "subcategory": ["កម្ពុជា"],
+      "subcategory": ["CAMBODIA"],
     },
   ];
 
-  /// ✅ MOTO plate types
+  /// ✅ MOTO plate types — subcategory values must match DB `code` column (used by backend lookup)
   final List<Map<String, dynamic>> motoPlateTypes = [
     {
       "key": "REGULAR",
       "label": "ធម្មតា",
       "subcategory": [
-        "ភ្នំពេញ",
-        "កណ្តាល",
-        "បន្ទាយមានជ័យ",
-        "បាត់ដំបង",
-        "កំពង់ចាម",
-        "កំពង់ឆ្នាំង",
-        "កំពង់ស្ពឺ",
-        "កំពង់ធំ",
-        "កំពត",
-        "កែប",
-        "កោះកុង",
-        "ក្រចេះ",
-        "មណ្ឌលគិរី",
-        "ឧត្តរមានជ័យ",
-        "ប៉ៃលិន",
-        "ព្រះសីហនុ",
-        "ព្រះវិហារ",
-        "ព្រៃវែង",
-        "ពោធិ៍សាត់",
-        "សៀមរាប",
-        "ស្ទឹងត្រែង",
-        "ស្វាយរៀង",
-        "តាកែវ",
-        "ត្បូងឃ្មុំ",
-        "រតនគិរី",
+        "PHNOM PENH_M",
+        "KANDAL_M",
+        "BANTEAY MEANCHEY_M",
+        "BATTAMBANG_M",
+        "KAMPONG CHAM_M",
+        "KAMPONG CHHNANG_M",
+        "KAMPONG SPEU_M",
+        "KAMPONG THOM_M",
+        "KAMPOT_M",
+        "KEP_M",
+        "KOH KONG_M",
+        "KRATIE_M",
+        "MONDULKIRI_M",
+        "ODDAR MEANCHEY_M",
+        "PAILIN_M",
+        "SIHANOUKVILLE_M",
+        "PREAH VIHEAR_M",
+        "PREY VENG_M",
+        "PURSAT_M",
+        "SIEM REAP_M",
+        "STUNG TRENG_M",
+        "SVAY RIENG_M",
+        "TAKEO_M",
+        "TBOUNG KHMUM_M",
+        "RATANAKIRI_M",
       ],
     },
     {
       "key": "CAMBODIA",
       "label": "កម្ពុជា",
-      "subcategory": ["កម្ពុជា"]
+      "subcategory": ["CAMBODIA_M"],
     },
     {
       "key": "POLICE",
       "label": "នគរបាល",
-      "subcategory": ["នគរបាល"]
+      "subcategory": ["POLICE_M"],
     },
     {
       "key": "ARMY_FORCE",
       "label": "ខេមរភូមិន្ទ",
-      "subcategory": List.generate(
-        9,
-        (i) => "ខេមរភូមិន្ទ-${(i + 1).toString().padLeft(2, '0')}",
-      ),
+      "subcategory": ["R C A F_M"],
     },
   ];
 
@@ -357,8 +354,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return (found["key"] ?? "UNKNOWN").toString();
   }
 
-  /// ✅ FIXED: return selected subcategory even if English (OI/CD01/CMD01-1/ONU01-1)
-  String getSubcategoryKey(_VehicleForm v) {
+  /// Returns the DB code to send as plateSubCategory.
+  /// Subcategory values in the list ARE the DB codes (e.g. "PHNOM PENH", "STATE_1").
+  /// If user selected one, return it. If only one option exists, auto-select it.
+  /// Otherwise return null.
+  String? getSubcategoryKey(_VehicleForm v) {
     final isMoto = v.vehicleType == "MOTORBIKE";
     final items = isMoto ? motoPlateTypes : plateCategory;
     final type = isMoto ? v.motoPlateType : v.carPlateType;
@@ -366,19 +366,103 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final found = items.firstWhere(
       (item) => item["key"] == type,
-      orElse: () => items.isNotEmpty
-          ? items[0]
-          : {"label": "N/A", "subcategory": <String>[]},
+      orElse: () => <String, dynamic>{},
     );
 
-    final typeLabel = (found["label"] ?? "N/A").toString();
-    if (sub == null || sub.trim().isEmpty) return typeLabel;
+    if (found.isEmpty) return null;
 
     final list =
         (found["subcategory"] as List?)?.cast<String>() ?? const <String>[];
-    if (list.contains(sub)) return sub;
 
-    return typeLabel;
+    // User explicitly selected a subcategory
+    if (sub != null && sub.trim().isNotEmpty && list.contains(sub)) return sub;
+
+    // Auto-select if only one option exists
+    if (list.length == 1) return list[0];
+
+    return null;
+  }
+
+  /// Maps DB code → Khmer display label
+  static const Map<String, String> _subcategoryLabels = {
+    // ROYAL_PALACE
+    "ROYAL_PALACE": "រាជវាំង",
+    // STATE
+    "STATE_1": "រដ្ឋ-01", "STATE_2": "រដ្ឋ-02", "STATE_3": "រដ្ឋ-03",
+    "STATE_4": "រដ្ឋ-04", "STATE_5": "រដ្ឋ-05", "STATE_6": "រដ្ឋ-06",
+    "STATE_7": "រដ្ឋ-07", "STATE_8": "រដ្ឋ-08", "STATE_9": "រដ្ឋ-09",
+    "STATE_10": "រដ្ឋ-10", "STATE_11": "រដ្ឋ-11", "STATE_12": "រដ្ឋ-12",
+    "STATE_13": "រដ្ឋ-13", "STATE_14": "រដ្ឋ-14", "STATE_15": "រដ្ឋ-15",
+    "STATE_16": "រដ្ឋ-16", "STATE_17": "រដ្ឋ-17", "STATE_18": "រដ្ឋ-18",
+    "STATE_19": "រដ្ឋ-19", "STATE_20": "រដ្ឋ-20", "STATE_21": "រដ្ឋ-21",
+    "STATE_22": "រដ្ឋ-22", "STATE_23": "រដ្ឋ-23", "STATE_24": "រដ្ឋ-24",
+    "STATE_25": "រដ្ឋ-25", "STATE_26": "រដ្ឋ-26", "STATE_27": "រដ្ឋ-27",
+    "STATE_28": "រដ្ឋ-28", "STATE_29": "រដ្ឋ-29", "STATE_30": "រដ្ឋ-30",
+    "STATE_31": "រដ្ឋ-31", "STATE_32": "រដ្ឋ-32", "STATE_33": "រដ្ឋ-33",
+    "STATE_34": "រដ្ឋ-34", "STATE_35": "រដ្ឋ-35", "STATE_36": "រដ្ឋ-36",
+    "STATE_37": "រដ្ឋ-37", "STATE_38": "រដ្ឋ-38", "STATE_39": "រដ្ឋ-39",
+    "STATE_40": "រដ្ឋ-40", "STATE_41": "រដ្ឋ-41", "STATE_42": "រដ្ឋ-42",
+    "STATE_43": "រដ្ឋ-43", "STATE_44": "រដ្ឋ-44", "STATE_45": "រដ្ឋ-45",
+    "STATE_46": "រដ្ឋ-46", "STATE_47": "រដ្ឋ-47", "STATE_48": "រដ្ឋ-48",
+    "STATE_49": "រដ្ឋ-49", "STATE_50": "រដ្ឋ-50", "STATE_51": "រដ្ឋ-51",
+    "STATE_52": "រដ្ឋ-52", "STATE_53": "រដ្ឋ-53", "STATE_54": "រដ្ឋ-54",
+    "STATE_55": "រដ្ឋ-55", "STATE_56": "រដ្ឋ-56", "STATE_57": "រដ្ឋ-57",
+    "STATE_58": "រដ្ឋ-58", "STATE_59": "រដ្ឋ-59", "STATE_60": "រដ្ឋ-60",
+    "STATE_61": "រដ្ឋ-61",
+    // POLICE
+    "POLICE": "នគរបាល",
+    "POLICE_M": "នគរបាល",
+    // ARMY_FORCE (car)
+    "R C A F_1": "ខេមរភូមិន្ទ-01", "R C A F_2": "ខេមរភូមិន្ទ-02",
+    "R C A F_3": "ខេមរភូមិន្ទ-03", "R C A F_4": "ខេមរភូមិន្ទ-04",
+    "R C A F_5": "ខេមរភូមិន្ទ-05", "R C A F_6": "ខេមរភូមិន្ទ-06",
+    "R C A F_7": "ខេមរភូមិន្ទ-07", "R C A F_8": "ខេមរភូមិន្ទ-08",
+    "R C A F_9": "ខេមរភូមិន្ទ-09",
+    // ARMY_FORCE (moto)
+    "R C A F_M": "ខេមរភូមិន្ទ",
+    // ORGANIZATION
+    "OI": "OI", "ONG1": "ONG1", "ONG2": "ONG2",
+    // EMBASSY
+    "CMD01-1": "CMD01-1", "CD01": "CD01",
+    // UNITED_NATIONS
+    "OUN01-1": "OUN01-1", "ONU01": "ONU01",
+    // TEMPORARY
+    "AT18": "AT18",
+    // REGULAR (car)
+    "PHNOM PENH": "ភ្នំពេញ", "KANDAL": "កណ្ដាល",
+    "BANTEAY MEANCHEY": "បន្ទាយមានជ័យ", "BATTAMBANG": "បាត់ដំបង",
+    "KAMPONG CHAM": "កំពង់ចាម", "KAMPONG CHHNANG": "កំពង់ឆ្នាំង",
+    "KAMPONG SPEU": "កំពង់ស្ពឺ", "KAMPONG THOM": "កំពង់ធំ",
+    "KAMPOT": "កំពត", "KEP": "កែប", "KOH KONG": "កោះកុង",
+    "KRATIE": "ក្រចេះ", "MONDULKIRI": "មណ្ឌលគិរី",
+    "ODDAR MEANCHEY": "ឧត្តរមានជ័យ", "PAILIN": "ប៉ៃលិន",
+    "SIHANOUKVILLE": "ព្រះសីហនុ", "PREAH VIHEAR": "ព្រះវិហារ",
+    "PREY VENG": "ព្រៃវែង", "PURSAT": "ពោធិ៍សាត់",
+    "SIEM REAP": "សៀមរាប", "STUNG TRENG": "ស្ទឹងត្រែង",
+    "SVAY RIENG": "ស្វាយរៀង", "TAKEO": "តាកែវ",
+    "TBOUNG KHMUM": "ត្បូងឃ្មុំ", "RATANAKIRI": "រតនគិរី",
+    // REGULAR (moto) — same but _M suffix
+    "PHNOM PENH_M": "ភ្នំពេញ", "KANDAL_M": "កណ្ដាល",
+    "BANTEAY MEANCHEY_M": "បន្ទាយមានជ័យ", "BATTAMBANG_M": "បាត់ដំបង",
+    "KAMPONG CHAM_M": "កំពង់ចាម", "KAMPONG CHHNANG_M": "កំពង់ឆ្នាំង",
+    "KAMPONG SPEU_M": "កំពង់ស្ពឺ", "KAMPONG THOM_M": "កំពង់ធំ",
+    "KAMPOT_M": "កំពត", "KEP_M": "កែប", "KOH KONG_M": "កោះកុង",
+    "KRATIE_M": "ក្រចេះ", "MONDULKIRI_M": "មណ្ឌលគិរី",
+    "ODDAR MEANCHEY_M": "ឧត្តរមានជ័យ", "PAILIN_M": "ប៉ៃលិន",
+    "SIHANOUKVILLE_M": "ព្រះសីហនុ", "PREAH VIHEAR_M": "ព្រះវិហារ",
+    "PREY VENG_M": "ព្រៃវែង", "PURSAT_M": "ពោធិ៍សាត់",
+    "SIEM REAP_M": "សៀមរាប", "STUNG TRENG_M": "ស្ទឹងត្រែង",
+    "SVAY RIENG_M": "ស្វាយរៀង", "TAKEO_M": "តាកែវ",
+    "TBOUNG KHMUM_M": "ត្បូងឃ្មុំ", "RATANAKIRI_M": "រតនគិរី",
+    // CAMBODIA
+    "CAMBODIA": "កម្ពុជា",
+    "CAMBODIA_M": "កម្ពុជា",
+  };
+
+  /// Returns the Khmer display label for a given DB code
+  String subcategoryLabel(String? code) {
+    if (code == null || code.isEmpty) return "";
+    return _subcategoryLabels[code] ?? code;
   }
 
   // ----------------------------
@@ -577,7 +661,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     // 1. Login Logic
     final loginRes = await _login(
-      baseUrl: "http://172.18.70.200:8080",
+      baseUrl: "http://10.0.2.2:8080",
       email: "user@moi.com",
       password: "Moi@2026\$",
     );
@@ -601,12 +685,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
-          "Authorization": "Bearer $token",
+          // "Authorization": "Bearer $token",
         },
       );
       if (res.statusCode == 200) {
         _snack("ស្វែងរកជោគជ័យ (Search Successful)");
-        
+
         final Map<String, dynamic> responseData = jsonDecode(res.body);
 
         if (!mounted) return res;
@@ -619,15 +703,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
             "token": responseData["token"],
             "parkingRequestStatus": responseData["parkingRequestStatus"],
             // Use server-returned data to ensure it matches the database
-            "fullName": responseData["name"], 
+            "fullName": responseData["name"],
             "phone": responseData["phone"],
             "userType": responseData["userType"],
-            "selfieBytes": null, // Search doesn't usually return the raw selfie bytes
+            "selfieBytes":
+                null, // Search doesn't usually return the raw selfie bytes
             "selfiePath": null,
             "requestDate": responseData["requestDate"],
             "requestAtDate": responseData["requestAtDate"],
-            "vehicleType": (responseData["vehicles"] as List).isNotEmpty 
-                ? responseData["vehicles"][0]["vehicleType"] 
+            "vehicleType": (responseData["vehicles"] as List).isNotEmpty
+                ? responseData["vehicles"][0]["vehicleType"]
                 : "",
             "workingInfo": {
               "generalDepartmentText": responseData["generalDepartmentText"],
@@ -637,10 +722,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
               "policeId": responseData["policeId"],
               "provinceCity": responseData["provinceCity"],
             },
-            "vehicles": responseData["vehicles"], // Returns the list of vehicle maps from backend
+            "vehicles": responseData[
+                "vehicles"], // Returns the list of vehicle maps from backend
           },
         );
-      
       } else if (res.statusCode == 500) {
         if (res.body.contains("IncorrectResultSizeDataAccessException") ||
             res.body.contains("non-unique result")) {
@@ -1192,149 +1277,160 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // API
   // ----------------------------
   Future<Map<String, dynamic>> createParkingCardRequest() async {
-    final base = Uri.parse("$baseUrl/api/v1/parking-card-requests");
+  final base = Uri.parse("$baseUrl/api/v1/parking-card-requests");
+  final now = DateTime.now();
 
-    final now = DateTime.now();
+  DateTime requestAt;
+  DateTime requestEnd;
 
-    DateTime requestAt;
-    DateTime requestEnd;
+  if (useDurationDays) {
+    final dur = int.parse(durationDaysController.text.trim());
+    requestAt = now;
+    requestEnd = requestAt.add(Duration(days: dur));
+  } else {
+    final chosen = DateTime.parse(requestDateController.text.trim());
+    requestAt = chosen;
+    requestEnd = DateTime(chosen.year + 1, chosen.month, chosen.day);
+  }
 
-    if (useDurationDays) {
-      // ✅ Guest + National: issue = NOW, expiry = NOW + duration days (keeps time)
-      final dur = int.parse(durationDaysController.text.trim());
-      requestAt = now;
-      requestEnd = requestAt.add(Duration(days: dur));
-    } else {
-      // ✅ Officer/Secretary/Deputy: issue = chosen date (00:00), expiry = +1 year
-      final chosen = DateTime.parse(requestDateController.text.trim());
-      requestAt = chosen;
-      requestEnd = DateTime(chosen.year + 1, chosen.month, chosen.day);
-    }
+  final int requestDateInt = _fmtYmdInt(requestEnd);
+  final String requestAtDateStr = _fmtDmy(requestAt);
 
-    final int requestDateInt = _fmtYmdInt(requestEnd); // yyyymmdd (expiry)
-    final String requestAtDateStr = _fmtDmy(requestAt); // dd-MM-yyyy (issue)
+  _lastRequestDateInt = requestDateInt;
+  _lastRequestAtDateStr = requestAtDateStr;
 
-    // ✅ Save for next screen (IMPORTANT: do NOT null for guest)
-    _lastRequestDateInt = requestDateInt;
-    _lastRequestAtDateStr = requestAtDateStr; // ✅ ALWAYS set
+  /// ===============================
+  /// BUILD DTO
+  /// ===============================
 
-    final dto = <String, dynamic>{
-      "reason": reasonController.text.trim().isEmpty
-          ? "Parking card request"
-          : reasonController.text.trim(),
-      "requestDate": requestDateInt,
-      "user": <String, dynamic>{
-        "name": fullNameController.text.trim(),
-        "phone": phoneController.text.trim(),
-        "userType": _userType,
-      },
-      "vehicles": vehicles.map((v) {
-        return <String, dynamic>{
-          "brand": v.brand.text.trim(),
-          "plate": <String, dynamic>{
-            "plateNumber": _normalizePlate(v.plate.text),
-            "plateCategory":
-                v.vehicleType == "MOTORBIKE" ? v.motoPlateType : v.carPlateType,
-          },
-          "color": v.color.text.trim(),
-          "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
-          "vehicleType": v.vehicleType,
-        };
-      }).toList(),
-    };
+  final dto = <String, dynamic>{
+    "reason": reasonController.text.trim().isEmpty
+        ? "Parking card request"
+        : reasonController.text.trim(),
+    "requestDate": requestDateInt,
 
-    // ✅ If backend must NOT receive requestAtDate for guest, keep this:
-    if (_userType != "GUEST") {
-      dto["requestAtDate"] = requestAtDateStr;
-    }
+    /// 🔥 IMPORTANT FIX:
+    /// Always send generalDepartmentText (for GUEST/NATIONAL too)
+    "generalDepartmentText": ministryController.text.trim().isEmpty
+        ? null
+        : ministryController.text.trim(),
 
-    final wi = <String, dynamic>{};
-    if (showIdNumber) wi["policeId"] = idNumberController.text.trim();
+    "departmentText": departmentController.text.trim().isEmpty
+        ? null
+        : departmentController.text.trim(),
 
-    if (showWorkFields) {
-      wi["generalDepartmentText"] = ministryController.text.trim();
-      wi["departmentText"] = departmentController.text.trim();
-      wi["burauText"] = officeController.text.trim();
-      wi["positionText"] = positionController.text.trim();
-    }
+    "burauText": officeController.text.trim().isEmpty
+        ? null
+        : officeController.text.trim(),
 
-    if (showProvinceCity) {
-      wi["provinceCity"] = provinceCityController.text.trim();
-    }
+    "positionText": positionController.text.trim().isEmpty
+        ? null
+        : positionController.text.trim(),
 
-    if (wi.isNotEmpty) {
-      (dto["user"] as Map<String, dynamic>)["workingInfo"] = wi;
-    }
+    "user": {
+      "name": fullNameController.text.trim(),
+      "phone": phoneController.text.trim(),
+      "userType": _userType,
+    },
 
-    final token = await _getToken();
-
-    final List<Map<String, String>> fileList = [];
-
-    for (int i = 0; i < attachFiles.length; i++) {
-      fileList.add({"path": attachFiles[i].path, "name": attachFileNames[i]});
-    }
-
-    if (cameraFile != null) {
-      fileList.add({
-        "path": cameraFile!.path,
-        "name": cameraFileName ?? cameraFile!.path.split('/').last,
-      });
-    }
-
-    Uri uri = base;
-    if (fileList.isNotEmpty) {
-      uri = base.replace(
-        queryParameters: <String, dynamic>{
-          "attachmentTypes":
-              List<String>.filled(fileList.length, attachmentTypeValue),
+    "vehicles": vehicles.map((v) {
+      return {
+        "brand": v.brand.text.trim(),
+        "plate": {
+          "plateNumber": _normalizePlate(v.plate.text),
+          "plateCategory":
+              v.vehicleType == "MOTORBIKE" ? v.motoPlateType : v.carPlateType,
+          "plateSubCategory": getSubcategoryKey(v),
         },
-      );
-    }
+        "color": v.color.text.trim(),
+        "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
+        "vehicleType": v.vehicleType,
+      };
+    }).toList(),
+  };
 
-    final request = http.MultipartRequest("POST", uri);
-    request.headers["Accept"] = "*/*";
+  if (_userType != "GUEST") {
+    dto["requestAtDate"] = requestAtDateStr;
+  }
 
-    if (token != null && token.isNotEmpty) {
-      request.headers["Authorization"] = "Bearer $token";
-    }
+  if (showIdNumber) {
+    dto["policeId"] = idNumberController.text.trim();
+  }
 
+  if (showProvinceCity) {
+    dto["provinceCity"] = provinceCityController.text.trim();
+  }
+
+  /// ===============================
+  /// DEBUG (VERY IMPORTANT)
+  /// ===============================
+  print("===== DTO SENT TO BACKEND =====");
+  print(jsonEncode(dto));
+
+  /// ===============================
+  /// FILES + ATTACHMENT TYPES FIX
+  /// ===============================
+
+  final request = http.MultipartRequest("POST", base);
+  request.headers["Accept"] = "*/*";
+
+  final token = await _getToken();
+  if (token != null && token.isNotEmpty) {
+    request.headers["Authorization"] = "Bearer $token";
+  }
+
+  request.files.add(
+    http.MultipartFile.fromString(
+      "dto",
+      jsonEncode(dto),
+      filename: "dto.json",
+      contentType: MediaType('application', 'json'),
+    ),
+  );
+
+  /// Add vehicle documents
+  for (int i = 0; i < attachFiles.length; i++) {
     request.files.add(
-      http.MultipartFile.fromString(
-        "dto",
-        jsonEncode(dto),
-        filename: "dto.json",
-        contentType: MediaType('application', 'json'),
+      await http.MultipartFile.fromPath(
+        "files",
+        attachFiles[i].path,
+        filename: attachFileNames[i],
       ),
     );
-
-    for (final f in fileList) {
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          "files",
-          f["path"]!,
-          filename: f["name"]!,
-        ),
-      );
-    }
-
-    final streamed = await request.send();
-    final resp = await http.Response.fromStream(streamed);
-
-    if (resp.statusCode != 200 && resp.statusCode != 201) {
-      throw "HTTP ${resp.statusCode}: ${resp.body.isEmpty ? '(empty body)' : resp.body}";
-    }
-
-    if (resp.body.isEmpty) return {};
-    final decoded = jsonDecode(resp.body);
-    return decoded is Map<String, dynamic> ? decoded : {};
+    request.fields.putIfAbsent("attachmentTypes", () => "VEHICLE_DOCUMENT");
   }
+
+  /// Add selfie photo
+  if (cameraFile != null) {
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        "files",
+        cameraFile!.path,
+        filename: cameraFileName ?? cameraFile!.path.split('/').last,
+      ),
+    );
+    request.fields.putIfAbsent("attachmentTypes", () => "SELFIE_PHOTO");
+  }
+
+  final streamed = await request.send();
+  final resp = await http.Response.fromStream(streamed);
+
+  if (resp.statusCode != 200 && resp.statusCode != 201) {
+    throw "HTTP ${resp.statusCode}: ${resp.body}";
+  }
+
+  if (resp.body.isEmpty) return {};
+
+  final decoded = jsonDecode(resp.body);
+  return decoded is Map<String, dynamic> ? decoded : {};
+}
 
   // ----------------------------
   // Submit
   // ----------------------------
   Future<void> submitRegister() async {
     await _login(
-      baseUrl: "http://172.18.70.200:8080",
+      baseUrl: "http://10.0.2.2:8080",
       email: "user@moi.com",
       password: "Moi@2026\$",
     );
@@ -1352,6 +1448,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
         selfieBytes = await cameraFile!.readAsBytes();
       }
 
+      // ✅ Fetch selfie bytes from attachment URL if camera not available
+      Uint8List? attachmentBytes;
+      final attachments = res["attachments"] as List?;
+      if (selfieBytes == null && attachments != null && attachments.isNotEmpty) {
+        try {
+          final attachUrl = "$baseUrl${attachments[0]["url"]}";
+          final token = await _getToken();
+          final attachRes = await http.get(
+            Uri.parse(attachUrl),
+            headers: {
+              if (token != null && token.isNotEmpty) "Authorization": "Bearer $token",
+            },
+          );
+          if (attachRes.statusCode == 200) attachmentBytes = attachRes.bodyBytes;
+        } catch (_) {}
+      }
+
       Navigator.pushNamed(
         context,
         Approute.verifySuccessScreen,
@@ -1359,35 +1472,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
           "code": res["code"],
           "token": res["token"],
           "parkingRequestStatus": res["parkingRequestStatus"],
-          "fullName": fullNameController.text.trim(),
-          "phone": phoneController.text.trim(),
-          "userType": _userType,
-          "selfieBytes": selfieBytes,
+          // ✅ Use backend response for all fields
+          "fullName": res["name"] ?? fullNameController.text.trim(),
+          "phone": res["phone"] ?? phoneController.text.trim(),
+          "userType": res["userType"] ?? _userType,
+          "selfieBytes": selfieBytes ?? attachmentBytes,
           "selfiePath": cameraFile?.path,
-          "requestDate": _lastRequestDateInt,
-          "requestAtDate": _lastRequestAtDateStr,
-          "vehicleType": vehicles.isNotEmpty ? vehicles.first.vehicleType : "",
+          "requestDate": res["requestDate"] ?? _lastRequestDateInt,
+          "requestAtDate": res["requestAtDate"] ?? _lastRequestAtDateStr,
+          "vehicleType": (res["vehicles"] as List?)?.isNotEmpty == true
+              ? res["vehicles"][0]["vehicleType"]
+              : (vehicles.isNotEmpty ? vehicles.first.vehicleType : ""),
           "workingInfo": {
-            "generalDepartmentText": ministryController.text.trim(),
-            "departmentText": departmentController.text.trim(),
-            "burauText": officeController.text.trim(),
-            "positionText": positionController.text.trim(),
-            "policeId": idNumberController.text.trim(),
-            "provinceCity": provinceCityController.text.trim(),
+            "generalDepartmentText": res["generalDepartmentText"] ?? ministryController.text.trim(),
+            "departmentText": res["departmentText"] ?? departmentController.text.trim(),
+            "burauText": res["burauText"] ?? officeController.text.trim(),
+            "positionText": res["positionText"] ?? positionController.text.trim(),
+            "policeId": res["policeId"] ?? idNumberController.text.trim(),
+            "provinceCity": res["provinceCity"] ?? "-",
           },
-          "vehicles": vehicles
-              .map((v) => {
-                    "brand": v.brand.text.trim(),
-                    "color": v.color.text.trim(),
-                    "plateNumber": v.plate.text.trim(),
-                    "madeYear": int.tryParse(v.year.text.trim()) ?? 0,
-                    "vehicleType": v.vehicleType,
-                    "plateCategory": v.vehicleType == "MOTORBIKE"
-                        ? v.motoPlateType
-                        : v.carPlateType,
-                    "subcategory": getSubcategoryKey(v),
-                  })
-              .toList(),
+          // ✅ Use backend vehicles — contains plateSubCategory (Khmer) and plateCode (English)
+          "vehicles": res["vehicles"] ?? [],
         },
       );
     } catch (e, st) {
@@ -1715,7 +1820,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   const SizedBox(height: 10),
                                   Center(
                                     child: plateBox(
-                                      label: getSubcategoryKey(v),
+                                      label: subcategoryLabel(getSubcategoryKey(v)),
                                       code:
                                           _normalizePlate(v.plate.text).isEmpty
                                               ? "----"
@@ -1931,7 +2036,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 .map((sub) => DropdownMenuItem<String>(
                       value: sub,
                       child: Text(
-                        sub,
+                        subcategoryLabel(sub),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),

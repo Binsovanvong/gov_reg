@@ -17,8 +17,7 @@ class RegisterSuccessMixedScreen extends StatefulWidget {
 }
 
 class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen> {
-  static const String baseUrl = "http://172.18.70.200:8080";
-
+  static const String baseUrl = "http://10.0.2.2:8080";
   Future<Uint8List?> _qrFuture = Future.value(null);
 
   // ✅ safe defaults (no LateInitializationError)
@@ -585,8 +584,9 @@ class _MoIStyleBadge extends StatelessWidget {
     final brand = s(v?["brand"]);
     final year = s(v?["madeYear"]);
 
-    // ✅ THIS WORKS ONLY IF YOU SEND "subcategory" FROM RegisterScreen
-    final subcategory = s(v?["subcategory"]);
+    // ✅ Backend returns plateSubCategory (Khmer name) and plateCode (English DB code)
+    final subcategory = s(v?["plateSubCategory"]);   // Khmer label e.g. "បាត់ដំបង"
+    final plateCode = s(v?["plateCode"]);             // English code e.g. "BATTAMBANG"
 
     final info = workingInfo ?? {};
     final ministry = s(info["generalDepartmentText"]);
@@ -805,7 +805,7 @@ class _MoIStyleBadge extends StatelessWidget {
                           ),
                           alignment: Alignment.center,
                           child: Text(
-                            subcategory.isEmpty ? "-" : provinceEn(subcategory),
+                            plateCode.isNotEmpty ? plateCode : (subcategory.isEmpty ? "-" : subcategory),
                             
                             style: const TextStyle(
                               color: _footerRed,
