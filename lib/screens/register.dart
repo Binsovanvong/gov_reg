@@ -802,6 +802,53 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return newAccessToken;
   }
 
+  /// Try to find token values in a nested map structure.
+  String _findTokenInMap(Map m, String key) {
+    if (m.containsKey(key)) {
+      final v = m[key];
+      if (v is String) return v;
+      if (v is Map) {
+        return _findTokenInMap(v, 'accessToken') ?? v['token']?.toString() ?? '';
+      }
+    }
+    for (final entry in m.entries) {
+      final v = entry.value;
+      if (v is Map) {
+        final found = _findTokenInMap(v, key);
+        if (found.isNotEmpty) return found;
+      }
+    }
+    return '';
+  }
+
+  /// Decode login response body and persist access/refresh tokens if found.
+  Future<Map<String, String>> _extractAndSaveTokens(String body) async {
+    try {
+      final data = jsonDecode(body);
+      if (data is Map) {
+        String access = _findTokenInMap(data, 'accessToken');
+        if (access.isEmpty) access = _findTokenInMap(data, 'token');
+        // token might be nested under token.accessToken
+        if (access.isEmpty && data['token'] is Map) {
+          access = _findTokenInMap(data['token'] as Map, 'accessToken');
+        }
+
+        String refresh = _findTokenInMap(data, 'refreshToken');
+        if (refresh.isEmpty && data['refreshToken'] is Map) {
+          refresh = _findTokenInMap(data['refreshToken'] as Map, 'token');
+        }
+
+        final prefs = await SharedPreferences.getInstance();
+        if (access.isNotEmpty) await prefs.setString('accessToken', access);
+        if (refresh.isNotEmpty) await prefs.setString('refreshToken', refresh);
+        return {'access': access, 'refresh': refresh};
+      }
+    } catch (e) {
+      debugPrint('Token parse failed: $e');
+    }
+    return {'access': '', 'refresh': ''};
+  }
+
   Future<void> forceLogout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove("accessToken");
@@ -1429,11 +1476,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Submit
   // ----------------------------
   Future<void> submitRegister() async {
-    await _login(
+    // Ensure we have a valid token before submitting — save it to prefs on success
+    final loginRes = await _login(
       baseUrl: "http://10.0.2.2:8080",
       email: "user@moi.com",
       password: "Moi@2026\$",
     );
+
+    if (loginRes.statusCode == 200) {
+      final tokens = await _extractAndSaveTokens(loginRes.body);
+      final access = tokens['access'] ?? '';
+      if (access.isEmpty) {
+        _snack('Login succeeded but no access token returned from server.');
+        return;
+      }
+    } else {
+      // Inform the user if login failed and stop the submit flow
+      _snack("Login Failed: ${loginRes.statusCode}");
+      return;
+    }
 
     if (!validateForm()) return;
 
