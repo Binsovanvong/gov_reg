@@ -58,8 +58,40 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
   bool get showWorkInfo => !isSecretaryOrDeputy;
   bool get showProvince => isNational; // officers hide province
 
-  // ---------------- KHMER DATE FORMAT ----------------
+  // ---------------- NORMALIZE / SAFE ----------------
+  String _safe(dynamic v, {String fallback = "-"}) {
+    final s = (v ?? "").toString().trim();
+    if (s.isEmpty || s.toLowerCase() == "null") return fallback;
+    return s;
+  }
 
+  Map<String, dynamic> _normalizeWorkingInfo(Map args) {
+    final wi = (args["workingInfo"] is Map)
+        ? Map<String, dynamic>.from(args["workingInfo"])
+        : <String, dynamic>{};
+
+    String pick(List<String> keys, {String fallback = "-"}) {
+      for (final k in keys) {
+        final v = wi[k] ?? args[k];
+        final s = _safe(v, fallback: "");
+        if (s.isNotEmpty) return s;
+      }
+      return fallback;
+    }
+
+    return {
+      "generalDepartmentText":
+          pick(["generalDepartmentText", "generalDepartment", "organization"]),
+      "departmentText": pick(["departmentText", "department"]),
+      "burauText": pick(["burauText", "bureauText", "burau"]),
+      "positionText": pick(["positionText", "position"]),
+      "provinceCity":
+          pick(["provinceCity", "province", "province_city"], fallback: "-"),
+      "policeId": pick(["policeId"], fallback: ""),
+    };
+  }
+
+  // ---------------- KHMER DATE FORMAT ----------------
   String _formatKhmerDate(DateTime d) {
     const khMonths = [
       "មករា",
@@ -77,8 +109,8 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
     ];
 
     String toKhmerNumber(String input) {
-      const en = ['0','1','2','3','4','5','6','7','8','9'];
-      const kh = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
+      const en = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+      const kh = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
 
       for (int i = 0; i < en.length; i++) {
         input = input.replaceAll(en[i], kh[i]);
@@ -114,19 +146,22 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
       code = (args["code"] ?? "").toString();
       token = (args["token"] ?? "").toString();
 
-      fullName = (args["fullName"] ?? "").toString();
+      fullName = (args["fullName"] ?? args["name"] ?? "").toString();
       phone = (args["phone"] ?? "").toString();
       userType = (args["userType"] ?? "").toString();
       parkingRequestStatus = (args["parkingRequestStatus"] ?? "").toString();
 
       requestDate = int.tryParse((args["requestDate"] ?? 0).toString()) ?? 0;
+
+      // ✅ accept both dd-MM-yyyy (your app) and yyyy-MM-dd (api sample)
       requestAtDate = args["requestAtDate"]?.toString();
 
       vehicleType = (args["vehicleType"] ?? "").toString();
 
       vehicles = (args["vehicles"] is List) ? (args["vehicles"] as List) : [];
-      workingInfo =
-          (args["workingInfo"] is Map) ? (args["workingInfo"] as Map) : null;
+
+      // ✅ FULL FIX: normalize work info so it never becomes null
+      workingInfo = _normalizeWorkingInfo(args);
 
       selfiePath = (args["selfiePath"] ?? "").toString();
       if (selfiePath.isEmpty && vehicles.isNotEmpty && vehicles.first is Map) {
@@ -141,7 +176,6 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
     precacheImage(const AssetImage("assets/img/about-moi-logo.png"), context);
     _qrFuture = _fetchQrPngOrNull();
   }
-
 
   Future<Uint8List?> _fetchQrPngOrNull() async {
     if (token.isEmpty) return null;
@@ -266,15 +300,26 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
     const gold = Color(0xFFDFB73B);
 
     String issueDateStr = "-";
-    if (requestAtDate != null && requestAtDate!.isNotEmpty) {
+    final rad = requestAtDate;
+
+    // ✅ accept dd-MM-yyyy OR yyyy-MM-dd
+    if (rad != null && rad.isNotEmpty) {
       try {
-        final parts = requestAtDate!.split("-");
+        final parts = rad.split("-");
         if (parts.length == 3) {
-          final day = int.parse(parts[0]);
-          final month = int.parse(parts[1]);
-          final year = int.parse(parts[2]);
-          issueDateStr =
-              _formatKhmerDate(DateTime(year, month, day));
+          // If first part has 4 digits -> yyyy-MM-dd
+          if (parts[0].length == 4) {
+            final year = int.parse(parts[0]);
+            final month = int.parse(parts[1]);
+            final day = int.parse(parts[2]);
+            issueDateStr = _formatKhmerDate(DateTime(year, month, day));
+          } else {
+            // dd-MM-yyyy
+            final day = int.parse(parts[0]);
+            final month = int.parse(parts[1]);
+            final year = int.parse(parts[2]);
+            issueDateStr = _formatKhmerDate(DateTime(year, month, day));
+          }
         }
       } catch (_) {
         issueDateStr = "-";
@@ -336,7 +381,7 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
               Expanded(
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFFFFCA28),
+                    backgroundColor: const Color(0xFFFFCA28),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -373,7 +418,7 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
               Expanded(
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:  Color(0xFFFFCA28),
+                    backgroundColor: const Color(0xFFFFCA28),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -543,38 +588,6 @@ class _MoIStyleBadge extends StatelessWidget {
         return v.isEmpty ? "-" : v;
     }
   }
-  String provinceEn(String v) {
-    const map = {
-      "ភ្នំពេញ": "PHNOM PENH",
-      "កណ្តាល": "KANDAL",
-      "បន្ទាយមានជ័យ": "BANTEAY MEANCHEY",
-      "បាត់ដំបង": "BATTAMBANG",
-      "កំពង់ចាម": "KAMPONG CHAM",
-      "កំពង់ឆ្នាំង": "KAMPONG CHHNANG",
-      "កំពង់ស្ពឺ": "KAMPONG SPEU",
-      "កំពង់ធំ": "KAMPONG THOM",
-      "កំពត": "KAMPOT",
-      "កែប": "KEP",
-      "កោះកុង": "KOH KONG",
-      "ក្រចេះ": "KRATIE",
-      "មណ្ឌលគិរី": "MONDULKIRI",
-      "ឧត្តរមានជ័យ": "ODDAR MEANCHEY",
-      "ប៉ៃលិន": "PAILIN",
-      "ព្រះសីហនុ": "PREAH SIHANOUK",
-      "ព្រះវិហារ": "PREAH VIHEAR",
-      "ព្រៃវែង": "PREY VENG",
-      "ពោធិ៍សាត់": "PURSAT",
-      "សៀមរាប": "SIEM REAP",
-      "ស្ទឹងត្រែង": "STUNG TRENG",
-      "ស្វាយរៀង": "SVAY RIENG",
-      "តាកែវ": "TAKEO",
-      "ត្បូងឃ្មុំ": "TBOUNG KHMUM",
-      "រតនគិរី": "RATANAKIRI",
-      "កម្ពុជា": "CAMBODIA",
-      "នគរបាល": "POLICE",
-    };
-    return map[v] ?? v;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -585,16 +598,27 @@ class _MoIStyleBadge extends StatelessWidget {
     final year = s(v?["madeYear"]);
 
     // ✅ Backend returns plateSubCategory (Khmer name) and plateCode (English DB code)
-    final subcategory = s(v?["plateSubCategory"]);   // Khmer label e.g. "បាត់ដំបង"
-    final plateCode = s(v?["plateCode"]);             // English code e.g. "BATTAMBANG"
+    final subcategory = s(v?["plateSubCategory"]); // Khmer label e.g. "បាត់ដំបង"
+    final plateCode = s(v?["plateCode"]); // English code e.g. "BATTAMBANG"
 
-    final info = workingInfo ?? {};
-    final ministry = s(info["generalDepartmentText"]);
-    final dept = s(info["departmentText"]);
-    final office = s(info["burauText"]);
-    final position = s(info["positionText"]);
-    final policeId = s(info["policeId"]);
-    final provinceCity = s(info["provinceCity"]);
+    final Map<String, dynamic> info =
+    Map<String, dynamic>.from(workingInfo ?? {});
+
+    String pick(List<String> keys, {String fallback = "-"}) {
+      for (final k in keys) {
+        final val = info[k];
+        final ss = s(val);
+        if (ss.isNotEmpty && ss.toLowerCase() != "null") return ss;
+      }
+      return fallback;
+    }
+
+    final ministry = pick(["generalDepartmentText", "generalDepartment", "organization"]);
+    final dept = pick(["departmentText", "department"]);
+    final office = pick(["burauText", "bureauText", "burau"]);
+    final position = pick(["positionText", "position"]);
+    final policeId = pick(["policeId"], fallback: "");
+    final provinceCity = pick(["provinceCity", "province", "province_city"]);
 
     return Material(
       color: Colors.transparent,
@@ -766,8 +790,6 @@ class _MoIStyleBadge extends StatelessWidget {
                     child: Column(
                       children: [
                         const SizedBox(height: 12),
-
-                        // 🔹 Top label = subcategory
                         Text(
                           subcategory.isEmpty ? "-" : subcategory,
                           style: const TextStyle(
@@ -777,10 +799,7 @@ class _MoIStyleBadge extends StatelessWidget {
                             height: 1.0,
                           ),
                         ),
-
                         const SizedBox(height: 14),
-
-                        // 🔹 Big plate number
                         Text(
                           plate.isEmpty ? "-" : plate,
                           style: const TextStyle(
@@ -791,10 +810,7 @@ class _MoIStyleBadge extends StatelessWidget {
                             height: 1.0,
                           ),
                         ),
-
                         const Spacer(),
-
-                        // 🔹 Bottom red label (subcategory)
                         Container(
                           height: 46,
                           width: double.infinity,
@@ -805,8 +821,9 @@ class _MoIStyleBadge extends StatelessWidget {
                           ),
                           alignment: Alignment.center,
                           child: Text(
-                            plateCode.isNotEmpty ? plateCode : (subcategory.isEmpty ? "-" : subcategory),
-                            
+                            plateCode.isNotEmpty
+                                ? plateCode
+                                : (subcategory.isEmpty ? "-" : subcategory),
                             style: const TextStyle(
                               color: _footerRed,
                               fontWeight: FontWeight.w900,
@@ -895,8 +912,8 @@ class _MoIStyleBadge extends StatelessWidget {
                       ],
 
                       _blueSectionTitle("ព័ត៌មាន ${vehicleTypeKh(vehicleType)}"),
-
                       const SizedBox(height: 12),
+
                       _twoColRowSafe(
                         leftLabel: "ស្លាកលេខ",
                         leftValue: plate,
@@ -910,25 +927,33 @@ class _MoIStyleBadge extends StatelessWidget {
                         rightLabel: "លេខទូរស័ព្ទ",
                         rightValue: phone,
                       ),
-                      Spacer(),
+                      const Spacer(),
+
                       Row(
-                        children: [
-                          Text("សុពលភាពពី ", style: TextStyle(
-                            color: Color(0xFF8A94A6),
-                            fontWeight: FontWeight.w900,
-                            fontSize: 18,
-                            height: 1.0,
-                          )),
+                        children: const [
+                          Text(
+                            "សុពលភាពពី ",
+                            style: TextStyle(
+                              color: Color(0xFF8A94A6),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 18,
+                              height: 1.0,
+                            ),
+                          ),
                           Spacer(),
-                          Text("សុពលភាពដល់ ", style: TextStyle(
-                            color: Color(0xFF8A94A6),
-                            fontWeight: FontWeight.w900,
-                            fontSize: 18,
-                            height: 1.0,
-                          )),
+                          Text(
+                            "សុពលភាពដល់ ",
+                            style: TextStyle(
+                              color: Color(0xFF8A94A6),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 18,
+                              height: 1.0,
+                            ),
+                          ),
                         ],
                       ),
-                      SizedBox(height: 10),
+                      const SizedBox(height: 10),
+
                       SizedBox(
                         width: double.infinity,
                         child: Row(

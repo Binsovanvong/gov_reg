@@ -21,7 +21,7 @@ class _VehicleForm {
   String vehicleType = "CAR";
   String carPlateType = "REGULAR";
 
-  // ✅ FIX: must match motoPlateTypes keys (REGULAR/CAMBODIA/POLICE/ARMY_FORCE)
+  /// ✅ must match motoPlateTypes keys
   String motoPlateType = "REGULAR";
 
   String? carPlateSubcategory;
@@ -128,7 +128,7 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
- static const String baseUrl = "http://10.0.2.2:8080";
+  static const String baseUrl = "http://10.0.2.2:8080";
 
   static const List<String> allowedUserTypes = [
     "GUEST",
@@ -140,10 +140,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
   ];
 
   /// ✅ Backend requires attachmentTypes for EACH file uploaded
-  static const String attachmentTypeValue = "VEHICLE_DOCUMENT";
+  static const String attachmentTypeVehicle = "VEHICLE_DOCUMENT";
+
+  /// ✅ Selfie = INVITATION_DOCUMENT (as you requested)
+  static const String attachmentTypeSelfie = "INVITATION_DOCUMENT";
+
+  // ✅ demo login creds (you already use these)
+  static const String _apiEmail = "user@moi.com";
+  static const String _apiPassword = "Moi@2026\$";
 
   String _userType = "GUEST";
   bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // ✅ FULL FIX: load dropdowns if initial type is officer (and ensure auth)
+    _loadWorkDropdownsIfNeeded(userTypeOverride: _userType);
+  }
 
   // ✅ ONLY 2 attachment inputs:
   // 1) Multi files up to 5
@@ -200,59 +214,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
   BurauItem? selectedBurau;
   PositionItem? selectedPos;
 
+  void _syncWorkControllersFromDropdownIfNeeded() {
+    if (!useWorkDropdown) return;
+
+    // Dropdown selected → fill controllers (so dto never sends empty)
+    if (selectedGD != null) ministryController.text = selectedGD!.name;
+    if (selectedDept != null) departmentController.text = selectedDept!.name;
+    if (selectedBurau != null) officeController.text = selectedBurau!.name;
+    if (selectedPos != null) positionController.text = selectedPos!.name;
+  }
+
   // ----------------------------
   // Plate Types
   // ----------------------------
-
-  /// ✅ CAR plate types — subcategory values must match DB `code` column (used by backend lookup)
   final List<Map<String, dynamic>> plateCategory = [
-    {
-      "key": "ROYAL_PALACE",
-      "label": "រាជវាំង",
-      "subcategory": ["ROYAL_PALACE"],
-    },
+    {"key": "ROYAL_PALACE", "label": "រាជវាំង", "subcategory": ["ROYAL_PALACE"]},
     {
       "key": "STATE",
       "label": "រដ្ឋ",
-      "subcategory": List.generate(
-        61,
-        (i) => "STATE_${i + 1}",
-      ),
+      "subcategory": List.generate(61, (i) => "STATE_${i + 1}"),
     },
-    {
-      "key": "POLICE",
-      "label": "នគរបាល",
-      "subcategory": ["POLICE"],
-    },
+    {"key": "POLICE", "label": "នគរបាល", "subcategory": ["POLICE"]},
     {
       "key": "ARMY_FORCE",
       "label": "ខេមរភូមិន្ទ",
-      "subcategory": List.generate(
-        9,
-        (i) => "R C A F_${i + 1}",
-      ),
+      "subcategory": List.generate(9, (i) => "R C A F_${i + 1}"),
     },
     {
       "key": "ORGANIZATION",
       "label": "អង្គការ",
       "subcategory": ["OI", "ONG1", "ONG2"],
     },
-    {
-      "key": "EMBASSY",
-      "label": "អង្គទូត",
-      "subcategory": ["CMD01-1", "CD01"],
-    },
+    {"key": "EMBASSY", "label": "អង្គទូត", "subcategory": ["CMD01-1", "CD01"]},
     {
       "key": "UNITED_NATIONS",
       "label": "អង្គការសហប្រជាជាតិ",
-      // ✅ FIX: DB code is "OUN01-1" not "ONU01-1"
       "subcategory": ["OUN01-1", "ONU01"],
     },
-    {
-      "key": "TEMPORARY",
-      "label": "បណ្តោះអាសន្ន",
-      "subcategory": ["AT18"],
-    },
+    {"key": "TEMPORARY", "label": "បណ្តោះអាសន្ន", "subcategory": ["AT18"]},
     {
       "key": "REGULAR",
       "label": "ធម្មតា",
@@ -284,14 +283,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         "RATANAKIRI",
       ],
     },
-    {
-      "key": "CAMBODIA",
-      "label": "កម្ពុជា",
-      "subcategory": ["CAMBODIA"],
-    },
+    {"key": "CAMBODIA", "label": "កម្ពុជា", "subcategory": ["CAMBODIA"]},
   ];
 
-  /// ✅ MOTO plate types — subcategory values must match DB `code` column (used by backend lookup)
   final List<Map<String, dynamic>> motoPlateTypes = [
     {
       "key": "REGULAR",
@@ -324,21 +318,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         "RATANAKIRI_M",
       ],
     },
-    {
-      "key": "CAMBODIA",
-      "label": "កម្ពុជា",
-      "subcategory": ["CAMBODIA_M"],
-    },
-    {
-      "key": "POLICE",
-      "label": "នគរបាល",
-      "subcategory": ["POLICE_M"],
-    },
-    {
-      "key": "ARMY_FORCE",
-      "label": "ខេមរភូមិន្ទ",
-      "subcategory": ["R C A F_M"],
-    },
+    {"key": "CAMBODIA", "label": "កម្ពុជា", "subcategory": ["CAMBODIA_M"]},
+    {"key": "POLICE", "label": "នគរបាល", "subcategory": ["POLICE_M"]},
+    {"key": "ARMY_FORCE", "label": "ខេមរភូមិន្ទ", "subcategory": ["R C A F_M"]},
   ];
 
   String getPlateKey(_VehicleForm v) {
@@ -354,10 +336,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return (found["key"] ?? "UNKNOWN").toString();
   }
 
-  /// Returns the DB code to send as plateSubCategory.
-  /// Subcategory values in the list ARE the DB codes (e.g. "PHNOM PENH", "STATE_1").
-  /// If user selected one, return it. If only one option exists, auto-select it.
-  /// Otherwise return null.
+  /// DB code to send as plateSubCategory
   String? getSubcategoryKey(_VehicleForm v) {
     final isMoto = v.vehicleType == "MOTORBIKE";
     final items = isMoto ? motoPlateTypes : plateCategory;
@@ -374,10 +353,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final list =
         (found["subcategory"] as List?)?.cast<String>() ?? const <String>[];
 
-    // User explicitly selected a subcategory
+    // selected
     if (sub != null && sub.trim().isNotEmpty && list.contains(sub)) return sub;
 
-    // Auto-select if only one option exists
+    // auto if only one
     if (list.length == 1) return list[0];
 
     return null;
@@ -385,88 +364,149 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   /// Maps DB code → Khmer display label
   static const Map<String, String> _subcategoryLabels = {
-    // ROYAL_PALACE
     "ROYAL_PALACE": "រាជវាំង",
-    // STATE
-    "STATE_1": "រដ្ឋ-01", "STATE_2": "រដ្ឋ-02", "STATE_3": "រដ្ឋ-03",
-    "STATE_4": "រដ្ឋ-04", "STATE_5": "រដ្ឋ-05", "STATE_6": "រដ្ឋ-06",
-    "STATE_7": "រដ្ឋ-07", "STATE_8": "រដ្ឋ-08", "STATE_9": "រដ្ឋ-09",
-    "STATE_10": "រដ្ឋ-10", "STATE_11": "រដ្ឋ-11", "STATE_12": "រដ្ឋ-12",
-    "STATE_13": "រដ្ឋ-13", "STATE_14": "រដ្ឋ-14", "STATE_15": "រដ្ឋ-15",
-    "STATE_16": "រដ្ឋ-16", "STATE_17": "រដ្ឋ-17", "STATE_18": "រដ្ឋ-18",
-    "STATE_19": "រដ្ឋ-19", "STATE_20": "រដ្ឋ-20", "STATE_21": "រដ្ឋ-21",
-    "STATE_22": "រដ្ឋ-22", "STATE_23": "រដ្ឋ-23", "STATE_24": "រដ្ឋ-24",
-    "STATE_25": "រដ្ឋ-25", "STATE_26": "រដ្ឋ-26", "STATE_27": "រដ្ឋ-27",
-    "STATE_28": "រដ្ឋ-28", "STATE_29": "រដ្ឋ-29", "STATE_30": "រដ្ឋ-30",
-    "STATE_31": "រដ្ឋ-31", "STATE_32": "រដ្ឋ-32", "STATE_33": "រដ្ឋ-33",
-    "STATE_34": "រដ្ឋ-34", "STATE_35": "រដ្ឋ-35", "STATE_36": "រដ្ឋ-36",
-    "STATE_37": "រដ្ឋ-37", "STATE_38": "រដ្ឋ-38", "STATE_39": "រដ្ឋ-39",
-    "STATE_40": "រដ្ឋ-40", "STATE_41": "រដ្ឋ-41", "STATE_42": "រដ្ឋ-42",
-    "STATE_43": "រដ្ឋ-43", "STATE_44": "រដ្ឋ-44", "STATE_45": "រដ្ឋ-45",
-    "STATE_46": "រដ្ឋ-46", "STATE_47": "រដ្ឋ-47", "STATE_48": "រដ្ឋ-48",
-    "STATE_49": "រដ្ឋ-49", "STATE_50": "រដ្ឋ-50", "STATE_51": "រដ្ឋ-51",
-    "STATE_52": "រដ្ឋ-52", "STATE_53": "រដ្ឋ-53", "STATE_54": "រដ្ឋ-54",
-    "STATE_55": "រដ្ឋ-55", "STATE_56": "រដ្ឋ-56", "STATE_57": "រដ្ឋ-57",
-    "STATE_58": "រដ្ឋ-58", "STATE_59": "រដ្ឋ-59", "STATE_60": "រដ្ឋ-60",
+    "STATE_1": "រដ្ឋ-01",
+    "STATE_2": "រដ្ឋ-02",
+    "STATE_3": "រដ្ឋ-03",
+    "STATE_4": "រដ្ឋ-04",
+    "STATE_5": "រដ្ឋ-05",
+    "STATE_6": "រដ្ឋ-06",
+    "STATE_7": "រដ្ឋ-07",
+    "STATE_8": "រដ្ឋ-08",
+    "STATE_9": "រដ្ឋ-09",
+    "STATE_10": "រដ្ឋ-10",
+    "STATE_11": "រដ្ឋ-11",
+    "STATE_12": "រដ្ឋ-12",
+    "STATE_13": "រដ្ឋ-13",
+    "STATE_14": "រដ្ឋ-14",
+    "STATE_15": "រដ្ឋ-15",
+    "STATE_16": "រដ្ឋ-16",
+    "STATE_17": "រដ្ឋ-17",
+    "STATE_18": "រដ្ឋ-18",
+    "STATE_19": "រដ្ឋ-19",
+    "STATE_20": "រដ្ឋ-20",
+    "STATE_21": "រដ្ឋ-21",
+    "STATE_22": "រដ្ឋ-22",
+    "STATE_23": "រដ្ឋ-23",
+    "STATE_24": "រដ្ឋ-24",
+    "STATE_25": "រដ្ឋ-25",
+    "STATE_26": "រដ្ឋ-26",
+    "STATE_27": "រដ្ឋ-27",
+    "STATE_28": "រដ្ឋ-28",
+    "STATE_29": "រដ្ឋ-29",
+    "STATE_30": "រដ្ឋ-30",
+    "STATE_31": "រដ្ឋ-31",
+    "STATE_32": "រដ្ឋ-32",
+    "STATE_33": "រដ្ឋ-33",
+    "STATE_34": "រដ្ឋ-34",
+    "STATE_35": "រដ្ឋ-35",
+    "STATE_36": "រដ្ឋ-36",
+    "STATE_37": "រដ្ឋ-37",
+    "STATE_38": "រដ្ឋ-38",
+    "STATE_39": "រដ្ឋ-39",
+    "STATE_40": "រដ្ឋ-40",
+    "STATE_41": "រដ្ឋ-41",
+    "STATE_42": "រដ្ឋ-42",
+    "STATE_43": "រដ្ឋ-43",
+    "STATE_44": "រដ្ឋ-44",
+    "STATE_45": "រដ្ឋ-45",
+    "STATE_46": "រដ្ឋ-46",
+    "STATE_47": "រដ្ឋ-47",
+    "STATE_48": "រដ្ឋ-48",
+    "STATE_49": "រដ្ឋ-49",
+    "STATE_50": "រដ្ឋ-50",
+    "STATE_51": "រដ្ឋ-51",
+    "STATE_52": "រដ្ឋ-52",
+    "STATE_53": "រដ្ឋ-53",
+    "STATE_54": "រដ្ឋ-54",
+    "STATE_55": "រដ្ឋ-55",
+    "STATE_56": "រដ្ឋ-56",
+    "STATE_57": "រដ្ឋ-57",
+    "STATE_58": "រដ្ឋ-58",
+    "STATE_59": "រដ្ឋ-59",
+    "STATE_60": "រដ្ឋ-60",
     "STATE_61": "រដ្ឋ-61",
-    // POLICE
     "POLICE": "នគរបាល",
     "POLICE_M": "នគរបាល",
-    // ARMY_FORCE (car)
-    "R C A F_1": "ខេមរភូមិន្ទ-01", "R C A F_2": "ខេមរភូមិន្ទ-02",
-    "R C A F_3": "ខេមរភូមិន្ទ-03", "R C A F_4": "ខេមរភូមិន្ទ-04",
-    "R C A F_5": "ខេមរភូមិន្ទ-05", "R C A F_6": "ខេមរភូមិន្ទ-06",
-    "R C A F_7": "ខេមរភូមិន្ទ-07", "R C A F_8": "ខេមរភូមិន្ទ-08",
+    "R C A F_1": "ខេមរភូមិន្ទ-01",
+    "R C A F_2": "ខេមរភូមិន្ទ-02",
+    "R C A F_3": "ខេមរភូមិន្ទ-03",
+    "R C A F_4": "ខេមរភូមិន្ទ-04",
+    "R C A F_5": "ខេមរភូមិន្ទ-05",
+    "R C A F_6": "ខេមរភូមិន្ទ-06",
+    "R C A F_7": "ខេមរភូមិន្ទ-07",
+    "R C A F_8": "ខេមរភូមិន្ទ-08",
     "R C A F_9": "ខេមរភូមិន្ទ-09",
-    // ARMY_FORCE (moto)
     "R C A F_M": "ខេមរភូមិន្ទ",
-    // ORGANIZATION
-    "OI": "OI", "ONG1": "ONG1", "ONG2": "ONG2",
-    // EMBASSY
-    "CMD01-1": "CMD01-1", "CD01": "CD01",
-    // UNITED_NATIONS
-    "OUN01-1": "OUN01-1", "ONU01": "ONU01",
-    // TEMPORARY
+    "OI": "OI",
+    "ONG1": "ONG1",
+    "ONG2": "ONG2",
+    "CMD01-1": "CMD01-1",
+    "CD01": "CD01",
+    "OUN01-1": "OUN01-1",
+    "ONU01": "ONU01",
     "AT18": "AT18",
-    // REGULAR (car)
-    "PHNOM PENH": "ភ្នំពេញ", "KANDAL": "កណ្ដាល",
-    "BANTEAY MEANCHEY": "បន្ទាយមានជ័យ", "BATTAMBANG": "បាត់ដំបង",
-    "KAMPONG CHAM": "កំពង់ចាម", "KAMPONG CHHNANG": "កំពង់ឆ្នាំង",
-    "KAMPONG SPEU": "កំពង់ស្ពឺ", "KAMPONG THOM": "កំពង់ធំ",
-    "KAMPOT": "កំពត", "KEP": "កែប", "KOH KONG": "កោះកុង",
-    "KRATIE": "ក្រចេះ", "MONDULKIRI": "មណ្ឌលគិរី",
-    "ODDAR MEANCHEY": "ឧត្តរមានជ័យ", "PAILIN": "ប៉ៃលិន",
-    "SIHANOUKVILLE": "ព្រះសីហនុ", "PREAH VIHEAR": "ព្រះវិហារ",
-    "PREY VENG": "ព្រៃវែង", "PURSAT": "ពោធិ៍សាត់",
-    "SIEM REAP": "សៀមរាប", "STUNG TRENG": "ស្ទឹងត្រែង",
-    "SVAY RIENG": "ស្វាយរៀង", "TAKEO": "តាកែវ",
-    "TBOUNG KHMUM": "ត្បូងឃ្មុំ", "RATANAKIRI": "រតនគិរី",
-    // REGULAR (moto) — same but _M suffix
-    "PHNOM PENH_M": "ភ្នំពេញ", "KANDAL_M": "កណ្ដាល",
-    "BANTEAY MEANCHEY_M": "បន្ទាយមានជ័យ", "BATTAMBANG_M": "បាត់ដំបង",
-    "KAMPONG CHAM_M": "កំពង់ចាម", "KAMPONG CHHNANG_M": "កំពង់ឆ្នាំង",
-    "KAMPONG SPEU_M": "កំពង់ស្ពឺ", "KAMPONG THOM_M": "កំពង់ធំ",
-    "KAMPOT_M": "កំពត", "KEP_M": "កែប", "KOH KONG_M": "កោះកុង",
-    "KRATIE_M": "ក្រចេះ", "MONDULKIRI_M": "មណ្ឌលគិរី",
-    "ODDAR MEANCHEY_M": "ឧត្តរមានជ័យ", "PAILIN_M": "ប៉ៃលិន",
-    "SIHANOUKVILLE_M": "ព្រះសីហនុ", "PREAH VIHEAR_M": "ព្រះវិហារ",
-    "PREY VENG_M": "ព្រៃវែង", "PURSAT_M": "ពោធិ៍សាត់",
-    "SIEM REAP_M": "សៀមរាប", "STUNG TRENG_M": "ស្ទឹងត្រែង",
-    "SVAY RIENG_M": "ស្វាយរៀង", "TAKEO_M": "តាកែវ",
-    "TBOUNG KHMUM_M": "ត្បូងឃ្មុំ", "RATANAKIRI_M": "រតនគិរី",
-    // CAMBODIA
+    "PHNOM PENH": "ភ្នំពេញ",
+    "KANDAL": "កណ្ដាល",
+    "BANTEAY MEANCHEY": "បន្ទាយមានជ័យ",
+    "BATTAMBANG": "បាត់ដំបង",
+    "KAMPONG CHAM": "កំពង់ចាម",
+    "KAMPONG CHHNANG": "កំពង់ឆ្នាំង",
+    "KAMPONG SPEU": "កំពង់ស្ពឺ",
+    "KAMPONG THOM": "កំពង់ធំ",
+    "KAMPOT": "កំពត",
+    "KEP": "កែប",
+    "KOH KONG": "កោះកុង",
+    "KRATIE": "ក្រចេះ",
+    "MONDULKIRI": "មណ្ឌលគិរី",
+    "ODDAR MEANCHEY": "ឧត្តរមានជ័យ",
+    "PAILIN": "ប៉ៃលិន",
+    "SIHANOUKVILLE": "ព្រះសីហនុ",
+    "PREAH VIHEAR": "ព្រះវិហារ",
+    "PREY VENG": "ព្រៃវែង",
+    "PURSAT": "ពោធិ៍សាត់",
+    "SIEM REAP": "សៀមរាប",
+    "STUNG TRENG": "ស្ទឹងត្រែង",
+    "SVAY RIENG": "ស្វាយរៀង",
+    "TAKEO": "តាកែវ",
+    "TBOUNG KHMUM": "ត្បូងឃ្មុំ",
+    "RATANAKIRI": "រតនគិរី",
+    "PHNOM PENH_M": "ភ្នំពេញ",
+    "KANDAL_M": "កណ្ដាល",
+    "BANTEAY MEANCHEY_M": "បន្ទាយមានជ័យ",
+    "BATTAMBANG_M": "បាត់ដំបង",
+    "KAMPONG CHAM_M": "កំពង់ចាម",
+    "KAMPONG CHHNANG_M": "កំពង់ឆ្នាំង",
+    "KAMPONG SPEU_M": "កំពង់ស្ពឺ",
+    "KAMPONG THOM_M": "កំពង់ធំ",
+    "KAMPOT_M": "កំពត",
+    "KEP_M": "កែប",
+    "KOH KONG_M": "កោះកុង",
+    "KRATIE_M": "ក្រចេះ",
+    "MONDULKIRI_M": "មណ្ឌលគិរី",
+    "ODDAR MEANCHEY_M": "ឧត្តរមានជ័យ",
+    "PAILIN_M": "ប៉ៃលិន",
+    "SIHANOUKVILLE_M": "ព្រះសីហនុ",
+    "PREAH VIHEAR_M": "ព្រះវិហារ",
+    "PREY VENG_M": "ព្រៃវែង",
+    "PURSAT_M": "ពោធិ៍សាត់",
+    "SIEM REAP_M": "សៀមរាប",
+    "STUNG TRENG_M": "ស្ទឹងត្រែង",
+    "SVAY RIENG_M": "ស្វាយរៀង",
+    "TAKEO_M": "តាកែវ",
+    "TBOUNG KHMUM_M": "ត្បូងឃ្មុំ",
+    "RATANAKIRI_M": "រតនគិរី",
     "CAMBODIA": "កម្ពុជា",
     "CAMBODIA_M": "កម្ពុជា",
   };
 
-  /// Returns the Khmer display label for a given DB code
   String subcategoryLabel(String? code) {
     if (code == null || code.isEmpty) return "";
     return _subcategoryLabels[code] ?? code;
   }
 
   // ----------------------------
-  // ✅ Rules (UPDATED)
+  // ✅ Rules
   // ----------------------------
   bool get isGuest => _userType == "GUEST";
   bool get isInsideOfficer => _userType == "INSIDE_OFFICER";
@@ -481,24 +521,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   static const bool showWorkFieldsForGuest = true;
 
-  /// ✅ Only officers show ID number
   bool get showIdNumber => isOfficer;
 
-  /// ✅ Work fields ONLY for Officer + National + Guest(optional)
-  /// ❌ SECRETARY/DEPUTY: hidden
   bool get showWorkFields =>
       isOfficer || isNational || (isGuest && showWorkFieldsForGuest);
 
-  /// ✅ Province only for NATIONAL
   bool get showProvinceCity => isNational;
 
-  /// ✅ GUEST + NATIONAL use duration days input
   bool get useDurationDays => isNational || isGuest;
 
-  /// ✅ Guest required selfie, other user types optional
   bool get selfieRequired => isGuest;
 
-  /// ✅ Dropdown ONLY for officers
   bool get useWorkDropdown => isOfficer;
 
   // ----------------------------
@@ -511,15 +544,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  /// ✅ yyyy-MM-dd (UI)
   String _fmtYmd(DateTime d) =>
       "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
 
-  /// yyyymmdd int
   int _fmtYmdInt(DateTime d) => int.parse(
       "${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}");
 
-  /// ✅ dd-MM-yyyy (Backend expects this for LocalDate)
   String _fmtDmy(DateTime d) =>
       "${d.day.toString().padLeft(2, '0')}-${d.month.toString().padLeft(2, '0')}-${d.year}";
 
@@ -527,19 +557,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ✅ Plate Validation + Formatter
   // ----------------------------
   static final Map<String, List<RegExp>> _categoryRules = {
-    // CAR
-    "ROYAL_PALACE": [RegExp(r'^[0-9]{3}$')], // 001
-    "STATE": [RegExp(r'^[2-6]{1}-[0-9]{3,4}$')], // 2-123 / 2-1234
-    "POLICE": [RegExp(r'^[2-6]{1}-[0-9]{4}$')], // 2-1234
-    "ARMY_FORCE": [RegExp(r'^[2-6]{1}-[0-9]{4}$')], // 2-1234
-    "REGULAR": [RegExp(r'^[2-6]{1}[A-Z]{1,2}-[0-9]{4}$')], // 2AB-1234
-    "CAMBODIA": [RegExp(r'^[A-Z0-9.]{8,}$')], // ✅ min 8 (A-Z0-9.)
+    "ROYAL_PALACE": [RegExp(r'^[0-9]{3}$')],
+    "STATE": [RegExp(r'^[2-6]{1}-[0-9]{3,4}$')],
+    "POLICE": [RegExp(r'^[2-6]{1}-[0-9]{4}$')],
+    "ARMY_FORCE": [RegExp(r'^[2-6]{1}-[0-9]{4}$')],
+    "REGULAR": [RegExp(r'^[2-6]{1}[A-Z]{1,2}-[0-9]{4}$')],
+    "CAMBODIA": [RegExp(r'^[A-Z0-9.]{8,}$')],
 
-    // MOTORBIKE
-    "MOTORBIKE_REGULAR": [RegExp(r'^1[A-Z]{1,2}-[0-9]{4}$')], // 1AB-1234
-    "MOTORBIKE_CAMBODIA": [RegExp(r'^[A-Z0-9.]{8,}$')], // min 8
-    "MOTORBIKE_POLICE": [RegExp(r'^1-[0-9]{4}$')], // 1-1234
-    "MOTORBIKE_ARMY_FORCE": [RegExp(r'^1-[0-9]{4}$')], // 1-1234
+    "MOTORBIKE_REGULAR": [RegExp(r'^1[A-Z]{1,2}-[0-9]{4}$')],
+    "MOTORBIKE_CAMBODIA": [RegExp(r'^[A-Z0-9.]{8,}$')],
+    "MOTORBIKE_POLICE": [RegExp(r'^1-[0-9]{4}$')],
+    "MOTORBIKE_ARMY_FORCE": [RegExp(r'^1-[0-9]{4}$')],
   };
 
   String _ruleKeyForVehicle(_VehicleForm v) {
@@ -572,12 +600,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final ruleKey = _ruleKeyForVehicle(v);
     final upper = raw.toUpperCase();
 
-    // CAMBODIA: allow only A-Z 0-9 .
     if (ruleKey.contains("CAMBODIA")) {
       return upper.replaceAll(RegExp(r'[^A-Z0-9.]'), '');
     }
 
-    // dash plates: keep A-Z 0-9 and reinsert dash
     var cleaned = upper.replaceAll(RegExp(r'[^A-Z0-9-]'), '');
     cleaned = cleaned.replaceAll('-', '');
 
@@ -594,7 +620,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return '$d-$nums';
     }
 
-    // REGULAR: 2AB-1234 (or 2A-1234)
     if (cleaned.isEmpty) return '';
     final first = cleaned.substring(0, 1);
     final rest = cleaned.substring(1);
@@ -643,108 +668,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         "Accept": "application/json",
         "Content-Type": "application/json",
       },
-      body: jsonEncode({
-        "email": email,
-        "password": password,
-      }),
+      body: jsonEncode({"email": email, "password": password}),
     );
 
     return res;
-  }
-
-  //TODO Remove static login
-  Future<http.Response> _search({
-    required String search,
-  }) async {
-    final uri =
-        Uri.parse("$baseUrl/api/v1/parking-card-requests/search/$search");
-
-    // 1. Login Logic
-    final loginRes = await _login(
-      baseUrl: "http://10.0.2.2:8080",
-      email: "user@moi.com",
-      password: "Moi@2026\$",
-    );
-
-    if (loginRes.statusCode == 200) {
-      final loginData = jsonDecode(loginRes.body);
-      final String newToken =
-          loginData['accessToken'] ?? loginData['token'] ?? "";
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString("accessToken", newToken);
-    } else {
-      _snack("Login Failed: ${loginRes.statusCode}");
-      return loginRes;
-    }
-    final token = await _getToken();
-
-    // 3. Perform Search
-    try {
-      final res = await http.get(
-        uri,
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          // "Authorization": "Bearer $token",
-        },
-      );
-      if (res.statusCode == 200) {
-        _snack("ស្វែងរកជោគជ័យ (Search Successful)");
-
-        final Map<String, dynamic> responseData = jsonDecode(res.body);
-
-        if (!mounted) return res;
-
-        Navigator.pushNamed(
-          context,
-          Approute.verifySuccessScreen,
-          arguments: {
-            "code": responseData["code"],
-            "token": responseData["token"],
-            "parkingRequestStatus": responseData["parkingRequestStatus"],
-            // Use server-returned data to ensure it matches the database
-            "fullName": responseData["name"],
-            "phone": responseData["phone"],
-            "userType": responseData["userType"],
-            "selfieBytes":
-                null, // Search doesn't usually return the raw selfie bytes
-            "selfiePath": null,
-            "requestDate": responseData["requestDate"],
-            "requestAtDate": responseData["requestAtDate"],
-            "vehicleType": (responseData["vehicles"] as List).isNotEmpty
-                ? responseData["vehicles"][0]["vehicleType"]
-                : "",
-            "workingInfo": {
-              "generalDepartmentText": responseData["generalDepartmentText"],
-              "departmentText": responseData["departmentText"],
-              "burauText": responseData["burauText"],
-              "positionText": responseData["positionText"],
-              "policeId": responseData["policeId"],
-              "provinceCity": responseData["provinceCity"],
-            },
-            "vehicles": responseData[
-                "vehicles"], // Returns the list of vehicle maps from backend
-          },
-        );
-      } else if (res.statusCode == 500) {
-        if (res.body.contains("IncorrectResultSizeDataAccessException") ||
-            res.body.contains("non-unique result")) {
-          //TODO dup phone number
-          _snack("មានទិន្នន័យស្ទួន (Found duplicate phone numbers)");
-        } else {
-          _snack("កំហុសម៉ាស៊ីនបម្រើ (Server Error: 500)");
-        }
-      } else if (res.statusCode == 404 || res.body.contains("not found")) {
-        _snack("រកមិនឃើញទិន្នន័យ (Request not found)");
-      } else {
-        _snack("មានបញ្ហាអ្វីមួយ (Error: ${res.statusCode})");
-      }
-      debugPrint("Response Body: ${res.body}");
-      return res;
-    } catch (e) {
-      _snack("(Connection Error)");
-      return http.Response('{"error": "Connection failed"}', 500);
-    }
   }
 
   Future<String?> _getToken() async {
@@ -772,10 +699,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         "Accept": "application/json",
         "Authorization": "Bearer $refreshToken",
       },
-      body: jsonEncode({
-        "refreshToken": refreshToken,
-        "token": refreshToken,
-      }),
+      body: jsonEncode({"refreshToken": refreshToken, "token": refreshToken}),
     );
 
     if (res.statusCode != 200) {
@@ -802,51 +726,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return newAccessToken;
   }
 
-  /// Try to find token values in a nested map structure.
-  String _findTokenInMap(Map m, String key) {
-    if (m.containsKey(key)) {
-      final v = m[key];
-      if (v is String) return v;
-      if (v is Map) {
-        return _findTokenInMap(v, 'accessToken') ?? v['token']?.toString() ?? '';
-      }
-    }
-    for (final entry in m.entries) {
-      final v = entry.value;
-      if (v is Map) {
-        final found = _findTokenInMap(v, key);
-        if (found.isNotEmpty) return found;
-      }
-    }
-    return '';
-  }
-
-  /// Decode login response body and persist access/refresh tokens if found.
   Future<Map<String, String>> _extractAndSaveTokens(String body) async {
     try {
       final data = jsonDecode(body);
+
+      String access = "";
+      String refresh = "";
+
       if (data is Map) {
-        String access = _findTokenInMap(data, 'accessToken');
-        if (access.isEmpty) access = _findTokenInMap(data, 'token');
-        // token might be nested under token.accessToken
-        if (access.isEmpty && data['token'] is Map) {
-          access = _findTokenInMap(data['token'] as Map, 'accessToken');
-        }
+        access = (data["accessToken"] ?? "").toString();
+        refresh = (data["refreshToken"] ?? "").toString();
 
-        String refresh = _findTokenInMap(data, 'refreshToken');
-        if (refresh.isEmpty && data['refreshToken'] is Map) {
-          refresh = _findTokenInMap(data['refreshToken'] as Map, 'token');
+        if (access.isEmpty) {
+          final token = data["token"];
+          if (token is String) {
+            access = token;
+          } else if (token is Map) {
+            access = (token["accessToken"] ?? token["token"] ?? "").toString();
+            refresh = (token["refreshToken"] ?? refresh).toString();
+          }
         }
-
-        final prefs = await SharedPreferences.getInstance();
-        if (access.isNotEmpty) await prefs.setString('accessToken', access);
-        if (refresh.isNotEmpty) await prefs.setString('refreshToken', refresh);
-        return {'access': access, 'refresh': refresh};
       }
+
+      final prefs = await SharedPreferences.getInstance();
+      if (access.isNotEmpty) await prefs.setString("accessToken", access);
+      if (refresh.isNotEmpty) await prefs.setString("refreshToken", refresh);
+
+      return {"access": access, "refresh": refresh};
     } catch (e) {
-      debugPrint('Token parse failed: $e');
+      debugPrint("Token parse failed: $e");
+      return {"access": "", "refresh": ""};
     }
-    return {'access': '', 'refresh': ''};
   }
 
   Future<void> forceLogout() async {
@@ -856,6 +766,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
     await prefs.clear();
     if (!mounted) return;
     _snack("Session expired. Please login again.");
+  }
+
+  /// ✅ FULL FIX: ensure you are logged in before calling dropdown APIs / submit
+  Future<void> _ensureAuth() async {
+    final prefs = await SharedPreferences.getInstance();
+    final existing = prefs.getString("accessToken") ?? "";
+    if (existing.isNotEmpty) return;
+
+    final loginRes = await _login(
+      baseUrl: baseUrl,
+      email: _apiEmail,
+      password: _apiPassword,
+    );
+
+    if (loginRes.statusCode == 200) {
+      await _extractAndSaveTokens(loginRes.body);
+    } else {
+      debugPrint("EnsureAuth login failed: ${loginRes.statusCode} ${loginRes.body}");
+      if (mounted) _snack("Login Failed: ${loginRes.statusCode}");
+    }
   }
 
   Future<http.Response> _getWithAuthRetry(Uri uri) async {
@@ -886,10 +816,84 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     if (res.statusCode == 401) {
-      await forceLogout();
+      // only logout if we actually had a token (otherwise just let caller handle)
+      if ((prefs.getString("accessToken") ?? "").isNotEmpty) {
+        await forceLogout();
+      }
     }
 
     return res;
+  }
+
+  // ----------------------------
+  // ✅ Search API (fixed burauText)
+  // ----------------------------
+  Future<http.Response> _search({required String search}) async {
+    final uri = Uri.parse("$baseUrl/api/v1/parking-card-requests/search/$search");
+
+    // ✅ ensure auth (instead of repeating login everywhere)
+    await _ensureAuth();
+
+    try {
+      final res = await _getWithAuthRetry(uri);
+
+      if (res.statusCode == 200) {
+        _snack("ស្វែងរកជោគជ័យ (Search Successful)");
+        final Map<String, dynamic> responseData = jsonDecode(res.body);
+
+        if (!mounted) return res;
+
+        Navigator.pushNamed(
+          context,
+          Approute.verifySuccessScreen,
+          arguments: {
+            "code": responseData["code"],
+            "token": responseData["token"],
+            "parkingRequestStatus": responseData["parkingRequestStatus"],
+            "fullName": responseData["name"],
+            "phone": responseData["phone"],
+            "userType": responseData["userType"],
+            "selfieBytes": null,
+            "selfiePath": null,
+            "requestDate": responseData["requestDate"],
+            "requestAtDate": responseData["requestAtDate"],
+            "vehicleType": (responseData["vehicles"] as List).isNotEmpty
+                ? responseData["vehicles"][0]["vehicleType"]
+                : "",
+            // ✅ pass workingInfo but keep it consistent
+            "workingInfo": {
+              "generalDepartmentText":
+                  responseData["generalDepartmentText"] ??
+                      responseData["generalDepartment"] ??
+                      responseData["organization"],
+              "departmentText":
+                  responseData["departmentText"] ?? responseData["department"],
+              "burauText":
+                  responseData["burauText"] ?? responseData["burau"],
+              "positionText":
+                  responseData["positionText"] ?? responseData["position"],
+              "policeId": responseData["policeId"],
+              "provinceCity": responseData["provinceCity"],
+            },
+            "vehicles": responseData["vehicles"],
+          },
+        );
+      } else if (res.statusCode == 404 || res.body.contains("not found")) {
+        _snack("រកមិនឃើញទិន្នន័យ (Request not found)");
+      } else if (res.statusCode == 403) {
+        _snack("403 Forbidden (No permission)");
+      } else if (res.statusCode == 500) {
+        _snack("កំហុសម៉ាស៊ីនបម្រើ (Server Error: 500)");
+      } else {
+        _snack("មានបញ្ហាអ្វីមួយ (Error: ${res.statusCode})");
+      }
+
+      debugPrint("Search Response Body: ${res.body}");
+      return res;
+    } catch (e) {
+      _snack("(Connection Error)");
+      return http.Response('{"error": "Connection failed"}', 500);
+    }
   }
 
   // ----------------------------
@@ -908,10 +912,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         .toList();
   }
 
-  Future<List<DepartmentItem>> fetchDepartmentsByGeneralDepartment(
-      int gdId) async {
-    final uri =
-        Uri.parse("$baseUrl/api/v1/departments/general-department/$gdId");
+  Future<List<DepartmentItem>> fetchDepartmentsByGeneralDepartment(int gdId) async {
+    final uri = Uri.parse("$baseUrl/api/v1/departments/general-department/$gdId");
     final res = await _getWithAuthRetry(uri);
     if (res.statusCode != 200) {
       throw "Departments HTTP ${res.statusCode}: ${res.body}";
@@ -949,8 +951,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
         .toList();
   }
 
-  Future<void> _loadWorkDropdownsIfNeeded() async {
-    if (!useWorkDropdown) return;
+  /// ✅ FULL FIX:
+  /// - Use userTypeOverride so it loads right after switching user type
+  /// - Ensure auth before calling dropdown APIs
+  Future<void> _loadWorkDropdownsIfNeeded({String? userTypeOverride}) async {
+    final type = userTypeOverride ?? _userType;
+    final shouldUseDropdown = (type == "INSIDE_OFFICER" || type == "OUTSIDE_OFFICER");
+    if (!shouldUseDropdown) return;
+
+    await _ensureAuth();
 
     setState(() => dropdownLoading = true);
     try {
@@ -1096,7 +1105,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
   }
 
-  // ✅ Camera (optional except guest)
+  // ✅ Camera
   Future<void> pickCameraImage() async {
     setState(() => cameraError = null);
 
@@ -1301,7 +1310,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return false;
       }
 
-      // ✅ Plate validation
       if (v.plate.text.trim().isEmpty) {
         _snack("សូមបញ្ចូលផ្លាកលេខ (#${i + 1})");
         return false;
@@ -1319,14 +1327,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     return true;
   }
+Future<Map<String, dynamic>> createParkingCardRequest() async {
+  final token = await _getToken();
+  if (token == null || token.isEmpty) {
+    throw Exception("Unauthorized: no access token");
+  }
 
-  // ----------------------------
-  // API
-  // ----------------------------
-  Future<Map<String, dynamic>> createParkingCardRequest() async {
-  final base = Uri.parse("$baseUrl/api/v1/parking-card-requests");
+  // ✅ sync dropdown -> controllers before dto
+  _syncWorkControllersFromDropdownIfNeeded();
+
+  /// 1) attachmentTypes (same logic)
+  final List<String> attachmentTypes = [
+    ...List.filled(attachFiles.length, attachmentTypeVehicle),
+    if (cameraFile != null) attachmentTypeSelfie,
+  ];
+
+  /// 2) Query string
+  String queryString = "";
+  if (attachmentTypes.isNotEmpty) {
+    final parts = attachmentTypes
+        .map((e) => "attachmentTypes=${Uri.encodeQueryComponent(e)}")
+        .toList();
+    queryString = "?${parts.join("&")}";
+  }
+
+  final uri = Uri.parse("$baseUrl/api/v1/parking-card-requests$queryString");
+
+  /// 3) Date logic
   final now = DateTime.now();
-
   DateTime requestAt;
   DateTime requestEnd;
 
@@ -1346,38 +1374,55 @@ class _RegisterScreenState extends State<RegisterScreen> {
   _lastRequestDateInt = requestDateInt;
   _lastRequestAtDateStr = requestAtDateStr;
 
-  /// ===============================
-  /// BUILD DTO
-  /// ===============================
+  /// 4) Work texts
+  String gdText = ministryController.text.trim();
+  String deptText = departmentController.text.trim();
+  String burauText = officeController.text.trim();
+  String posText = positionController.text.trim();
 
-  final dto = <String, dynamic>{
+  if (showWorkFields) {
+    gdText = gdText.isEmpty ? "-" : gdText;
+    deptText = deptText.isEmpty ? "-" : deptText;
+    burauText = burauText.isEmpty ? "-" : burauText;
+    posText = posText.isEmpty ? "-" : posText;
+  }
+
+  final policeIdVal = idNumberController.text.trim();
+  final provinceVal = provinceCityController.text.trim();
+
+  /// ✅ IMPORTANT: backend expects dto.user NOT NULL
+  final Map<String, dynamic> userObj = {
+    "name": fullNameController.text.trim(),
+    "phone": phoneController.text.trim(),
+    "userType": _userType,
+  };
+
+  /// 5) DTO (✅ user + workingInfo)
+  final Map<String, dynamic> dto = {
     "reason": reasonController.text.trim().isEmpty
         ? "Parking card request"
         : reasonController.text.trim(),
     "requestDate": requestDateInt,
+    if (_userType != "GUEST") "requestAtDate": requestAtDateStr,
 
-    /// 🔥 IMPORTANT FIX:
-    /// Always send generalDepartmentText (for GUEST/NATIONAL too)
-    "generalDepartmentText": ministryController.text.trim().isEmpty
-        ? null
-        : ministryController.text.trim(),
+    // ✅ REQUIRED by backend NPE stacktrace
+    "user": userObj,
 
-    "departmentText": departmentController.text.trim().isEmpty
-        ? null
-        : departmentController.text.trim(),
+    // ✅ Backend contract you pasted
+    "workingInfo": {
+      "policeId": showIdNumber ? policeIdVal : "",
+      "generalDepartmentText": gdText,
+      "departmentText": deptText,
+      "burauText": burauText,
+      "positionText": posText,
 
-    "burauText": officeController.text.trim().isEmpty
-        ? null
-        : officeController.text.trim(),
+      // IDs inside workingInfo (as your schema)
+      "generalDepartment": useWorkDropdown ? (selectedGD?.id ?? 0) : 0,
+      "department": useWorkDropdown ? (selectedDept?.id ?? 0) : 0,
+      "burau": useWorkDropdown ? (selectedBurau?.id ?? 0) : 0,
+      "position": useWorkDropdown ? (selectedPos?.id ?? 0) : 0,
 
-    "positionText": positionController.text.trim().isEmpty
-        ? null
-        : positionController.text.trim(),
-
-    "user": {
-      "name": fullNameController.text.trim(),
-      "phone": phoneController.text.trim(),
-      "userType": _userType,
+      "provinceCity": showProvinceCity ? provinceVal : "",
     },
 
     "vehicles": vehicles.map((v) {
@@ -1396,46 +1441,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }).toList(),
   };
 
-  if (_userType != "GUEST") {
-    dto["requestAtDate"] = requestAtDateStr;
-  }
+  debugPrint("URI = $uri");
+  debugPrint("DTO SENT = ${jsonEncode(dto)}");
 
-  if (showIdNumber) {
-    dto["policeId"] = idNumberController.text.trim();
-  }
-
-  if (showProvinceCity) {
-    dto["provinceCity"] = provinceCityController.text.trim();
-  }
-
-  /// ===============================
-  /// DEBUG (VERY IMPORTANT)
-  /// ===============================
-  print("===== DTO SENT TO BACKEND =====");
-  print(jsonEncode(dto));
-
-  /// ===============================
-  /// FILES + ATTACHMENT TYPES FIX
-  /// ===============================
-
-  final request = http.MultipartRequest("POST", base);
-  request.headers["Accept"] = "*/*";
-
-  final token = await _getToken();
-  if (token != null && token.isNotEmpty) {
-    request.headers["Authorization"] = "Bearer $token";
-  }
+  /// 6) Multipart request
+  final request = http.MultipartRequest("POST", uri);
+  request.headers["Authorization"] = "Bearer $token";
+  request.headers["Accept"] = "application/json";
 
   request.files.add(
     http.MultipartFile.fromString(
       "dto",
       jsonEncode(dto),
       filename: "dto.json",
-      contentType: MediaType('application', 'json'),
+      contentType: MediaType("application", "json"),
     ),
   );
 
-  /// Add vehicle documents
   for (int i = 0; i < attachFiles.length; i++) {
     request.files.add(
       await http.MultipartFile.fromPath(
@@ -1444,132 +1466,120 @@ class _RegisterScreenState extends State<RegisterScreen> {
         filename: attachFileNames[i],
       ),
     );
-    request.fields.putIfAbsent("attachmentTypes", () => "VEHICLE_DOCUMENT");
   }
 
-  /// Add selfie photo
   if (cameraFile != null) {
     request.files.add(
       await http.MultipartFile.fromPath(
         "files",
         cameraFile!.path,
-        filename: cameraFileName ?? cameraFile!.path.split('/').last,
+        filename: cameraFileName ?? cameraFile!.path.split("/").last,
       ),
     );
-    request.fields.putIfAbsent("attachmentTypes", () => "SELFIE_PHOTO");
   }
 
   final streamed = await request.send();
   final resp = await http.Response.fromStream(streamed);
 
+  debugPrint("STATUS: ${resp.statusCode}");
+  debugPrint("BODY: ${resp.body}");
+
   if (resp.statusCode != 200 && resp.statusCode != 201) {
-    throw "HTTP ${resp.statusCode}: ${resp.body}";
+    throw Exception("HTTP ${resp.statusCode}: ${resp.body}");
   }
 
   if (resp.body.isEmpty) return {};
-
   final decoded = jsonDecode(resp.body);
   return decoded is Map<String, dynamic> ? decoded : {};
 }
-
   // ----------------------------
   // Submit
   // ----------------------------
   Future<void> submitRegister() async {
-    // Ensure we have a valid token before submitting — save it to prefs on success
-    final loginRes = await _login(
-      baseUrl: "http://10.0.2.2:8080",
-      email: "user@moi.com",
-      password: "Moi@2026\$",
-    );
+    debugPrint("SUBMIT pressed");
 
-    if (loginRes.statusCode == 200) {
-      final tokens = await _extractAndSaveTokens(loginRes.body);
-      final access = tokens['access'] ?? '';
-      if (access.isEmpty) {
-        _snack('Login succeeded but no access token returned from server.');
-        return;
-      }
-    } else {
-      // Inform the user if login failed and stop the submit flow
-      _snack("Login Failed: ${loginRes.statusCode}");
-      return;
-    }
+    await _ensureAuth();
+
+    // ✅ sync before validation + submit
+    _syncWorkControllersFromDropdownIfNeeded();
 
     if (!validateForm()) return;
 
     setState(() => isLoading = true);
-    try {
-      final res = await createParkingCardRequest();
+    // ✅ Put this INSIDE submitRegister() -> after createParkingCardRequest() success
+try {
+  final res = await createParkingCardRequest();
+  if (!mounted) return;
 
-      if (!mounted) return;
-
-      Uint8List? selfieBytes;
-      if (cameraFile != null) {
-        selfieBytes = await cameraFile!.readAsBytes();
-      }
-
-      // ✅ Fetch selfie bytes from attachment URL if camera not available
-      Uint8List? attachmentBytes;
-      final attachments = res["attachments"] as List?;
-      if (selfieBytes == null && attachments != null && attachments.isNotEmpty) {
-        try {
-          final attachUrl = "$baseUrl${attachments[0]["url"]}";
-          final token = await _getToken();
-          final attachRes = await http.get(
-            Uri.parse(attachUrl),
-            headers: {
-              if (token != null && token.isNotEmpty) "Authorization": "Bearer $token",
-            },
-          );
-          if (attachRes.statusCode == 200) attachmentBytes = attachRes.bodyBytes;
-        } catch (_) {}
-      }
-
-      Navigator.pushNamed(
-        context,
-        Approute.verifySuccessScreen,
-        arguments: {
-          "code": res["code"],
-          "token": res["token"],
-          "parkingRequestStatus": res["parkingRequestStatus"],
-          // ✅ Use backend response for all fields
-          "fullName": res["name"] ?? fullNameController.text.trim(),
-          "phone": res["phone"] ?? phoneController.text.trim(),
-          "userType": res["userType"] ?? _userType,
-          "selfieBytes": selfieBytes ?? attachmentBytes,
-          "selfiePath": cameraFile?.path,
-          "requestDate": res["requestDate"] ?? _lastRequestDateInt,
-          "requestAtDate": res["requestAtDate"] ?? _lastRequestAtDateStr,
-          "vehicleType": (res["vehicles"] as List?)?.isNotEmpty == true
-              ? res["vehicles"][0]["vehicleType"]
-              : (vehicles.isNotEmpty ? vehicles.first.vehicleType : ""),
-          "workingInfo": {
-            "generalDepartmentText": res["generalDepartmentText"] ?? ministryController.text.trim(),
-            "departmentText": res["departmentText"] ?? departmentController.text.trim(),
-            "burauText": res["burauText"] ?? officeController.text.trim(),
-            "positionText": res["positionText"] ?? positionController.text.trim(),
-            "policeId": res["policeId"] ?? idNumberController.text.trim(),
-            "provinceCity": res["provinceCity"] ?? "-",
-          },
-          // ✅ Use backend vehicles — contains plateSubCategory (Khmer) and plateCode (English)
-          "vehicles": res["vehicles"] ?? [],
-        },
-      );
-    } catch (e, st) {
-      debugPrint("SUBMIT ERROR: $e");
-      debugPrint("STACK: $st");
-      if (!mounted) return;
-
-      final msg = e.toString().contains("401") || e.toString().contains("403")
-          ? "Backend still requires login (401/403). You must allow guest POST /parking-card-requests in backend."
-          : "Error: $e";
-
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-    } finally {
-      if (mounted) setState(() => isLoading = false);
-    }
+  // ✅ selfie bytes
+  Uint8List? selfieBytes;
+  if (cameraFile != null) {
+    selfieBytes = await cameraFile!.readAsBytes();
   }
+
+  // ✅ workingInfo map (SAFE)
+  final Map<String, dynamic> wi =
+      (res["workingInfo"] is Map<String, dynamic>)
+          ? (res["workingInfo"] as Map<String, dynamic>)
+          : (res["workingInfo"] is Map)
+              ? Map<String, dynamic>.from(res["workingInfo"] as Map)
+              : <String, dynamic>{};
+
+  // ✅ vehicles list (SAFE)
+  final List<dynamic> resVehicles =
+      (res["vehicles"] is List) ? (res["vehicles"] as List) : <dynamic>[];
+
+  Navigator.pushNamed(
+    context,
+    Approute.verifySuccessScreen,
+    arguments: {
+      "code": res["code"],
+      "token": res["token"],
+      "parkingRequestStatus": res["parkingRequestStatus"],
+      "fullName": (res["name"] ?? fullNameController.text.trim()).toString(),
+      "phone": (res["phone"] ?? phoneController.text.trim()).toString(),
+      "userType": (res["userType"] ?? _userType).toString(),
+
+      "selfieBytes": selfieBytes,
+      "selfiePath": cameraFile?.path,
+
+      "requestDate": res["requestDate"] ?? _lastRequestDateInt,
+      "requestAtDate": res["requestAtDate"] ?? _lastRequestAtDateStr,
+
+      "vehicleType": (resVehicles.isNotEmpty && resVehicles.first is Map)
+          ? ((resVehicles.first as Map)["vehicleType"] ?? "").toString()
+          : (vehicles.isNotEmpty ? vehicles.first.vehicleType : ""),
+
+      // ✅ WORKING INFO (from backend workingInfo, fallback to controllers)
+      "workingInfo": {
+        "generalDepartmentText":
+            (wi["generalDepartmentText"] ?? ministryController.text.trim() ?? "-")
+                .toString(),
+        "departmentText":
+            (wi["departmentText"] ?? departmentController.text.trim() ?? "-")
+                .toString(),
+        "burauText":
+            (wi["burauText"] ?? officeController.text.trim() ?? "-").toString(),
+        "positionText":
+            (wi["positionText"] ?? positionController.text.trim() ?? "-")
+                .toString(),
+        "policeId": (wi["policeId"] ?? idNumberController.text.trim() ?? "")
+            .toString(),
+        "provinceCity":
+            (wi["provinceCity"] ?? provinceCityController.text.trim() ?? "-")
+                .toString(),
+      },
+      "vehicles": resVehicles,
+    },
+  );
+} catch (e) {
+  debugPrint("SUBMIT ERROR: $e");
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(e.toString())),
+  );
+}
+}
 
   // ----------------------------
   // Date picker (NON duration)
@@ -1590,19 +1600,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ----------------------------
   // ✅ UI BLOCKS
   // ----------------------------
-  Widget fieldBlock({
-    required String label,
-    required Widget child,
-  }) {
+  Widget fieldBlock({required String label, required Widget child}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-          ),
+          Text(label,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           child,
         ],
@@ -1669,6 +1674,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // SEARCH ROW
                             Row(
                               children: [
                                 Expanded(
@@ -1680,9 +1686,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ),
                                 Column(
                                   children: [
-                                    SizedBox(
-                                      height: 20,
-                                    ),
+                                    const SizedBox(height: 20),
                                     Row(
                                       children: [
                                         SizedBox(
@@ -1691,8 +1695,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                           child: ElevatedButton(
                                             onPressed: () {
                                               _search(
-                                                  search:
-                                                      searchController.text);
+                                                  search: searchController.text);
                                             },
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.white,
@@ -1706,22 +1709,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                               elevation: 0,
                                               padding: EdgeInsets.zero,
                                             ),
-                                            child: Icon(Icons.search,
+                                            child: const Icon(Icons.search,
                                                 size: 24, color: Colors.black),
                                           ),
                                         ),
-                                        SizedBox(
-                                          width: 20,
-                                        )
+                                        const SizedBox(width: 20)
                                       ],
                                     ),
                                   ],
                                 ),
                               ],
                             ),
+
                             sectionTitle("ព័ត៌មានផ្ទាល់ខ្លួន"),
                             dropdownUserType(),
                             const SizedBox(height: 15),
+
                             if (showIdNumber) ...[
                               oneInput(
                                 label: "គោត្តនាម និងនាម",
@@ -1746,6 +1749,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 controller: fullNameController,
                               ),
                             ],
+
                             if (showWorkFields) ...[
                               sectionTitle("ព័ត៌មានការងារ"),
                               if (useWorkDropdown) ...[
@@ -1782,13 +1786,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ),
                               ],
                             ],
+
                             if (showProvinceCity)
                               oneInput(
                                 label: "ខេត្ត/រាជធានី",
                                 hint: "បញ្ចូលខេត្ត/រាជធានី",
                                 controller: provinceCityController,
                               ),
+
                             const SizedBox(height: 10),
+
                             if (useDurationDays) ...[
                               textFieldBlock(
                                 label: "លេខទូរស័ព្ទ",
@@ -1809,6 +1816,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ] else ...[
                               phoneAndDate(),
                             ],
+
                             sectionTitle("ព័ត៌មានរថយន្ត/ម៉ូតូ"),
                             ...List.generate(vehicles.length, (i) {
                               final v = vehicles[i];
@@ -1869,23 +1877,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     controller: v.brand,
                                   ),
                                   plateRow(v),
-
-                                  // ✅ Plate input with formatter
                                   textFieldBlock(
                                     label: "ផ្លាកលេខ",
                                     hint: "សូមបញ្ចូលផ្លាកលេខអោយត្រូវតាមទម្រង់",
                                     controller: v.plate,
                                     inputFormatters: _plateFormatters(v),
                                   ),
-
                                   const SizedBox(height: 10),
                                   Center(
                                     child: plateBox(
                                       label: subcategoryLabel(getSubcategoryKey(v)),
-                                      code:
-                                          _normalizePlate(v.plate.text).isEmpty
-                                              ? "----"
-                                              : _normalizePlate(v.plate.text),
+                                      code: _normalizePlate(v.plate.text).isEmpty
+                                          ? "----"
+                                          : _normalizePlate(v.plate.text),
                                       keyText: getPlateKey(v),
                                     ),
                                   ),
@@ -1918,7 +1922,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ----------------------------
-  // Work dropdown widgets (label on top)
+  // Work dropdown widgets
   // ----------------------------
   Widget _ddGeneralDepartment() {
     return fieldBlock(
@@ -2025,11 +2029,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     required String hint,
     required TextEditingController controller,
   }) {
-    return textFieldBlock(
-      label: label,
-      hint: hint,
-      controller: controller,
-    );
+    return textFieldBlock(label: label, hint: hint, controller: controller);
   }
 
   // ----------------------------
@@ -2078,7 +2078,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   v.carPlateSubcategory = null;
                 }
 
-                // ✅ reformat after changing type
                 v.plate.text = _formatPlateLive(v, v.plate.text);
               });
             },
@@ -2217,8 +2216,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             return Row(
               children: [
                 Expanded(
-                  child:
-                      Text(attachFileNames[i], overflow: TextOverflow.ellipsis),
+                  child: Text(attachFileNames[i],
+                      overflow: TextOverflow.ellipsis),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.red),
@@ -2246,9 +2245,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(selfieRequired
-              ? "ថតរូប Selfie (ចាំបាច់)"
-              : "ថតរូប Selfie (ជាជម្រើស)"),
+          Text(selfieRequired ? "ថតរូប Selfie (ចាំបាច់)" : "ថតរូប Selfie (ជាជម្រើស)"),
           const SizedBox(height: 8),
           GestureDetector(
             onTap: pickCameraImage,
@@ -2259,8 +2256,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 color: Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(
-                  color:
-                      cameraError != null ? Colors.red : Colors.grey.shade400,
+                  color: cameraError != null ? Colors.red : Colors.grey.shade400,
                   width: 1.5,
                 ),
               ),
@@ -2461,7 +2457,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             _resetWorkDropdownStateAndControllers();
           });
 
-          await _loadWorkDropdownsIfNeeded();
+          // ✅ FULL FIX: load dropdowns based on NEW type
+          await _loadWorkDropdownsIfNeeded(userTypeOverride: v);
         },
       ),
     );
@@ -2508,7 +2505,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 height: 48,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFFFFCA28),
+                    backgroundColor: const Color(0xFFFFCA28),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(15),
                     ),
