@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gov_reg/routes/approute.dart';
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
+import 'package:http/http.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -131,12 +131,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   static const String baseUrl = "http://10.0.2.2:8080";
 
   static const List<String> allowedUserTypes = [
-    "GUEST",
-    "INSIDE_OFFICER",
-    "OUTSIDE_OFFICER",
     "SECRETARY",
     "DEPUTY_SECRETARY",
+    "INSIDE_OFFICER",
+    "OUTSIDE_OFFICER",
     "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER",
+    "GUEST",
   ];
 
   /// ✅ Backend requires attachmentTypes for EACH file uploaded
@@ -145,7 +145,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   /// ✅ Selfie = INVITATION_DOCUMENT (as you requested)
   static const String attachmentTypeSelfie = "INVITATION_DOCUMENT";
 
-  // ✅ demo login creds (you already use these)
+  // ✅ demo login creds
   static const String _apiEmail = "user@moi.com";
   static const String _apiPassword = "Moi@2026\$";
 
@@ -155,7 +155,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void initState() {
     super.initState();
-    // ✅ FULL FIX: load dropdowns if initial type is officer (and ensure auth)
     _loadWorkDropdownsIfNeeded(userTypeOverride: _userType);
   }
 
@@ -182,14 +181,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final phoneController = TextEditingController();
   final searchController = TextEditingController();
 
-  /// calendar date (yyyy-MM-dd) - only for NON duration types
+  /// (kept but no longer used for officer/secretary/deputy)
   final requestDateController = TextEditingController();
 
   final provinceCityController = TextEditingController();
   final reasonController = TextEditingController();
 
-  /// ✅ duration days input (used for NATIONAL + GUEST)
+  /// (kept but replaced by dropdown for Guest/National)
   final durationDaysController = TextEditingController();
+
+  // ✅ NEW: duration dropdown for Guest/National (1..7)
+  int? selectedDurationDays; // 1..7
+  String? durationError;
 
   // Vehicles list
   final List<_VehicleForm> vehicles = [_VehicleForm()];
@@ -216,8 +219,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   void _syncWorkControllersFromDropdownIfNeeded() {
     if (!useWorkDropdown) return;
-
-    // Dropdown selected → fill controllers (so dto never sends empty)
     if (selectedGD != null) ministryController.text = selectedGD!.name;
     if (selectedDept != null) departmentController.text = selectedDept!.name;
     if (selectedBurau != null) officeController.text = selectedBurau!.name;
@@ -528,6 +529,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool get showProvinceCity => isNational;
 
+  /// ✅ ONLY Guest + National uses duration (now via dropdown 1..7)
   bool get useDurationDays => isNational || isGuest;
 
   bool get selfieRequired => isGuest;
@@ -543,9 +545,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
-
-  String _fmtYmd(DateTime d) =>
-      "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
 
   int _fmtYmdInt(DateTime d) => int.parse(
       "${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}");
@@ -563,7 +562,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     "ARMY_FORCE": [RegExp(r'^[2-6]{1}-[0-9]{4}$')],
     "REGULAR": [RegExp(r'^[2-6]{1}[A-Z]{1,2}-[0-9]{4}$')],
     "CAMBODIA": [RegExp(r'^[A-Z0-9.]{8,}$')],
-
     "MOTORBIKE_REGULAR": [RegExp(r'^1[A-Z]{1,2}-[0-9]{4}$')],
     "MOTORBIKE_CAMBODIA": [RegExp(r'^[A-Z0-9.]{8,}$')],
     "MOTORBIKE_POLICE": [RegExp(r'^1-[0-9]{4}$')],
@@ -661,7 +659,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     required String password,
   }) async {
     final uri = Uri.parse("$baseUrl/api/auth/authenticate");
-
     final res = await http.post(
       uri,
       headers: const {
@@ -670,7 +667,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       },
       body: jsonEncode({"email": email, "password": password}),
     );
-
     return res;
   }
 
@@ -768,7 +764,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _snack("Session expired. Please login again.");
   }
 
-  /// ✅ FULL FIX: ensure you are logged in before calling dropdown APIs / submit
   Future<void> _ensureAuth() async {
     final prefs = await SharedPreferences.getInstance();
     final existing = prefs.getString("accessToken") ?? "";
@@ -797,7 +792,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         uri,
         headers: {
           "Accept": "application/json",
-          if (t.isNotEmpty) "Authorization": "Bearer $t",
+          // if (t.isNotEmpty) "Authorization": "Bearer $t",
         },
       );
     }
@@ -816,7 +811,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     if (res.statusCode == 401) {
-      // only logout if we actually had a token (otherwise just let caller handle)
       if ((prefs.getString("accessToken") ?? "").isNotEmpty) {
         await forceLogout();
       }
@@ -826,12 +820,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ----------------------------
-  // ✅ Search API (fixed burauText)
+  // ✅ Search API
   // ----------------------------
   Future<http.Response> _search({required String search}) async {
     final uri = Uri.parse("$baseUrl/api/v1/parking-card-requests/search/$search");
-
-    // ✅ ensure auth (instead of repeating login everywhere)
     await _ensureAuth();
 
     try {
@@ -860,7 +852,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             "vehicleType": (responseData["vehicles"] as List).isNotEmpty
                 ? responseData["vehicles"][0]["vehicleType"]
                 : "",
-            // ✅ pass workingInfo but keep it consistent
             "workingInfo": {
               "generalDepartmentText":
                   responseData["generalDepartmentText"] ??
@@ -868,8 +859,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       responseData["organization"],
               "departmentText":
                   responseData["departmentText"] ?? responseData["department"],
-              "burauText":
-                  responseData["burauText"] ?? responseData["burau"],
+              "burauText": responseData["burauText"] ?? responseData["burau"],
               "positionText":
                   responseData["positionText"] ?? responseData["position"],
               "policeId": responseData["policeId"],
@@ -926,7 +916,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<List<BurauItem>> fetchBuraus() async {
-    final uri = Uri.parse("$baseUrl/api/v1/buraus");
+    final uri = Uri.parse("$baseUrl/api/v1/bureaus");
     final res = await _getWithAuthRetry(uri);
     if (res.statusCode != 200) {
       throw "Buraus HTTP ${res.statusCode}: ${res.body}";
@@ -951,12 +941,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         .toList();
   }
 
-  /// ✅ FULL FIX:
-  /// - Use userTypeOverride so it loads right after switching user type
-  /// - Ensure auth before calling dropdown APIs
   Future<void> _loadWorkDropdownsIfNeeded({String? userTypeOverride}) async {
     final type = userTypeOverride ?? _userType;
-    final shouldUseDropdown = (type == "INSIDE_OFFICER" || type == "OUTSIDE_OFFICER");
+    final shouldUseDropdown =
+        (type == "INSIDE_OFFICER" || type == "OUTSIDE_OFFICER");
     if (!shouldUseDropdown) return;
 
     await _ensureAuth();
@@ -1194,9 +1182,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ----------------------------
-  // validateForm
+  // ✅ validateForm (UPDATED)
   // ----------------------------
   bool validateForm() {
+    setState(() => durationError = null);
+
     if (fullNameController.text.trim().isEmpty) {
       _snack("សូមបញ្ចូលឈ្មោះពេញ");
       return false;
@@ -1226,24 +1216,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return false;
     }
 
+    // ✅ Guest + National must select duration 1..7 (dropdown)
     if (useDurationDays) {
-      final durText = durationDaysController.text.trim();
-      if (durText.isEmpty) {
-        _snack("សូមបញ្ចូលរយៈពេល (ចំនួនថ្ងៃ)");
-        return false;
-      }
-      final dur = int.tryParse(durText);
-      if (dur == null || dur <= 0) {
-        _snack("រយៈពេលត្រូវជាលេខ > 0");
-        return false;
-      }
-      if (dur > 365) {
-        _snack("រយៈពេលមិនអាចលើស 365 ថ្ងៃ");
-        return false;
-      }
-    } else {
-      if (requestDateController.text.trim().isEmpty) {
-        _snack("សូមជ្រើសកាលបរិច្ឆេទស្នើរ");
+      if (selectedDurationDays == null ||
+          selectedDurationDays! < 1 ||
+          selectedDurationDays! > 7) {
+        setState(() => durationError = "សូមជ្រើសរយៈពេល ១-៧ ថ្ងៃ");
+        _snack("សូមជ្រើសរយៈពេល ១-៧ ថ្ងៃ");
         return false;
       }
     }
@@ -1333,16 +1312,13 @@ Future<Map<String, dynamic>> createParkingCardRequest() async {
     throw Exception("Unauthorized: no access token");
   }
 
-  // ✅ sync dropdown -> controllers before dto
   _syncWorkControllersFromDropdownIfNeeded();
 
-  /// 1) attachmentTypes (same logic)
   final List<String> attachmentTypes = [
     ...List.filled(attachFiles.length, attachmentTypeVehicle),
     if (cameraFile != null) attachmentTypeSelfie,
   ];
 
-  /// 2) Query string
   String queryString = "";
   if (attachmentTypes.isNotEmpty) {
     final parts = attachmentTypes
@@ -1353,19 +1329,17 @@ Future<Map<String, dynamic>> createParkingCardRequest() async {
 
   final uri = Uri.parse("$baseUrl/api/v1/parking-card-requests$queryString");
 
-  /// 3) Date logic
   final now = DateTime.now();
-  DateTime requestAt;
-  DateTime requestEnd;
+  late final DateTime requestAt;
+  late final DateTime requestEnd;
 
   if (useDurationDays) {
-    final dur = int.parse(durationDaysController.text.trim());
+    final dur = selectedDurationDays ?? 1;
     requestAt = now;
     requestEnd = requestAt.add(Duration(days: dur));
   } else {
-    final chosen = DateTime.parse(requestDateController.text.trim());
-    requestAt = chosen;
-    requestEnd = DateTime(chosen.year + 1, chosen.month, chosen.day);
+    requestAt = now;
+    requestEnd = DateTime(now.year + 1, now.month, now.day);
   }
 
   final int requestDateInt = _fmtYmdInt(requestEnd);
@@ -1374,57 +1348,49 @@ Future<Map<String, dynamic>> createParkingCardRequest() async {
   _lastRequestDateInt = requestDateInt;
   _lastRequestAtDateStr = requestAtDateStr;
 
-  /// 4) Work texts
   String gdText = ministryController.text.trim();
   String deptText = departmentController.text.trim();
-  String burauText = officeController.text.trim();
+  String bureauText = officeController.text.trim();
   String posText = positionController.text.trim();
+
+  final String policeIdVal = idNumberController.text.trim();
+  final String provinceVal = provinceCityController.text.trim();
 
   if (showWorkFields) {
     gdText = gdText.isEmpty ? "-" : gdText;
     deptText = deptText.isEmpty ? "-" : deptText;
-    burauText = burauText.isEmpty ? "-" : burauText;
+    bureauText = bureauText.isEmpty ? "-" : bureauText;
     posText = posText.isEmpty ? "-" : posText;
+  } else {
+    gdText = "";
+    deptText = "";
+    bureauText = "";
+    posText = "";
   }
 
-  final policeIdVal = idNumberController.text.trim();
-  final provinceVal = provinceCityController.text.trim();
-
-  /// ✅ IMPORTANT: backend expects dto.user NOT NULL
-  final Map<String, dynamic> userObj = {
-    "name": fullNameController.text.trim(),
-    "phone": phoneController.text.trim(),
-    "userType": _userType,
-  };
-
-  /// 5) DTO (✅ user + workingInfo)
   final Map<String, dynamic> dto = {
     "reason": reasonController.text.trim().isEmpty
         ? "Parking card request"
         : reasonController.text.trim(),
     "requestDate": requestDateInt,
     if (_userType != "GUEST") "requestAtDate": requestAtDateStr,
-
-    // ✅ REQUIRED by backend NPE stacktrace
-    "user": userObj,
-
-    // ✅ Backend contract you pasted
+    "user": {
+      "name": fullNameController.text.trim(),
+      "phone": phoneController.text.trim(),
+      "userType": _userType,
+    },
     "workingInfo": {
       "policeId": showIdNumber ? policeIdVal : "",
       "generalDepartmentText": gdText,
       "departmentText": deptText,
-      "burauText": burauText,
+      "bureauText": bureauText,
       "positionText": posText,
-
-      // IDs inside workingInfo (as your schema)
       "generalDepartment": useWorkDropdown ? (selectedGD?.id ?? 0) : 0,
       "department": useWorkDropdown ? (selectedDept?.id ?? 0) : 0,
-      "burau": useWorkDropdown ? (selectedBurau?.id ?? 0) : 0,
+      "bureau": useWorkDropdown ? (selectedBurau?.id ?? 0) : 0,
       "position": useWorkDropdown ? (selectedPos?.id ?? 0) : 0,
-
       "provinceCity": showProvinceCity ? provinceVal : "",
     },
-
     "vehicles": vehicles.map((v) {
       return {
         "brand": v.brand.text.trim(),
@@ -1444,7 +1410,6 @@ Future<Map<String, dynamic>> createParkingCardRequest() async {
   debugPrint("URI = $uri");
   debugPrint("DTO SENT = ${jsonEncode(dto)}");
 
-  /// 6) Multipart request
   final request = http.MultipartRequest("POST", uri);
   request.headers["Authorization"] = "Bearer $token";
   request.headers["Accept"] = "application/json";
@@ -1489,114 +1454,109 @@ Future<Map<String, dynamic>> createParkingCardRequest() async {
   }
 
   if (resp.body.isEmpty) return {};
+
   final decoded = jsonDecode(resp.body);
   return decoded is Map<String, dynamic> ? decoded : {};
 }
-  // ----------------------------
-  // Submit
-  // ----------------------------
-  Future<void> submitRegister() async {
-    debugPrint("SUBMIT pressed");
+Future<void> submitRegister() async {
+  debugPrint("SUBMIT pressed");
 
-    await _ensureAuth();
+  await _ensureAuth();
+  _syncWorkControllersFromDropdownIfNeeded();
 
-    // ✅ sync before validation + submit
-    _syncWorkControllersFromDropdownIfNeeded();
+  if (!validateForm()) return;
 
-    if (!validateForm()) return;
+  setState(() => isLoading = true);
 
-    setState(() => isLoading = true);
-    // ✅ Put this INSIDE submitRegister() -> after createParkingCardRequest() success
-try {
-  final res = await createParkingCardRequest();
-  if (!mounted) return;
+  try {
+    final res = await createParkingCardRequest();
+    if (!mounted) return;
 
-  // ✅ selfie bytes
-  Uint8List? selfieBytes;
-  if (cameraFile != null) {
-    selfieBytes = await cameraFile!.readAsBytes();
-  }
+    Uint8List? selfieBytes;
+    if (cameraFile != null) {
+      selfieBytes = await cameraFile!.readAsBytes();
+    }
 
-  // ✅ workingInfo map (SAFE)
-  final Map<String, dynamic> wi =
-      (res["workingInfo"] is Map<String, dynamic>)
-          ? (res["workingInfo"] as Map<String, dynamic>)
-          : (res["workingInfo"] is Map)
-              ? Map<String, dynamic>.from(res["workingInfo"] as Map)
-              : <String, dynamic>{};
+    String fallbackText(
+      dynamic apiValue,
+      String controllerValue, {
+      String defaultValue = "-",
+    }) {
+      final api = (apiValue ?? "").toString().trim();
+      if (api.isNotEmpty && api.toLowerCase() != "null") {
+        return api;
+      }
 
-  // ✅ vehicles list (SAFE)
-  final List<dynamic> resVehicles =
-      (res["vehicles"] is List) ? (res["vehicles"] as List) : <dynamic>[];
+      final local = controllerValue.trim();
+      if (local.isNotEmpty) {
+        return local;
+      }
 
-  Navigator.pushNamed(
-    context,
-    Approute.verifySuccessScreen,
-    arguments: {
-      "code": res["code"],
-      "token": res["token"],
-      "parkingRequestStatus": res["parkingRequestStatus"],
-      "fullName": (res["name"] ?? fullNameController.text.trim()).toString(),
-      "phone": (res["phone"] ?? phoneController.text.trim()).toString(),
-      "userType": (res["userType"] ?? _userType).toString(),
+      return defaultValue;
+    }
 
-      "selfieBytes": selfieBytes,
-      "selfiePath": cameraFile?.path,
+    final List<dynamic> resVehicles =
+        (res["vehicles"] is List) ? (res["vehicles"] as List) : <dynamic>[];
 
-      "requestDate": res["requestDate"] ?? _lastRequestDateInt,
-      "requestAtDate": res["requestAtDate"] ?? _lastRequestAtDateStr,
-
-      "vehicleType": (resVehicles.isNotEmpty && resVehicles.first is Map)
-          ? ((resVehicles.first as Map)["vehicleType"] ?? "").toString()
-          : (vehicles.isNotEmpty ? vehicles.first.vehicleType : ""),
-
-      // ✅ WORKING INFO (from backend workingInfo, fallback to controllers)
-      "workingInfo": {
-        "generalDepartmentText":
-            (wi["generalDepartmentText"] ?? ministryController.text.trim() ?? "-")
-                .toString(),
-        "departmentText":
-            (wi["departmentText"] ?? departmentController.text.trim() ?? "-")
-                .toString(),
-        "burauText":
-            (wi["burauText"] ?? officeController.text.trim() ?? "-").toString(),
-        "positionText":
-            (wi["positionText"] ?? positionController.text.trim() ?? "-")
-                .toString(),
-        "policeId": (wi["policeId"] ?? idNumberController.text.trim() ?? "")
-            .toString(),
-        "provinceCity":
-            (wi["provinceCity"] ?? provinceCityController.text.trim() ?? "-")
-                .toString(),
+    Navigator.pushNamed(
+      context,
+      Approute.verifySuccessScreen,
+      arguments: {
+        "code": res["code"],
+        "token": res["token"],
+        "parkingRequestStatus": res["parkingRequestStatus"],
+        "fullName": (res["name"] ?? fullNameController.text.trim()).toString(),
+        "phone": (res["phone"] ?? phoneController.text.trim()).toString(),
+        "userType": (res["userType"] ?? _userType).toString(),
+        "selfieBytes": selfieBytes,
+        "selfiePath": cameraFile?.path,
+        "requestDate": res["requestDate"] ?? _lastRequestDateInt,
+        "requestAtDate": res["requestAtDate"] ?? _lastRequestAtDateStr,
+        "vehicleType": (resVehicles.isNotEmpty && resVehicles.first is Map)
+            ? ((resVehicles.first as Map)["vehicleType"] ?? "").toString()
+            : (vehicles.isNotEmpty ? vehicles.first.vehicleType : ""),
+        "workingInfo": {
+          "generalDepartmentText": fallbackText(
+            res["generalDepartmentText"],
+            ministryController.text,
+          ),
+          "departmentText": fallbackText(
+            res["departmentText"],
+            departmentController.text,
+          ),
+          "bureauText": fallbackText(
+            res["bureauText"],
+            officeController.text,
+          ),
+          "positionText": fallbackText(
+            res["positionText"],
+            positionController.text,
+          ),
+          "policeId": fallbackText(
+            res["policeId"],
+            idNumberController.text,
+            defaultValue: "",
+          ),
+          "provinceCity": fallbackText(
+            res["provinceCity"],
+            provinceCityController.text,
+          ),
+        },
+        "vehicles": resVehicles,
       },
-      "vehicles": resVehicles,
-    },
-  );
-} catch (e) {
-  debugPrint("SUBMIT ERROR: $e");
-  if (!mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(e.toString())),
-  );
-}
-}
-
-  // ----------------------------
-  // Date picker (NON duration)
-  // ----------------------------
-  void pickDate() async {
-    final d = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2100),
     );
-
-    if (d != null) {
-      requestDateController.text = _fmtYmd(d);
+  } catch (e) {
+    debugPrint("SUBMIT ERROR: $e");
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(e.toString())),
+    );
+  } finally {
+    if (mounted) {
+      setState(() => isLoading = false);
     }
   }
-
+}
   // ----------------------------
   // ✅ UI BLOCKS
   // ----------------------------
@@ -1648,279 +1608,305 @@ try {
   // ----------------------------
   // UI
   // ----------------------------
-  @override
-  Widget build(BuildContext context) {
-    if (!allowedUserTypes.contains(_userType)) _userType = "GUEST";
+@override
+Widget build(BuildContext context) {
+  if (!allowedUserTypes.contains(_userType)) _userType = "GUEST";
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFFFCA28),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 130),
+  return Scaffold(
+    backgroundColor: Colors.grey.shade100,
+    body: SingleChildScrollView(
+      child: Column(
+        children: [
+          _header(),
+
+          // ✅ FORM ON APPBAR (overlap header)
+          Transform.translate(
+            offset: const Offset(0, -60), // change -50/-70 to adjust
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 15),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: const [
+                    BoxShadow(
+                      blurRadius: 12,
+                      offset: Offset(0, 6),
+                      color: Colors.black12,
+                    ),
+                  ],
+                ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _header(),
-                    const SizedBox(height: 20),
+                    SizedBox(height: 10),
+                    // ✅ SEARCH
                     Padding(
-                      padding: const EdgeInsets.all(15),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // SEARCH ROW
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: oneInput(
-                                    label: "ស្វែងរក",
-                                    hint: "តាមរយះ លេខកូដ ឬលេខទូរស័ព្ទ",
-                                    controller: searchController,
-                                  ),
-                                ),
-                                Column(
-                                  children: [
-                                    const SizedBox(height: 20),
-                                    Row(
-                                      children: [
-                                        SizedBox(
-                                          height: 48,
-                                          width: 48,
-                                          child: ElevatedButton(
-                                            onPressed: () {
-                                              _search(
-                                                  search: searchController.text);
-                                            },
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.white,
-                                              foregroundColor: Colors.black,
-                                              side: BorderSide(
-                                                  color: Colors.grey.shade400),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(16),
-                                              ),
-                                              elevation: 0,
-                                              padding: EdgeInsets.zero,
-                                            ),
-                                            child: const Icon(Icons.search,
-                                                size: 24, color: Colors.black),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 20)
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ],
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: searchController,
+                              decoration: inputDecoration(
+                                "តាមរយះ លេខកូដ ឬលេខទូរស័ព្ទ",
+                              ).copyWith(
+                                prefixIcon: const Icon(Icons.search),
+                              ),
                             ),
-
-                            sectionTitle("ព័ត៌មានផ្ទាល់ខ្លួន"),
-                            dropdownUserType(),
-                            const SizedBox(height: 15),
-
-                            if (showIdNumber) ...[
-                              oneInput(
-                                label: "គោត្តនាម និងនាម",
-                                hint: "បញ្ចូលឈ្មោះពេញ",
-                                controller: fullNameController,
-                              ),
-                              textFieldBlock(
-                                label: "អត្តលេខ",
-                                hint: "បញ្ចូលអត្តលេខ",
-                                controller: idNumberController,
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                  LengthLimitingTextInputFormatter(10),
-                                ],
-                                maxLength: 10,
-                              ),
-                            ] else ...[
-                              oneInput(
-                                label: "គោត្តនាម និងនាម",
-                                hint: "បញ្ចូលឈ្មោះពេញ",
-                                controller: fullNameController,
-                              ),
-                            ],
-
-                            if (showWorkFields) ...[
-                              sectionTitle("ព័ត៌មានការងារ"),
-                              if (useWorkDropdown) ...[
-                                if (dropdownLoading)
-                                  const Padding(
-                                    padding: EdgeInsets.symmetric(
-                                        horizontal: 20, vertical: 8),
-                                    child: LinearProgressIndicator(),
-                                  ),
-                                _ddGeneralDepartment(),
-                                _ddDepartment(),
-                                _ddBurau(),
-                                _ddPosition(),
-                              ] else ...[
-                                oneInput(
-                                  label: "ក្រសួង/ស្ថាប័ន",
-                                  hint: "បញ្ចូលក្រសួង",
-                                  controller: ministryController,
+                          ),
+                          const SizedBox(width: 10),
+                          SizedBox(
+                            height: 48,
+                            width: 48,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                _search(search: searchController.text);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: Colors.black,
+                                side: BorderSide(color: Colors.grey.shade400),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                                oneInput(
-                                  label: "នាយកដ្ឋាន/អង្គភាព",
-                                  hint: "បញ្ចូលនាយកដ្ឋាន",
-                                  controller: departmentController,
-                                ),
-                                oneInput(
-                                  label: "ការិយាល័យ",
-                                  hint: "បញ្ចូលការិយាល័យ",
-                                  controller: officeController,
-                                ),
-                                oneInput(
-                                  label: "តួនាទី",
-                                  hint: "បញ្ចូលតួនាទី",
-                                  controller: positionController,
-                                ),
-                              ],
-                            ],
-
-                            if (showProvinceCity)
-                              oneInput(
-                                label: "ខេត្ត/រាជធានី",
-                                hint: "បញ្ចូលខេត្ត/រាជធានី",
-                                controller: provinceCityController,
+                                elevation: 0,
+                                padding: EdgeInsets.zero,
                               ),
-
-                            const SizedBox(height: 10),
-
-                            if (useDurationDays) ...[
-                              textFieldBlock(
-                                label: "លេខទូរស័ព្ទ",
-                                hint: "លេខទូរស័ព្ទ",
-                                controller: phoneController,
-                                keyboardType: TextInputType.phone,
-                              ),
-                              textFieldBlock(
-                                label: "រយៈពេលស្នើរ (ចំនួនថ្ងៃ)",
-                                hint: "ឧ: 2 ឬ 4 ឬ 7",
-                                controller: durationDaysController,
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                  LengthLimitingTextInputFormatter(3),
-                                ],
-                              ),
-                            ] else ...[
-                              phoneAndDate(),
-                            ],
-
-                            sectionTitle("ព័ត៌មានរថយន្ត/ម៉ូតូ"),
-                            ...List.generate(vehicles.length, (i) {
-                              final v = vehicles[i];
-
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 20, vertical: 6),
-                                    child: Row(
-                                      children: [
-                                        Text("រថយន្ត/ម៉ូតូ #${i + 1}",
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.bold)),
-                                        const Spacer(),
-                                        if (vehicles.length > 1)
-                                          IconButton(
-                                            icon: const Icon(Icons.delete,
-                                                color: Colors.red),
-                                            onPressed: () {
-                                              setState(() {
-                                                v.dispose();
-                                                vehicles.removeAt(i);
-                                              });
-                                            },
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: RadioListTile<String>(
-                                          value: "CAR",
-                                          groupValue: v.vehicleType,
-                                          title: const Text("រថយន្ត"),
-                                          onChanged: (x) => setState(() {
-                                            if (x != null) v.vehicleType = x;
-                                          }),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        child: RadioListTile<String>(
-                                          value: "MOTORBIKE",
-                                          groupValue: v.vehicleType,
-                                          title: const Text("ម៉ូតូ"),
-                                          onChanged: (x) => setState(() {
-                                            if (x != null) v.vehicleType = x;
-                                          }),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  oneInput(
-                                    label: "ម៉ាក",
-                                    hint: "បញ្ចូលម៉ាក",
-                                    controller: v.brand,
-                                  ),
-                                  plateRow(v),
-                                  textFieldBlock(
-                                    label: "ផ្លាកលេខ",
-                                    hint: "សូមបញ្ចូលផ្លាកលេខអោយត្រូវតាមទម្រង់",
-                                    controller: v.plate,
-                                    inputFormatters: _plateFormatters(v),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Center(
-                                    child: plateBox(
-                                      label: subcategoryLabel(getSubcategoryKey(v)),
-                                      code: _normalizePlate(v.plate.text).isEmpty
-                                          ? "----"
-                                          : _normalizePlate(v.plate.text),
-                                      keyText: getPlateKey(v),
-                                    ),
-                                  ),
-                                  oneInput(
-                                    label: "ពណ៌",
-                                    hint: "ពណ៌រថយន្ត",
-                                    controller: v.color,
-                                  ),
-                                  oneInput(
-                                    label: "ឆ្នាំផលិត",
-                                    hint: "ឆ្នាំផលិត",
-                                    controller: v.year,
-                                  ),
-                                  const Divider(height: 24),
-                                ],
-                              );
-                            }),
-                            uploadMultiAttachment(),
-                            uploadCameraAttachment(),
-                            bottom(),
-                          ],
-                        ),
+                              child: const Icon(Icons.search,
+                                  size: 24, color: Colors.black),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                    SizedBox(height: 10),
+                    sectionTitle("ព័ត៌មានផ្ទាល់ខ្លួន"),
+                    dropdownUserType(),
+                    const SizedBox(height: 15),
+
+                    // ✅ NAME
+                    oneInput(
+                      label: "គោត្តនាម និងនាម",
+                      hint: "បញ្ចូលឈ្មោះពេញ",
+                      controller: fullNameController,
+                    ),
+
+                    // ✅ ID NUMBER (only officer)
+                    if (showIdNumber)
+                      textFieldBlock(
+                        label: "អត្តលេខ",
+                        hint: "បញ្ចូលអត្តលេខ",
+                        controller: idNumberController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
+                        maxLength: 10,
+                      ),
+
+                    // ✅ WORK FIELDS
+                    if (showWorkFields) ...[
+                      sectionTitle("ព័ត៌មានការងារ"),
+                      if (useWorkDropdown) ...[
+                        if (dropdownLoading)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 8),
+                            child: LinearProgressIndicator(),
+                          ),
+                        _ddGeneralDepartment(),
+                        _ddDepartment(),
+                        _ddBurau(),
+                        _ddPosition(),
+                      ] else ...[
+                        oneInput(
+                          label: "ក្រសួង/ស្ថាប័ន",
+                          hint: "បញ្ចូលក្រសួង",
+                          controller: ministryController,
+                        ),
+                        oneInput(
+                          label: "នាយកដ្ឋាន/អង្គភាព",
+                          hint: "បញ្ចូលនាយកដ្ឋាន",
+                          controller: departmentController,
+                        ),
+                        oneInput(
+                          label: "ការិយាល័យ",
+                          hint: "បញ្ចូលការិយាល័យ",
+                          controller: officeController,
+                        ),
+                        oneInput(
+                          label: "តួនាទី",
+                          hint: "បញ្ចូលតួនាទី",
+                          controller: positionController,
+                        ),
+                      ],
+                    ],
+
+                    // ✅ PROVINCE CITY (National only)
+                    if (showProvinceCity)
+                      oneInput(
+                        label: "ខេត្ត/រាជធានី",
+                        hint: "បញ្ចូលខេត្ត/រាជធានី",
+                        controller: provinceCityController,
+                      ),
+
+                    // ✅ PHONE
+                    textFieldBlock(
+                      label: "លេខទូរស័ព្ទ",
+                      hint: "លេខទូរស័ព្ទ",
+                      controller: phoneController,
+                      keyboardType: TextInputType.phone,
+                    ),
+
+                    // ✅ DURATION (Guest + National)
+                    if (useDurationDays) ...[
+                      fieldBlock(
+                        label: "រយៈពេលស្នើរ (១-៧ ថ្ងៃ)",
+                        child: DropdownButtonFormField<int>(
+                          isExpanded: true,
+                          value: selectedDurationDays,
+                          decoration: inputDecoration("ជ្រើសរយៈពេល ១-៧ ថ្ងៃ")
+                              .copyWith(errorText: durationError),
+                          items: List.generate(7, (i) {
+                            final d = i + 1;
+                            return DropdownMenuItem<int>(
+                              value: d,
+                              child: Text("$d ថ្ងៃ"),
+                            );
+                          }),
+                          onChanged: (v) {
+                            setState(() {
+                              selectedDurationDays = v;
+                              durationError = null;
+                            });
+                          },
+                        ),
+                      ),
+                    ] else ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 6),
+                        child: Text(
+                          "កាលបរិច្ឆេទស្នើរ៖ ស្វ័យប្រវត្តិ (ថ្ងៃនេះ) | ផុតកំណត់៖ ១ ឆ្នាំ",
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey.shade700),
+                        ),
+                      ),
+                    ],
+
+                    // ✅ VEHICLE SECTION
+                    sectionTitle("ព័ត៌មានរថយន្ត/ម៉ូតូ"),
+                    ...List.generate(vehicles.length, (i) {
+                      final v = vehicles[i];
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 6),
+                            child: Row(
+                              children: [
+                                Text("រថយន្ត/ម៉ូតូ #${i + 1}",
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold)),
+                                const Spacer(),
+                                if (vehicles.length > 1)
+                                  IconButton(
+                                    icon: const Icon(Icons.delete,
+                                        color: Colors.red),
+                                    onPressed: () {
+                                      setState(() {
+                                        v.dispose();
+                                        vehicles.removeAt(i);
+                                      });
+                                    },
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: RadioListTile<String>(
+                                  value: "CAR",
+                                  groupValue: v.vehicleType,
+                                  title: const Text("រថយន្ត"),
+                                  onChanged: (x) =>
+                                      setState(() => v.vehicleType = x!),
+                                ),
+                              ),
+                              Expanded(
+                                child: RadioListTile<String>(
+                                  value: "MOTORBIKE",
+                                  groupValue: v.vehicleType,
+                                  title: const Text("ម៉ូតូ"),
+                                  onChanged: (x) =>
+                                      setState(() => v.vehicleType = x!),
+                                ),
+                              ),
+                            ],
+                          ),
+                          oneInput(
+                            label: "ម៉ាក",
+                            hint: "បញ្ចូលម៉ាក",
+                            controller: v.brand,
+                          ),
+                          plateRow(v),
+                          textFieldBlock(
+                            label: "ផ្លាកលេខ",
+                            hint: "សូមបញ្ចូលផ្លាកលេខ",
+                            controller: v.plate,
+                            inputFormatters: _plateFormatters(v),
+                          ),
+                          const SizedBox(height: 10),
+                          Center(
+                            child: plateBox(
+                              label: subcategoryLabel(getSubcategoryKey(v)),
+                              code: _normalizePlate(v.plate.text).isEmpty
+                                  ? "----"
+                                  : _normalizePlate(v.plate.text),
+                              keyText: getPlateKey(v),
+                            ),
+                          ),
+                          oneInput(
+                            label: "ពណ៌",
+                            hint: "ពណ៌រថយន្ត",
+                            controller: v.color,
+                          ),
+                          oneInput(
+                            label: "ឆ្នាំផលិត",
+                            hint: "ឆ្នាំផលិត",
+                            controller: v.year,
+                          ),
+                          const Divider(height: 24),
+                        ],
+                      );
+                    }),
+
+                    // ✅ ATTACHMENTS
+                    uploadMultiAttachment(),
+                    uploadCameraAttachment(),
+
+                    // ✅ BUTTONS (inside scroll => can see full form)
+                    bottom(),
+
+                    const SizedBox(height: 30),
                   ],
                 ),
               ),
             ),
-    );
-  }
+          ),
 
+          // ✅ This makes sure the scroll has space after overlap
+          const SizedBox(height: 60),
+        ],
+      ),
+    ),
+  );
+}
   // ----------------------------
   // Work dropdown widgets
   // ----------------------------
@@ -1993,31 +1979,6 @@ try {
             .toList(),
         onChanged: (x) => onSelectPosition(x),
       ),
-    );
-  }
-
-  // ----------------------------
-  // Phone/date vertical
-  // ----------------------------
-  Widget phoneAndDate() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        textFieldBlock(
-          label: "លេខទូរស័ព្ទ",
-          hint: "លេខទូរស័ព្ទ",
-          controller: phoneController,
-          keyboardType: TextInputType.phone,
-        ),
-        textFieldBlock(
-          label: "កាលបរិច្ឆេទស្នើរ",
-          hint: "ថ្ងៃស្នើរ",
-          controller: requestDateController,
-          readOnly: true,
-          suffixIcon: const Icon(Icons.calendar_month),
-          onTap: pickDate,
-        ),
-      ],
     );
   }
 
@@ -2117,7 +2078,6 @@ try {
       ],
     );
   }
-
   Widget plateBox({
     required String label,
     required String code,
@@ -2305,20 +2265,29 @@ try {
   // ----------------------------
   Widget _header() {
     return Container(
-      height: 265,
+      height: 340,
       width: double.infinity,
-      color: Colors.white,
+      decoration: BoxDecoration(
+        color: Color(0xFF06175F),
+      ),
       child: Column(
-        children: const [
+        children: [
           SizedBox(height: 55),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Padding(
                 padding: EdgeInsets.all(8.0),
-                child: Image(
-                  image: AssetImage('assets/img/about-moi-logo.png'),
-                  height: 100,
+                child: Container(
+                  padding: EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                  ),
+                  child: Image.asset(
+                    'assets/img/about-moi-logo.png',
+                    height: 90,
+                  ),
                 ),
               ),
               Column(
@@ -2327,7 +2296,7 @@ try {
                   Text(
                     'ក្រសួងមហាផ្ទៃ',
                     style: TextStyle(
-                      fontSize: 22,
+                      fontSize: 26,
                       fontWeight: FontWeight.bold,
                       color: Color(0xffDFB73B),
                     ),
@@ -2336,7 +2305,7 @@ try {
                   Text(
                     'Ministry of Interior',
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 18,
                       color: Color(0xffDFB73B),
                       fontWeight: FontWeight.bold,
                     ),
@@ -2345,15 +2314,15 @@ try {
               ),
             ],
           ),
-          SizedBox(height: 15),
-          Text(
-            "ទម្រង់ការស្នើរសំុបំពេញបែបបទចេញចូល​",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
           SizedBox(height: 10),
           Text(
+            "ទម្រង់ការស្នើរសំុបំពេញបែបបទចេញចូល​",
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold,color: Colors.white),
+          ),
+          SizedBox(height: 5),
+          Text(
             "ទីស្តីការក្រសួងមហាផ្ទៃ",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold,color: Colors.white),
           ),
         ],
       ),
@@ -2383,18 +2352,18 @@ try {
   Widget dropdownUserType() {
     String labelOf(String v) {
       switch (v) {
-        case "GUEST":
-          return "ភ្ញៀវ";
-        case "INSIDE_OFFICER":
-          return "មន្រ្តីបំរើការងារនៅក្នុងទីស្តីការក្រសួងមហាផ្ទៃ";
-        case "OUTSIDE_OFFICER":
-          return "មន្រ្តីបំរើការងារនៅក្រៅទីស្តីការក្រសួងមហាផ្ទៃ";
         case "SECRETARY":
           return "រដ្ឋលេខាធិការក្រសួងមហាផ្ទៃ";
         case "DEPUTY_SECRETARY":
           return "អនុរដ្ឋលេខាធិការ​ ក្រសួងមហាផ្ទៃ";
+        case "INSIDE_OFFICER":
+          return "មន្រ្តីបំរើការងារនៅក្នុងទីស្តីការក្រសួងមហាផ្ទៃ";
+        case "OUTSIDE_OFFICER":
+          return "មន្រ្តីបំរើការងារនៅក្រៅទីស្តីការក្រសួងមហាផ្ទៃ";
         case "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER":
           return "មន្ត្រីរដ្ឋបាលថ្នាក់ក្រោមជាតិ";
+        case "GUEST":
+          return "ភ្ញៀវ";
         default:
           return v;
       }
@@ -2419,6 +2388,10 @@ try {
           setState(() {
             _userType = v;
 
+            // ✅ reset duration dropdown
+            selectedDurationDays = null;
+            durationError = null;
+
             if (!(v == "INSIDE_OFFICER" || v == "OUTSIDE_OFFICER")) {
               idNumberController.clear();
             }
@@ -2439,12 +2412,9 @@ try {
               provinceCityController.clear();
             }
 
-            if (v == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER" ||
-                v == "GUEST") {
-              requestDateController.clear();
-            } else {
-              durationDaysController.clear();
-            }
+            // ✅ Keep these clears (no date picker used anymore)
+            requestDateController.clear();
+            durationDaysController.clear();
 
             attachFiles.clear();
             attachFileNames.clear();
@@ -2457,7 +2427,6 @@ try {
             _resetWorkDropdownStateAndControllers();
           });
 
-          // ✅ FULL FIX: load dropdowns based on NEW type
           await _loadWorkDropdownsIfNeeded(userTypeOverride: v);
         },
       ),
@@ -2471,41 +2440,41 @@ try {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Row(
           children: [
-            Expanded(
-              child: SizedBox(
-                height: 48,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFFFCA28)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                  ),
-                  onPressed: () {
-                    setState(() => vehicles.add(_VehicleForm()));
-                  },
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.add, color: Color(0xFFFFCA28), size: 20),
-                      SizedBox(width: 6),
-                      Text(
-                        "បន្ថែមរថយន្ត",
-                        style:
-                            TextStyle(fontSize: 16, color: Color(0xFFFFCA28)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
+            // Expanded(
+            //   child: SizedBox(
+            //     height: 48,
+            //     child: OutlinedButton(
+            //       style: OutlinedButton.styleFrom(
+            //         side: const BorderSide(color: Color(0xFFFFCA28)),
+            //         shape: RoundedRectangleBorder(
+            //           borderRadius: BorderRadius.circular(15),
+            //         ),
+            //       ),
+            //       onPressed: () {
+            //         setState(() => vehicles.add(_VehicleForm()));
+            //       },
+            //       child: Row(
+            //         mainAxisSize: MainAxisSize.min,
+            //         children: const [
+            //           Icon(Icons.add, color: Color(0xFFFFCA28), size: 20),
+            //           SizedBox(width: 6),
+            //           Text(
+            //             "បន្ថែមរថយន្ត",
+            //             style:
+            //                 TextStyle(fontSize: 16, color: Color(0xFFFFCA28)),
+            //           ),
+            //         ],
+            //       ),
+            //     ),
+            //   ),
+            // ),
+            // const SizedBox(width: 10),
             Expanded(
               child: SizedBox(
                 height: 48,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFCA28),
+                    backgroundColor: const Color(0xFF06175F),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(15),
                     ),
@@ -2513,7 +2482,7 @@ try {
                   onPressed: submitRegister,
                   child: const Text(
                     "ដាក់ស្នើ",
-                    style: TextStyle(fontSize: 18, color: Colors.white),
+                    style: TextStyle(fontSize: 18, color: Colors.white,fontWeight: FontWeight.bold),
                   ),
                 ),
               ),

@@ -21,7 +21,7 @@ class MainApp extends StatelessWidget {
   initialRoute: Approute.splash,
   theme: ThemeData(
     useMaterial3: true,
-    textTheme: GoogleFonts.notoSansKhmerTextTheme(),
+    textTheme: GoogleFonts.kantumruyProTextTheme(),
   ),
   routes: {
     Approute.splash: (context) => const SplashScreen(),
