@@ -1,13 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gov_reg/models/parking_card.dart';
+import 'package:gov_reg/api/api.dart';
 import 'package:gov_reg/routes/approute.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/http.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 
@@ -34,93 +33,6 @@ class _VehicleForm {
     plate.dispose();
     color.dispose();
     year.dispose();
-  }
-}
-
-class PlateSubCategoryItem {
-  final String code;
-  final String name;
-  final String category;
-
-  PlateSubCategoryItem({
-    required this.code,
-    required this.name,
-    required this.category,
-  });
-
-  factory PlateSubCategoryItem.fromJson(Map<String, dynamic> json) {
-    return PlateSubCategoryItem(
-      code: (json['code'] ?? '') as String,
-      name: (json['name'] ?? '') as String,
-      category: (json['category'] ?? json['plateCategory'] ?? '') as String,
-    );
-  }
-}
-
-class GeneralDepartmentItem {
-  final int id;
-  final String name;
-  GeneralDepartmentItem({required this.id, required this.name});
-  factory GeneralDepartmentItem.fromJson(Map<String, dynamic> json) {
-    return GeneralDepartmentItem(
-      id: (json['id'] ?? 0) is int
-          ? (json['id'] ?? 0) as int
-          : int.tryParse("${json['id']}") ?? 0,
-      name: (json['name'] ?? '') as String,
-    );
-  }
-}
-
-class DepartmentItem {
-  final int id;
-  final String name;
-  final int generalDepartmentId;
-  DepartmentItem(
-      {required this.id,
-      required this.name,
-      required this.generalDepartmentId});
-  factory DepartmentItem.fromJson(Map<String, dynamic> json) {
-    final gd = json['generalDepartment'] as Map<String, dynamic>?;
-    final gdId = (json['generalDepartmentId'] ?? gd?['id'] ?? 0);
-    return DepartmentItem(
-      id: (json['id'] ?? 0) is int
-          ? (json['id'] ?? 0) as int
-          : int.tryParse("${json['id']}") ?? 0,
-      name: (json['name'] ?? '') as String,
-      generalDepartmentId: gdId is int ? gdId : int.tryParse("$gdId") ?? 0,
-    );
-  }
-}
-
-class BurauItem {
-  final int id;
-  final String name;
-  final int departmentId;
-  BurauItem({required this.id, required this.name, required this.departmentId});
-  factory BurauItem.fromJson(Map<String, dynamic> json) {
-    final dept = json['department'] as Map<String, dynamic>?;
-    final deptId = (json['departmentId'] ?? dept?['id'] ?? 0);
-    return BurauItem(
-      id: (json['id'] ?? 0) is int
-          ? (json['id'] ?? 0) as int
-          : int.tryParse("${json['id']}") ?? 0,
-      name: (json['name'] ?? '') as String,
-      departmentId: deptId is int ? deptId : int.tryParse("$deptId") ?? 0,
-    );
-  }
-}
-
-class PositionItem {
-  final int id;
-  final String name;
-  PositionItem({required this.id, required this.name});
-  factory PositionItem.fromJson(Map<String, dynamic> json) {
-    return PositionItem(
-      id: (json['id'] ?? 0) is int
-          ? (json['id'] ?? 0) as int
-          : int.tryParse("${json['id']}") ?? 0,
-      name: (json['name'] ?? '') as String,
-    );
   }
 }
 
@@ -157,8 +69,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _initDefaultSubcategories() async {
-    final carSubs = await fetchPlateSubCategories("REGULAR");
-    final motoSubs = await fetchPlateSubCategories("REGULAR");
+    final carSubs = await Api.fetchPlateSubCategories("REGULAR");
+    final motoSubs = await Api.fetchPlateSubCategories("REGULAR");
     if (!mounted) return;
     setState(() {
       vehicles.first.carSubcategories = carSubs;
@@ -368,126 +280,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return http.get(uri, headers: {"Accept": "application/json"});
   }
 
-  // ----------------------------
-  // ✅ Search — typed, handles list or single
-  // ----------------------------
-  Future<void> _search({required String search}) async {
-    final uri =
-        Uri.parse("$baseUrl/api/v1/parking-card-requests/search/$search");
-    try {
-      final res = await _get(uri);
-
-      if (res.statusCode == 200) {
-        final body = jsonDecode(res.body);
-
-        List<ParkingCardRequestResponseDTO> results = [];
-        if (body is List) {
-          results = body
-              .map((e) => ParkingCardRequestResponseDTO.fromJson(
-                  e as Map<String, dynamic>))
-              .toList();
-        } else if (body is Map<String, dynamic>) {
-          results = [ParkingCardRequestResponseDTO.fromJson(body)];
-        }
-
-        if (results.isEmpty) {
-          _snack("រកមិនឃើញទិន្នន័យ (Request not found)");
-          return;
-        }
-
-        _snack("ស្វែងរកជោគជ័យ (Search Successful)");
-        if (!mounted) return;
-
-        Navigator.pushNamed(
-          context,
-          Approute.verifySuccessScreen,
-          arguments: {
-            "response": results.first,
-            "allResults":
-                results, // ✅ pass full list — success screen can paginate
-            "selfieBytes": null,
-            "selfiePath": null,
-          },
-        );
-      } else if (res.statusCode == 404 || res.body.contains("not found")) {
-        _snack("រកមិនឃើញទិន្នន័យ (Request not found)");
-      } else if (res.statusCode == 403) {
-        _snack("403 Forbidden (No permission)");
-      } else if (res.statusCode == 500) {
-        _snack("កំហុសម៉ាស៊ីនបម្រើ (Server Error: 500)");
-      } else {
-        _snack("មានបញ្ហាអ្វីមួយ (Error: ${res.statusCode})");
-      }
-      debugPrint("Search Response Body: ${res.body}");
-    } catch (e) {
-      _snack("(Connection Error)");
-    }
-  }
-
-  Future<List<GeneralDepartmentItem>> fetchGeneralDepartments() async {
-    final res = await _get(Uri.parse("$baseUrl/api/v1/general-departments"));
-    if (res.statusCode != 200)
-      throw "GeneralDepartments HTTP ${res.statusCode}";
-    final decoded = jsonDecode(res.body);
-    if (decoded is! List) return [];
-    return decoded
-        .map((e) => GeneralDepartmentItem.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<List<DepartmentItem>> fetchDepartmentsByGeneralDepartment(
-      int gdId) async {
-    final res = await _get(
-        Uri.parse("$baseUrl/api/v1/departments/general-department/$gdId"));
-    if (res.statusCode != 200) throw "Departments HTTP ${res.statusCode}";
-    final decoded = jsonDecode(res.body);
-    if (decoded is! List) return [];
-    return decoded
-        .map((e) => DepartmentItem.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<List<BurauItem>> fetchBuraus() async {
-    final res = await _get(Uri.parse("$baseUrl/api/v1/bureaus"));
-    if (res.statusCode != 200) throw "Buraus HTTP ${res.statusCode}";
-    final decoded = jsonDecode(res.body);
-    if (decoded is! List) return [];
-    return decoded
-        .map((e) => BurauItem.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<List<PositionItem>> fetchPositions() async {
-    final res = await _get(Uri.parse("$baseUrl/api/v1/positions"));
-    if (res.statusCode != 200) throw "Positions HTTP ${res.statusCode}";
-    final decoded = jsonDecode(res.body);
-    if (decoded is! List) return [];
-    return decoded
-        .map((e) => PositionItem.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<List<PlateSubCategoryItem>> fetchPlateSubCategories(
-      String category) async {
-    final res = await _get(Uri.parse(
-        "$baseUrl/api/v1/platenumber-sub-categories/category/$category"));
-    if (res.statusCode != 200) return [];
-    final decoded = jsonDecode(res.body);
-    if (decoded is! List) return [];
-    return decoded
-        .map((e) => PlateSubCategoryItem.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
   Future<void> _loadWorkDropdownsIfNeeded({String? userTypeOverride}) async {
     final type = userTypeOverride ?? _userType;
     if (type != "INSIDE_OFFICER" && type != "OUTSIDE_OFFICER") return;
 
     setState(() => dropdownLoading = true);
     try {
-      final gds = await fetchGeneralDepartments();
-      final buraus = await fetchBuraus();
-      final positions = await fetchPositions();
+      final gds = await Api.fetchGeneralDepartments();
+      final buraus = await Api.fetchBuraus();
+      final positions = await Api.fetchPositions();
       if (!mounted) return;
       setState(() {
         gdList = gds;
@@ -529,7 +330,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (gd == null) return;
     try {
       setState(() => dropdownLoading = true);
-      final deps = await fetchDepartmentsByGeneralDepartment(gd.id);
+      final deps = await Api.fetchDepartmentsByGeneralDepartment(gd.id);
       if (!mounted) return;
       setState(() => deptList = deps);
     } catch (e) {
@@ -774,122 +575,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // ----------------------------
-  // ✅ Returns typed ParkingCardRequestResponseDTO
-  // ----------------------------
-  Future<ParkingCardRequestResponseDTO> createParkingCardRequest() async {
-    _syncWorkControllersFromDropdownIfNeeded();
-
-    final attachmentTypes = [
-      ...List.filled(attachFiles.length, attachmentTypeVehicle),
-      if (cameraFile != null) attachmentTypeSelfie,
-    ];
-
-    final queryString = attachmentTypes.isEmpty
-        ? ""
-        : "?${attachmentTypes.map((e) => "attachmentTypes=${Uri.encodeQueryComponent(e)}").join("&")}";
-
-    final uri = Uri.parse("$baseUrl/api/v1/parking-card-requests$queryString");
-
-    final now = DateTime.now();
-    final requestAt = now;
-    final requestEnd = useDurationDays
-        ? requestAt.add(Duration(days: selectedDurationDays ?? 1))
-        : DateTime(now.year + 1, now.month, now.day);
-
-    _lastRequestDateInt = _fmtYmdInt(requestEnd);
-    _lastRequestAtDateStr = _fmtDmy(requestAt);
-
-    String _fill(String s) => s.isEmpty ? "-" : s;
-
-    final gdText = showWorkFields ? _fill(ministryController.text.trim()) : "";
-    final deptText =
-        showWorkFields ? _fill(departmentController.text.trim()) : "";
-    final bureauText =
-        showWorkFields ? _fill(officeController.text.trim()) : "";
-    final posText = showWorkFields ? _fill(positionController.text.trim()) : "";
-
-    // ✅ Build typed request DTO
-    final requestDto = ParkingCardRequestRequestDTO(
-      reason: reasonController.text.trim().isEmpty
-          ? "Parking card request"
-          : reasonController.text.trim(),
-      requestDate: _lastRequestDateInt,
-      requestAtDate: _userType != "GUEST" ? _lastRequestAtDateStr : null,
-      user: UserRequestDTO(
-        name: fullNameController.text.trim(),
-        phone: phoneController.text.trim(),
-        userType: UserTypeX.fromString(_userType),
-      ),
-      workingInfo: WorkingInfoDTO(
-        policeId: showIdNumber ? idNumberController.text.trim() : "",
-        generalDepartmentText: gdText,
-        departmentText: deptText,
-        bureauText: bureauText,
-        positionText: posText,
-        generalDepartment: useWorkDropdown ? (selectedGD?.id ?? 0) : 0,
-        department: useWorkDropdown ? (selectedDept?.id ?? 0) : 0,
-        bureau: useWorkDropdown ? (selectedBurau?.id ?? 0) : 0,
-        position: useWorkDropdown ? (selectedPos?.id ?? 0) : 0,
-        provinceCity:
-            showProvinceCity ? provinceCityController.text.trim() : "",
-      ),
-      vehicles: vehicles
-          .map((v) => VehicleDTO(
-                brand: v.brand.text.trim(),
-                color: v.color.text.trim(),
-                madeYear: int.tryParse(v.year.text.trim()) ?? 0,
-                vehicleType: v.vehicleType,
-                plate: PlateNumberDTO(
-                  plateNumber: _normalizePlate(v.plate.text),
-                  plateCategory: v.vehicleType == "MOTORBIKE"
-                      ? v.motoPlateType
-                      : v.carPlateType,
-                  plateSubCategory: getSubcategoryKey(v),
-                ),
-              ))
-          .toList(),
-    );
-
-    debugPrint("URI = $uri");
-    debugPrint("DTO SENT = ${jsonEncode(requestDto.toJson())}");
-
-    final request = http.MultipartRequest("POST", uri);
-    request.headers["Accept"] = "application/json";
-    request.files.add(http.MultipartFile.fromString(
-      "dto",
-      jsonEncode(requestDto.toJson()),
-      filename: "dto.json",
-      contentType: MediaType("application", "json"),
-    ));
-
-    for (int i = 0; i < attachFiles.length; i++) {
-      request.files.add(await http.MultipartFile.fromPath(
-          "files", attachFiles[i].path,
-          filename: attachFileNames[i]));
-    }
-    if (cameraFile != null) {
-      request.files.add(await http.MultipartFile.fromPath(
-          "files", cameraFile!.path,
-          filename: cameraFileName ?? cameraFile!.path.split("/").last));
-    }
-
-    final streamed = await request.send();
-    final resp = await http.Response.fromStream(streamed);
-
-    debugPrint("STATUS: ${resp.statusCode}");
-    debugPrint("BODY: ${resp.body}");
-
-    if (resp.statusCode != 200 && resp.statusCode != 201) {
-      throw Exception("HTTP ${resp.statusCode}: ${resp.body}");
-    }
-
-    if (resp.body.isEmpty) return ParkingCardRequestResponseDTO();
-    final decoded = jsonDecode(resp.body);
-    return ParkingCardRequestResponseDTO.fromJson(
-        decoded is Map<String, dynamic> ? decoded : {});
-  }
-
-  // ----------------------------
   // ✅ submitRegister — typed end-to-end
   // ----------------------------
   Future<void> submitRegister() async {
@@ -899,8 +584,73 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => isLoading = true);
 
     try {
+      // ── Build requestDto here ──────────────────────────────────
+      final now = DateTime.now();
+      final requestEnd = useDurationDays
+          ? now.add(Duration(days: selectedDurationDays ?? 1))
+          : DateTime(now.year + 1, now.month, now.day);
+
+      _lastRequestDateInt = _fmtYmdInt(requestEnd);
+      _lastRequestAtDateStr = _fmtDmy(now);
+
+      String fill(String s) => s.isEmpty ? "-" : s;
+
+      final requestDto = ParkingCardRequestRequestDTO(
+        reason: reasonController.text.trim().isEmpty
+            ? "Parking card request"
+            : reasonController.text.trim(),
+        requestDate: _lastRequestDateInt,
+        requestAtDate: _userType != "GUEST" ? _lastRequestAtDateStr : null,
+        user: UserRequestDTO(
+          name: fullNameController.text.trim(),
+          phone: phoneController.text.trim(),
+          userType: UserTypeX.fromString(_userType),
+        ),
+        workingInfo: WorkingInfoDTO(
+          policeId: showIdNumber ? idNumberController.text.trim() : "",
+          generalDepartmentText:
+              showWorkFields ? fill(ministryController.text.trim()) : "",
+          departmentText:
+              showWorkFields ? fill(departmentController.text.trim()) : "",
+          bureauText: showWorkFields ? fill(officeController.text.trim()) : "",
+          positionText:
+              showWorkFields ? fill(positionController.text.trim()) : "",
+          generalDepartment: useWorkDropdown ? (selectedGD?.id ?? 0) : 0,
+          department: useWorkDropdown ? (selectedDept?.id ?? 0) : 0,
+          bureau: useWorkDropdown ? (selectedBurau?.id ?? 0) : 0,
+          position: useWorkDropdown ? (selectedPos?.id ?? 0) : 0,
+          provinceCity:
+              showProvinceCity ? provinceCityController.text.trim() : "",
+        ),
+        vehicles: vehicles
+            .map((v) => VehicleDTO(
+                  brand: v.brand.text.trim(),
+                  color: v.color.text.trim(),
+                  madeYear: int.tryParse(v.year.text.trim()) ?? 0,
+                  vehicleType: v.vehicleType,
+                  plate: PlateNumberDTO(
+                    plateNumber: _normalizePlate(v.plate.text),
+                    plateCategory: v.vehicleType == "MOTORBIKE"
+                        ? v.motoPlateType
+                        : v.carPlateType,
+                    plateSubCategory: getSubcategoryKey(v),
+                  ),
+                ))
+            .toList(),
+      );
+
+      debugPrint("DTO SENT = ${jsonEncode(requestDto.toJson())}");
+      // ──────────────────────────────────────────────────────────
+
       final ParkingCardRequestResponseDTO res =
-          await createParkingCardRequest();
+          await Api.createParkingCardRequest(CreateParkingCardPayload(
+        dto: requestDto,
+        vehicleFiles: attachFiles,
+        vehicleFileNames: attachFileNames,
+        selfieFile: cameraFile,
+        selfieFileName: cameraFileName,
+      ));
+
       if (!mounted) return;
 
       Uint8List? selfieBytes;
@@ -939,12 +689,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
         context,
         Approute.verifySuccessScreen,
         arguments: {
-          "response": filledRes, // ✅ typed model
-          "allResults": [filledRes], // ✅ list of 1 for submit case
+          "response": filledRes,
+          "allResults": [filledRes],
           "selfieBytes": selfieBytes,
           "selfiePath": cameraFile?.path,
         },
       );
+    } on ApiException catch (e) {
+      debugPrint("SUBMIT API ERROR: $e");
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     } catch (e) {
       debugPrint("SUBMIT ERROR: $e");
       if (!mounted) return;
@@ -1045,8 +800,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             height: 48,
                             width: 48,
                             child: ElevatedButton(
-                              onPressed: () =>
-                                  _search(search: searchController.text),
+                              onPressed: () => Api.searchParkingCardRequest(
+                                  searchController.text),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white,
                                 foregroundColor: Colors.black,
@@ -1187,7 +942,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     setState(() => v.vehicleType = x!);
                                     if (v.carSubcategories.isEmpty) {
                                       final subs =
-                                          await fetchPlateSubCategories(
+                                          await Api.fetchPlateSubCategories(
                                               v.carPlateType);
                                       if (!mounted) return;
                                       setState(() => v.carSubcategories = subs);
@@ -1203,7 +958,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     setState(() => v.vehicleType = x!);
                                     if (v.motoSubcategories.isEmpty) {
                                       final subs =
-                                          await fetchPlateSubCategories(
+                                          await Api.fetchPlateSubCategories(
                                               v.motoPlateType);
                                       if (!mounted) return;
                                       setState(
@@ -1366,13 +1121,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
               }
               v.plate.text = _formatPlateLive(v, v.plate.text);
             });
-            final subs = await fetchPlateSubCategories(x);
+            final subs = await Api.fetchPlateSubCategories(x);
             if (!mounted) return;
             setState(() {
-              if (isMoto)
+              if (isMoto) {
                 v.motoSubcategories = subs;
-              else
+              } else {
                 v.carSubcategories = subs;
+              }
             });
           },
         ),
