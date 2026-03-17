@@ -290,7 +290,7 @@ class ParkingCardRequestResponseDTO {
           json['parkingRequestStatus'] as String?),
       positionText: json['positionText'] as String?,
       generalDepartment: json['generalDepartment'] as String?,
-      generalDepartmentText: json['generalDepartmentText'] as String?,
+      generalDepartmentText: (json['generalDepartmentText'] ?? json['organization']) as String?,
       departmentText: json['departmentText'] as String?,
       bureauText: json['bureauText'] as String?,
       reason: json['reason'] as String?,

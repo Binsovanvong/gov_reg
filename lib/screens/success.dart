@@ -41,8 +41,9 @@ class _RegisterSuccessMixedScreenState
   bool _initedArgs = false;
 
   // ---------- CONVENIENCE GETTERS (from current response) ----------
-  ParkingCardRequestResponseDTO get _current =>
-      _allResults.isNotEmpty ? _allResults[_currentIndex] : (_response ?? ParkingCardRequestResponseDTO());
+  ParkingCardRequestResponseDTO get _current => _allResults.isNotEmpty
+      ? _allResults[_currentIndex]
+      : (_response ?? ParkingCardRequestResponseDTO());
 
   String get code => _current.code ?? "";
   String get token => _current.token ?? "";
@@ -88,13 +89,23 @@ class _RegisterSuccessMixedScreenState
   // ---------- KHMER DATE ----------
   String _formatKhmerDate(DateTime d) {
     const khMonths = [
-      "មករា", "កុម្ភៈ", "មីនា", "មេសា", "ឧសភា", "មិថុនា",
-      "កក្កដា", "សីហា", "កញ្ញា", "តុលា", "វិច្ឆិកា", "ធ្នូ",
+      "មករា",
+      "កុម្ភៈ",
+      "មីនា",
+      "មេសា",
+      "ឧសភា",
+      "មិថុនា",
+      "កក្កដា",
+      "សីហា",
+      "កញ្ញា",
+      "តុលា",
+      "វិច្ឆិកា",
+      "ធ្នូ",
     ];
 
     String toKhmerNumber(String input) {
-      const en = ['0','1','2','3','4','5','6','7','8','9'];
-      const kh = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
+      const en = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+      const kh = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
       for (int i = 0; i < en.length; i++) {
         input = input.replaceAll(en[i], kh[i]);
       }
@@ -130,7 +141,8 @@ class _RegisterSuccessMixedScreenState
 
     // ✅ Read full list (search may pass multiple results)
     final allResults = args["allResults"];
-    if (allResults is List<ParkingCardRequestResponseDTO> && allResults.isNotEmpty) {
+    if (allResults is List<ParkingCardRequestResponseDTO> &&
+        allResults.isNotEmpty) {
       _allResults = allResults;
       _currentIndex = 0;
     } else if (_response != null) {
@@ -139,7 +151,9 @@ class _RegisterSuccessMixedScreenState
     }
 
     // ✅ Selfie from args (submit path)
-    selfieBytes = (args["selfieBytes"] is Uint8List) ? args["selfieBytes"] as Uint8List : null;
+    selfieBytes = (args["selfieBytes"] is Uint8List)
+        ? args["selfieBytes"] as Uint8List
+        : null;
     selfiePath = (args["selfiePath"] ?? "").toString();
 
     precacheImage(const AssetImage("assets/img/about-moi-logo.png"), context);
@@ -175,13 +189,20 @@ class _RegisterSuccessMixedScreenState
 
   String _userTypeKhmer(String v) {
     switch (v) {
-      case "GUEST": return "ភ្ញៀវ";
-      case "INSIDE_OFFICER": return "មន្រ្តីបំរើការងារនៅក្នុងទីស្តីការក្រសួងមហាផ្ទៃ";
-      case "OUTSIDE_OFFICER": return "មន្រ្តីបំរើការងារនៅក្រៅទីស្តីការក្រសួងមហាផ្ទៃ";
-      case "SECRETARY": return "រដ្ឋលេខាធិការក្រសួងមហាផ្ទៃ";
-      case "DEPUTY_SECRETARY": return "អនុរដ្ឋលេខាធិការ​ ក្រសួងមហាផ្ទៃ";
-      case "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER": return "មន្ត្រីរដ្ឋបាលថ្នាក់ក្រោមជាតិ";
-      default: return v;
+      case "GUEST":
+        return "ភ្ញៀវ";
+      case "INSIDE_OFFICER":
+        return "មន្រ្តីបំរើការងារនៅក្នុងទីស្តីការក្រសួងមហាផ្ទៃ";
+      case "OUTSIDE_OFFICER":
+        return "មន្រ្តីបំរើការងារនៅក្រៅទីស្តីការក្រសួងមហាផ្ទៃ";
+      case "SECRETARY":
+        return "រដ្ឋលេខាធិការក្រសួងមហាផ្ទៃ";
+      case "DEPUTY_SECRETARY":
+        return "អនុរដ្ឋលេខាធិការ​ ក្រសួងមហាផ្ទៃ";
+      case "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER":
+        return "មន្ត្រីរដ្ឋបាលថ្នាក់ក្រោមជាតិ";
+      default:
+        return v;
     }
   }
 
@@ -211,7 +232,8 @@ class _RegisterSuccessMixedScreenState
       if (!Platform.isAndroid && !Platform.isIOS) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Save to Photos supports only Android/iOS")),
+          const SnackBar(
+              content: Text("Save to Photos supports only Android/iOS")),
         );
         return;
       }
@@ -255,9 +277,14 @@ class _RegisterSuccessMixedScreenState
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
-      if (mounted) setState(() { _saving = false; _showExportForCapture = false; });
+      if (mounted)
+        setState(() {
+          _saving = false;
+          _showExportForCapture = false;
+        });
     }
   }
 
@@ -273,35 +300,45 @@ class _RegisterSuccessMixedScreenState
         final parts = rad.split("-");
         if (parts.length == 3) {
           if (parts[0].length == 4) {
-            issueDateStr = _formatKhmerDate(DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2])));
+            issueDateStr = _formatKhmerDate(DateTime(
+                int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2])));
           } else {
-            issueDateStr = _formatKhmerDate(DateTime(int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0])));
+            issueDateStr = _formatKhmerDate(DateTime(
+                int.parse(parts[2]), int.parse(parts[1]), int.parse(parts[0])));
           }
         }
       } catch (_) {}
     }
-    final expiryDateStr = requestDate > 0 ? _formatYmdIntToKhmer(requestDate) : "-";
+    final expiryDateStr =
+        requestDate > 0 ? _formatYmdIntToKhmer(requestDate) : "-";
 
     // ---------- Build working-info map for badge ----------
     final cur = _current;
     final workingInfoMap = <String, dynamic>{
+      "generalDepartment": _safe(cur.generalDepartment),
+      "department": _safe(cur.department),
+      "bureau": _safe(cur.bureau),
+      "position": _safe(cur.position),
       "generalDepartmentText": _safe(cur.generalDepartmentText),
-      "departmentText":        _safe(cur.departmentText),
-      "burauText":             _safe(cur.bureauText),
-      "positionText":          _safe(cur.positionText),
-      "provinceCity":          _safe(cur.provinceCity),
-      "policeId":              _safe(cur.policeId, fallback: ""),
+      "organization": _safe(cur.organization),
+      "departmentText": _safe(cur.departmentText),
+      "bureauText": _safe(cur.bureauText),
+      "positionText": _safe(cur.positionText),
+      "provinceCity": _safe(cur.provinceCity),
+      "policeId": _safe(cur.policeId, fallback: ""),
     };
 
     // ✅ Convert typed VehicleResponseDTO list → List<Map> for badge widget
-    final vehiclesMaps = (cur.vehicles ?? []).map((v) => {
-      "plateNumber":    v.plateNumber ?? "",
-      "brand":          v.brand ?? "",
-      "madeYear":       (v.madeYear ?? 0).toString(),
-      "plateSubCategory": v.plateSubCategory ?? "",
-      "plateCode":      v.plateCode ?? "",
-      "vehicleType":    v.vehicleType ?? "",
-    }).toList();
+    final vehiclesMaps = (cur.vehicles ?? [])
+        .map((v) => {
+              "plateNumber": v.plateNumber ?? "",
+              "brand": v.brand ?? "",
+              "madeYear": (v.madeYear ?? 0).toString(),
+              "plateSubCategory": v.plateSubCategory ?? "",
+              "plateCode": v.plateCode ?? "",
+              "vehicleType": v.vehicleType ?? "",
+            })
+        .toList();
 
     final badgeWidget = MediaQuery(
       data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
@@ -346,15 +383,20 @@ class _RegisterSuccessMixedScreenState
                     children: [
                       IconButton(
                         icon: const Icon(Icons.chevron_left),
-                        onPressed: _currentIndex > 0 ? () => _switchToResult(_currentIndex - 1) : null,
+                        onPressed: _currentIndex > 0
+                            ? () => _switchToResult(_currentIndex - 1)
+                            : null,
                       ),
                       Text(
                         "${_currentIndex + 1} / ${_allResults.length}",
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 15),
                       ),
                       IconButton(
                         icon: const Icon(Icons.chevron_right),
-                        onPressed: _currentIndex < _allResults.length - 1 ? () => _switchToResult(_currentIndex + 1) : null,
+                        onPressed: _currentIndex < _allResults.length - 1
+                            ? () => _switchToResult(_currentIndex + 1)
+                            : null,
                       ),
                     ],
                   ),
@@ -367,10 +409,15 @@ class _RegisterSuccessMixedScreenState
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           side: const BorderSide(color: Color(0xFFFFCA28)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
                         ),
-                        onPressed: _saving ? null : () => Navigator.pop(context),
-                        child: const Text("ត្រឡប់ក្រោយ", style: TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFDFB73B))),
+                        onPressed:
+                            _saving ? null : () => Navigator.pop(context),
+                        child: const Text("ត្រឡប់ក្រោយ",
+                            style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFDFB73B))),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -379,17 +426,27 @@ class _RegisterSuccessMixedScreenState
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFFFCA28),
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
                         ),
                         onPressed: _saving ? null : _saveToPhotos,
                         child: _saving
-                            ? const SizedBox(height: 18, width: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                Icon(Icons.download_rounded, size: 18, color: Colors.white),
-                                SizedBox(width: 8),
-                                Text("ទាញទុក", style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white)),
-                              ]),
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))
+                            : const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                    Icon(Icons.download_rounded,
+                                        size: 18, color: Colors.white),
+                                    SizedBox(width: 8),
+                                    Text("ទាញទុក",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            color: Colors.white)),
+                                  ]),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -398,10 +455,17 @@ class _RegisterSuccessMixedScreenState
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFFFCA28),
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
                         ),
-                        onPressed: _saving ? null : () => Navigator.pushNamed(context, Approute.welcome),
-                        child: const Text("ទៅទំព័រដើម", style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white)),
+                        onPressed: _saving
+                            ? null
+                            : () =>
+                                Navigator.pushNamed(context, Approute.welcome),
+                        child: const Text("ទៅទំព័រដើម",
+                            style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white)),
                       ),
                     ),
                   ],
@@ -456,7 +520,8 @@ class _RegisterSuccessMixedScreenState
                         child: RepaintBoundary(
                           key: _exportKey,
                           child: MediaQuery(
-                            data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
+                            data: MediaQuery.of(context)
+                                .copyWith(textScaler: TextScaler.noScaling),
                             child: _MoIStyleBadge(
                               fullName: fullName,
                               phone: phone,
@@ -501,8 +566,8 @@ class _MoIStyleBadge extends StatelessWidget {
   final String token;
   final String userTypeText;
   final String parkingRequestStatus;
-  final List vehicles;          // List<Map<String,dynamic>> — built above
-  final Map? workingInfo;       // Map<String,dynamic>       — built above
+  final List vehicles; // List<Map<String,dynamic>> — built above
+  final Map? workingInfo; // Map<String,dynamic>       — built above
   final Uint8List? selfieBytes;
   final String selfiePath;
   final Future<Uint8List?> qrFuture;
@@ -538,11 +603,11 @@ class _MoIStyleBadge extends StatelessWidget {
   static const double badgeW = 1180;
   static const double badgeH = 1000;
 
-  static const _navy      = Color(0xFF0A2D66);
-  static const _gold      = Color(0xFFDFB73B);
-  static const _line      = Color(0xFFBBD4FF);
+  static const _navy = Color(0xFF0A2D66);
+  static const _gold = Color(0xFFDFB73B);
+  static const _line = Color(0xFFBBD4FF);
   static const _footerRed = Color(0xFFF04444);
-  static const _cardBlue  = Color(0xFF1E3A8A);
+  static const _cardBlue = Color(0xFF1E3A8A);
 
   String s(dynamic x) => (x ?? "").toString().trim();
 
@@ -553,9 +618,12 @@ class _MoIStyleBadge extends StatelessWidget {
 
   String vehicleTypeKh(String v) {
     switch (v) {
-      case "CAR": return "រថយន្ត";
-      case "MOTORBIKE": return "ម៉ូតូ";
-      default: return v.isEmpty ? "-" : v;
+      case "CAR":
+        return "រថយន្ត";
+      case "MOTORBIKE":
+        return "ម៉ូតូ";
+      default:
+        return v.isEmpty ? "-" : v;
     }
   }
 
@@ -563,13 +631,14 @@ class _MoIStyleBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final v = _firstVehicle();
 
-    final plate       = s(v?["plateNumber"]);
-    final brand       = s(v?["brand"]);
-    final year        = s(v?["madeYear"]);
+    final plate = s(v?["plateNumber"]);
+    final brand = s(v?["brand"]);
+    final year = s(v?["madeYear"]);
     final subcategory = s(v?["plateSubCategory"]);
-    final plateCode   = s(v?["plateCode"]);
+    final plateCode = s(v?["plateCode"]);
 
-    final Map<String, dynamic> info = Map<String, dynamic>.from(workingInfo ?? {});
+    final Map<String, dynamic> info =
+        Map<String, dynamic>.from(workingInfo ?? {});
 
     String pick(List<String> keys, {String fallback = "-"}) {
       for (final k in keys) {
@@ -580,12 +649,13 @@ class _MoIStyleBadge extends StatelessWidget {
       return fallback;
     }
 
-    final ministry  = pick(["generalDepartmentText", "generalDepartment", "organization"]);
-    final dept      = pick(["departmentText", "department"]);
-    final office    = pick(["burauText", "bureauText", "burau"]);
-    final position  = pick(["positionText", "position"]);
-    final policeId  = pick(["policeId"], fallback: "");
-    final provCity  = pick(["provinceCity", "province", "province_city"]);
+    final ministry =
+        pick(["generalDepartment", "generalDepartmentText", "organization"]);
+    final dept = pick(["department", "departmentText"]);
+    final office = pick(["bureau", "bureauText"]);
+    final position = pick(["position", "positionText"]);
+    final policeId = pick(["policeId"], fallback: "");
+    final provCity = pick(["provinceCity", "province", "province_city"]);
 
     return Material(
       color: Colors.transparent,
@@ -602,7 +672,8 @@ class _MoIStyleBadge extends StatelessWidget {
             child: Stack(
               children: [
                 // Background gradient
-                Positioned.fill(child: DecoratedBox(
+                Positioned.fill(
+                    child: DecoratedBox(
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
@@ -613,49 +684,83 @@ class _MoIStyleBadge extends StatelessWidget {
                 )),
 
                 // Watermark logo
-                Positioned.fill(child: Opacity(
+                Positioned.fill(
+                    child: Opacity(
                   opacity: 0.10,
-                  child: Center(child: Image.asset(
-                    "assets/img/about-moi-logo.png", width: 620, height: 620,
-                    fit: BoxFit.contain, filterQuality: FilterQuality.high,
+                  child: Center(
+                      child: Image.asset(
+                    "assets/img/about-moi-logo.png",
+                    width: 620,
+                    height: 620,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
                   )),
                 )),
 
                 // Header row
                 Positioned(
-                  left: 36, right: 36, top: 26,
+                  left: 36,
+                  right: 36,
+                  top: 26,
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Container(
-                        width: 88, height: 88,
+                        width: 88,
+                        height: 88,
                         decoration: BoxDecoration(
-                          color: Colors.white, shape: BoxShape.circle,
+                          color: Colors.white,
+                          shape: BoxShape.circle,
                           border: Border.all(color: _gold, width: 3),
                         ),
                         padding: const EdgeInsets.all(12),
-                        child: Image.asset("assets/img/about-moi-logo.png", fit: BoxFit.contain, filterQuality: FilterQuality.high),
+                        child: Image.asset("assets/img/about-moi-logo.png",
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.high),
                       ),
                       const SizedBox(width: 18),
                       const Expanded(
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text("ក្រសួងមហាផ្ទៃ", style: TextStyle(color: _gold, fontWeight: FontWeight.w900, fontSize: 36, height: 1.0)),
-                          SizedBox(height: 6),
-                          Text("MINISTRY OF INTERIOR", style: TextStyle(color: _gold, fontWeight: FontWeight.w800, fontSize: 22, letterSpacing: 0.6, height: 1.0)),
-                        ]),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text("ក្រសួងមហាផ្ទៃ",
+                                  style: TextStyle(
+                                      color: _gold,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 36,
+                                      height: 1.0)),
+                              SizedBox(height: 6),
+                              Text("MINISTRY OF INTERIOR",
+                                  style: TextStyle(
+                                      color: _gold,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 22,
+                                      letterSpacing: 0.6,
+                                      height: 1.0)),
+                            ]),
                       ),
                       // QR code box
                       Container(
-                        width: 130, height: 130,
-                        decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.black54, width: 2)),
+                        width: 130,
+                        height: 130,
+                        decoration: BoxDecoration(
+                            color: Colors.white,
+                            border:
+                                Border.all(color: Colors.black54, width: 2)),
                         padding: const EdgeInsets.all(6),
                         child: FutureBuilder<Uint8List?>(
                           future: qrFuture,
                           builder: (_, snap) {
                             if (!snap.hasData || snap.data == null) {
-                              return const Center(child: Text("NO QR", style: TextStyle(fontWeight: FontWeight.w900, color: Colors.black54)));
+                              return const Center(
+                                  child: Text("NO QR",
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.black54)));
                             }
-                            return Image.memory(snap.data!, fit: BoxFit.contain, filterQuality: FilterQuality.high);
+                            return Image.memory(snap.data!,
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.high);
                           },
                         ),
                       ),
@@ -664,15 +769,22 @@ class _MoIStyleBadge extends StatelessWidget {
                 ),
 
                 // Horizontal rule
-                Positioned(left: 36, right: 36, top: 170, child: Container(height: 2, color: _line)),
+                Positioned(
+                    left: 36,
+                    right: 36,
+                    top: 170,
+                    child: Container(height: 2, color: _line)),
 
                 // Selfie photo box
                 Positioned(
-                  left: 46, top: 210,
+                  left: 46,
+                  top: 210,
                   child: Container(
-                    width: 300, height: 320,
+                    width: 300,
+                    height: 320,
                     decoration: BoxDecoration(
-                      color: Colors.white, borderRadius: BorderRadius.circular(28),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(28),
                       border: Border.all(color: _cardBlue, width: 5),
                     ),
                     padding: const EdgeInsets.all(10),
@@ -685,29 +797,50 @@ class _MoIStyleBadge extends StatelessWidget {
 
                 // Plate number box
                 Positioned(
-                  left: 46, top: 550,
+                  left: 46,
+                  top: 550,
                   child: Container(
-                    width: 300, height: 160,
+                    width: 300,
+                    height: 160,
                     decoration: BoxDecoration(
-                      color: Colors.white, borderRadius: BorderRadius.circular(22),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(22),
                       border: Border.all(color: _cardBlue, width: 3),
                     ),
                     clipBehavior: Clip.hardEdge,
                     child: Column(children: [
                       const SizedBox(height: 12),
                       Text(subcategory.isEmpty ? "-" : subcategory,
-                          style: const TextStyle(color: _navy, fontWeight: FontWeight.w900, fontSize: 32, height: 1.0)),
+                          style: const TextStyle(
+                              color: _navy,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 32,
+                              height: 1.0)),
                       const SizedBox(height: 14),
                       Text(plate.isEmpty ? "-" : plate,
-                          style: const TextStyle(color: _navy, fontWeight: FontWeight.w900, fontSize: 40, letterSpacing: 2, height: 1.0)),
+                          style: const TextStyle(
+                              color: _navy,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 40,
+                              letterSpacing: 2,
+                              height: 1.0)),
                       const Spacer(),
                       Container(
-                        height: 46, width: double.infinity,
-                        decoration: const BoxDecoration(border: Border(top: BorderSide(color: _cardBlue, width: 2))),
+                        height: 46,
+                        width: double.infinity,
+                        decoration: const BoxDecoration(
+                            border: Border(
+                                top: BorderSide(color: _cardBlue, width: 2))),
                         alignment: Alignment.center,
                         child: Text(
-                          plateCode.isNotEmpty ? plateCode : (subcategory.isEmpty ? "-" : subcategory),
-                          style: const TextStyle(color: _footerRed, fontWeight: FontWeight.w900, fontSize: 18, height: 1.0),
+                          plateCode.isNotEmpty
+                              ? plateCode
+                              : (subcategory.isEmpty ? "-" : subcategory),
+                          style: const TextStyle(
+                              color: _footerRed,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 18,
+                              height: 1.0),
                         ),
                       ),
                     ]),
@@ -716,53 +849,104 @@ class _MoIStyleBadge extends StatelessWidget {
 
                 // Right panel — personal info + vehicle info
                 Positioned(
-                  left: 380, right: 46, top: 210, bottom: 130,
+                  left: 380,
+                  right: 46,
+                  top: 210,
+                  bottom: 130,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Personal info header with code
                       Container(
-                        height: 62, color: _navy,
+                        height: 62,
+                        color: _navy,
                         padding: const EdgeInsets.symmetric(horizontal: 18),
                         child: Row(children: [
-                          const Expanded(child: Text("ព័ត៌មានផ្ទាល់ខ្លួន",
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24))),
+                          const Expanded(
+                              child: Text("ព័ត៌មានផ្ទាល់ខ្លួន",
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 24))),
                           Text(code.isEmpty ? "GDDTM###########" : code,
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: 0.6)),
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 24,
+                                  letterSpacing: 0.6)),
                         ]),
                       ),
                       const SizedBox(height: 18),
 
-                      _twoColRowSafe(leftLabel: "នាមត្រកូល និងនាមខ្លួន", leftValue: fullName, rightLabel: "ប្រភេទមន្ត្រី", rightValue: userTypeText),
+                      _twoColRowSafe(
+                          leftLabel: "នាមត្រកូល និងនាមខ្លួន",
+                          leftValue: fullName,
+                          rightLabel: "ប្រភេទមន្ត្រី",
+                          rightValue: userTypeText),
                       const SizedBox(height: 14),
 
                       if (showPoliceId) ...[
-                        _twoColRowSafe(leftLabel: "អត្តលេខ", leftValue: policeId, rightLabel: "", rightValue: ""),
+                        _twoColRowSafe(
+                            leftLabel: "អត្តលេខ",
+                            leftValue: policeId,
+                            rightLabel: "",
+                            rightValue: ""),
                         const SizedBox(height: 14),
                       ],
                       if (showProvince) ...[
-                        _twoColRowSafe(leftLabel: "ខេត្ត/រាជធានី", leftValue: provCity, rightLabel: "", rightValue: ""),
+                        _twoColRowSafe(
+                            leftLabel: "ខេត្ត/រាជធានី",
+                            leftValue: provCity,
+                            rightLabel: "",
+                            rightValue: ""),
                         const SizedBox(height: 14),
                       ],
                       if (showWorkInfo) ...[
-                        _twoColRowSafe(leftLabel: "ក្រសួង/ស្ថាប័ន", leftValue: ministry, rightLabel: "នាយកដ្ឋាន/អង្គភាព", rightValue: dept),
+                        _twoColRowSafe(
+                            leftLabel: "ក្រសួង/ស្ថាប័ន",
+                            leftValue: ministry,
+                            rightLabel: "នាយកដ្ឋាន/អង្គភាព",
+                            rightValue: dept),
                         const SizedBox(height: 14),
-                        _twoColRowSafe(leftLabel: "ការិយាល័យ", leftValue: office, rightLabel: "តួនាទី", rightValue: position),
+                        _twoColRowSafe(
+                            leftLabel: "ការិយាល័យ",
+                            leftValue: office,
+                            rightLabel: "តួនាទី",
+                            rightValue: position),
                         const SizedBox(height: 14),
                       ],
 
-                      _blueSectionTitle("ព័ត៌មាន ${vehicleTypeKh(vehicleType)}"),
+                      _blueSectionTitle(
+                          "ព័ត៌មាន ${vehicleTypeKh(vehicleType)}"),
                       const SizedBox(height: 12),
 
-                      _twoColRowSafe(leftLabel: "ស្លាកលេខ", leftValue: plate, rightLabel: "ម៉ាក", rightValue: brand),
+                      _twoColRowSafe(
+                          leftLabel: "ស្លាកលេខ",
+                          leftValue: plate,
+                          rightLabel: "ម៉ាក",
+                          rightValue: brand),
                       const SizedBox(height: 14),
-                      _twoColRowSafe(leftLabel: "ឆ្នាំផលិត", leftValue: year, rightLabel: "លេខទូរស័ព្ទ", rightValue: phone),
+                      _twoColRowSafe(
+                          leftLabel: "ឆ្នាំផលិត",
+                          leftValue: year,
+                          rightLabel: "លេខទូរស័ព្ទ",
+                          rightValue: phone),
                       const SizedBox(height: 18),
 
                       Row(children: const [
-                        Text("សុពលភាពពី ", style: TextStyle(color: Color(0xFF8A94A6), fontWeight: FontWeight.w900, fontSize: 18, height: 1.0)),
+                        Text("សុពលភាពពី ",
+                            style: TextStyle(
+                                color: Color(0xFF8A94A6),
+                                fontWeight: FontWeight.w900,
+                                fontSize: 18,
+                                height: 1.0)),
                         Spacer(),
-                        Text("សុពលភាពដល់ ", style: TextStyle(color: Color(0xFF8A94A6), fontWeight: FontWeight.w900, fontSize: 18, height: 1.0)),
+                        Text("សុពលភាពដល់ ",
+                            style: TextStyle(
+                                color: Color(0xFF8A94A6),
+                                fontWeight: FontWeight.w900,
+                                fontSize: 18,
+                                height: 1.0)),
                       ]),
                       const SizedBox(height: 10),
 
@@ -772,9 +956,17 @@ class _MoIStyleBadge extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text("ថ្ងៃទី $issueDateStr",
-                                style: const TextStyle(color: _footerRed, fontWeight: FontWeight.w900, fontSize: 22, height: 1.0)),
+                                style: const TextStyle(
+                                    color: _footerRed,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 22,
+                                    height: 1.0)),
                             Text("ថ្ងៃទី $expiryDateStr",
-                                style: const TextStyle(color: _navy, fontWeight: FontWeight.w900, fontSize: 22, height: 1.0)),
+                                style: const TextStyle(
+                                    color: _navy,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 22,
+                                    height: 1.0)),
                           ],
                         ),
                       ),
@@ -784,7 +976,9 @@ class _MoIStyleBadge extends StatelessWidget {
 
                 // Status footer
                 Positioned(
-                  left: 0, right: 0, bottom: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
                   child: _parkingStatusFooter(parkingRequestStatus),
                 ),
               ],
@@ -797,37 +991,62 @@ class _MoIStyleBadge extends StatelessWidget {
 
   static Widget _blueSectionTitle(String title) {
     return Container(
-      height: 58, color: _navy,
+      height: 58,
+      color: _navy,
       alignment: Alignment.centerLeft,
       padding: const EdgeInsets.symmetric(horizontal: 18),
-      child: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22)),
+      child: Text(title,
+          style: const TextStyle(
+              color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22)),
     );
   }
 
   static Widget _twoColRowSafe({
-    required String leftLabel, required String leftValue,
-    required String rightLabel, required String rightValue,
+    required String leftLabel,
+    required String leftValue,
+    required String rightLabel,
+    required String rightValue,
   }) {
-    Widget cell({required String label, required String value, required CrossAxisAlignment align, required TextAlign textAlign}) {
+    Widget cell(
+        {required String label,
+        required String value,
+        required CrossAxisAlignment align,
+        required TextAlign textAlign}) {
       return Expanded(
         child: Column(crossAxisAlignment: align, children: [
-          Text(label, textAlign: textAlign,
-              style: const TextStyle(color: Color(0xFF8A94A6), fontWeight: FontWeight.w800, fontSize: 18, height: 1.0)),
+          Text(label,
+              textAlign: textAlign,
+              style: const TextStyle(
+                  color: Color(0xFF8A94A6),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  height: 1.0)),
           const SizedBox(height: 8),
           Container(
             width: double.infinity,
-            alignment: align == CrossAxisAlignment.end ? Alignment.centerRight : Alignment.centerLeft,
+            alignment: align == CrossAxisAlignment.end
+                ? Alignment.centerRight
+                : Alignment.centerLeft,
             child: FittedBox(
               fit: BoxFit.scaleDown,
-              alignment: align == CrossAxisAlignment.end ? Alignment.centerRight : Alignment.centerLeft,
+              alignment: align == CrossAxisAlignment.end
+                  ? Alignment.centerRight
+                  : Alignment.centerLeft,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 420),
                 child: AutoSizeText(
                   value.trim().isEmpty ? "-" : value.trim(),
-                  maxLines: 1, minFontSize: 24, stepGranularity: 1,
-                  overflow: TextOverflow.ellipsis, softWrap: false,
+                  maxLines: 1,
+                  minFontSize: 24,
+                  stepGranularity: 1,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: false,
                   textAlign: textAlign,
-                  style: const TextStyle(color: _navy, fontWeight: FontWeight.w900, fontSize: 28, height: 1.08),
+                  style: const TextStyle(
+                      color: _navy,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 28,
+                      height: 1.08),
                 ),
               ),
             ),
@@ -837,37 +1056,73 @@ class _MoIStyleBadge extends StatelessWidget {
     }
 
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      cell(label: leftLabel,  value: leftValue,  align: CrossAxisAlignment.start, textAlign: TextAlign.left),
+      cell(
+          label: leftLabel,
+          value: leftValue,
+          align: CrossAxisAlignment.start,
+          textAlign: TextAlign.left),
       const SizedBox(width: 32),
-      cell(label: rightLabel, value: rightValue, align: CrossAxisAlignment.end,   textAlign: TextAlign.right),
+      cell(
+          label: rightLabel,
+          value: rightValue,
+          align: CrossAxisAlignment.end,
+          textAlign: TextAlign.right),
     ]);
   }
 
   static Widget _parkingStatusFooter(String? rawStatus) {
     final status = (rawStatus ?? "").trim().toLowerCase();
-    Color bg; String label;
+    Color bg;
+    String label;
 
-    if (status == "new" || status.isEmpty) { bg = Colors.blueGrey; label = "សំណើរកំពុងដាក់ស្នើរ"; }
-    else if (status == "pending")          { bg = Colors.orange;    label = "កំពុងរង់ចាំពិនិត្យ"; }
-    else if (status == "approve" || status == "approved") { bg = Colors.blue; label = "បានអនុម័ត"; }
-    else if (status == "active")           { bg = Colors.green;     label = "កំពុងប្រើប្រាស់"; }
-    else if (status == "reject" || status == "rejected")  { bg = Colors.red;  label = "បានបដិសេធ"; }
-    else                                   { bg = Colors.blueGrey; label = "សំណើរកំពុងដាក់ស្នើរ"; }
+    if (status == "new" || status.isEmpty) {
+      bg = Colors.blueGrey;
+      label = "សំណើរកំពុងដាក់ស្នើរ";
+    } else if (status == "pending") {
+      bg = Colors.orange;
+      label = "កំពុងរង់ចាំពិនិត្យ";
+    } else if (status == "approve" || status == "approved") {
+      bg = Colors.blue;
+      label = "បានអនុម័ត";
+    } else if (status == "active") {
+      bg = Colors.green;
+      label = "កំពុងប្រើប្រាស់";
+    } else if (status == "reject" || status == "rejected") {
+      bg = Colors.red;
+      label = "បានបដិសេធ";
+    } else {
+      bg = Colors.blueGrey;
+      label = "សំណើរកំពុងដាក់ស្នើរ";
+    }
 
     return Container(
-      height: 90, color: bg, alignment: Alignment.center,
-      child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 34, letterSpacing: 0.6)),
+      height: 90,
+      color: bg,
+      alignment: Alignment.center,
+      child: Text(label,
+          style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              fontSize: 34,
+              letterSpacing: 0.6)),
     );
   }
 
   static Widget _badgePhoto(Uint8List? bytes, String path) {
-    Widget fallback() => const Center(child: Icon(Icons.person, size: 80, color: Color(0xFF9AA6B2)));
+    Widget fallback() => const Center(
+        child: Icon(Icons.person, size: 80, color: Color(0xFF9AA6B2)));
 
     if (bytes != null && bytes.isNotEmpty) {
-      return Image.memory(bytes, fit: BoxFit.cover, filterQuality: FilterQuality.high, errorBuilder: (_, __, ___) => fallback());
+      return Image.memory(bytes,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.high,
+          errorBuilder: (_, __, ___) => fallback());
     }
     if (path.isNotEmpty && File(path).existsSync()) {
-      return Image.file(File(path), fit: BoxFit.cover, filterQuality: FilterQuality.high, errorBuilder: (_, __, ___) => fallback());
+      return Image.file(File(path),
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.high,
+          errorBuilder: (_, __, ___) => fallback());
     }
     return fallback();
   }

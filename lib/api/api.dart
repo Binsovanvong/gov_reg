@@ -256,8 +256,7 @@ class Api {
         ? ""
         : "?${attachmentTypes.map((e) => "attachmentTypes=${Uri.encodeQueryComponent(e)}").join("&")}";
 
-    final uri =
-        Uri.parse("$baseUrl/api/v1/parking-card-requests$queryString");
+    final uri = Uri.parse("$baseUrl/api/v1/parking-card-requests$queryString");
 
     final request = http.MultipartRequest("POST", uri);
     request.headers["Accept"] = "application/json";
@@ -284,8 +283,8 @@ class Api {
       request.files.add(await http.MultipartFile.fromPath(
         "files",
         payload.selfieFile!.path,
-        filename: payload.selfieFileName ??
-            payload.selfieFile!.path.split("/").last,
+        filename:
+            payload.selfieFileName ?? payload.selfieFile!.path.split("/").last,
       ));
     }
 
