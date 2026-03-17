@@ -153,6 +153,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return v.vehicleType == "MOTORBIKE" ? v.motoPlateType : v.carPlateType;
   }
 
+  Future<void> _doSearch() async {
+    final query = searchController.text.trim();
+    if (query.isEmpty) return;
+
+    setState(() => isLoading = true);
+
+    try {
+      final results = await Api.searchParkingCardRequest(query);
+
+      if (!mounted) return;
+
+      if (results.isEmpty) {
+        _snack("រកមិនឃើញទិន្នន័យ");
+        return;
+      }
+
+      Navigator.pushNamed(
+        context,
+        Approute.verifySuccessScreen,
+        arguments: {
+          "response": results.first,
+          "allResults": results,
+          "selfieBytes": null,
+          "selfiePath": null,
+        },
+      );
+    } on ApiException catch (e) {
+      _snack(e.message);
+    } catch (e) {
+      _snack(e.toString());
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
   String? getSubcategoryKey(_VehicleForm v) {
     final code = v.vehicleType == "MOTORBIKE"
         ? v.motoPlateSubcategory // ← was motoPlateSubcategoryCode
@@ -800,8 +835,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             height: 48,
                             width: 48,
                             child: ElevatedButton(
-                              onPressed: () => Api.searchParkingCardRequest(
-                                  searchController.text),
+                              onPressed: isLoading ? null : _doSearch,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white,
                                 foregroundColor: Colors.black,

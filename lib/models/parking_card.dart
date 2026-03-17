@@ -276,13 +276,12 @@ class ParkingCardRequestResponseDTO {
       bureau: json['bureau'] as String?,
       phone: json['phone'] as String?,
       vehicles: (json['vehicles'] as List?)
-              ?.map((e) =>
-                  VehicleResponseDTO.fromJson(e as Map<String, dynamic>))
+              ?.map(
+                  (e) => VehicleResponseDTO.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
       attachments: (json['attachments'] as List?)
-              ?.map((e) =>
-                  AttachmentDTO.fromJson(e as Map<String, dynamic>))
+              ?.map((e) => AttachmentDTO.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
       requestDate: _parseInt32(json['requestDate']),
