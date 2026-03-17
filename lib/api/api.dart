@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:gov_reg/models/parking_card.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
@@ -225,7 +225,7 @@ class Api {
     final uri =
         Uri.parse("$baseUrl/api/v1/parking-card-requests/search/$search");
     final res = await _get(uri);
-
+    debugPrint("SEARCH RAW BODY: ${res.body}");
     if (res.statusCode != 200) {
       throw ApiException(statusCode: res.statusCode, body: res.body);
     }

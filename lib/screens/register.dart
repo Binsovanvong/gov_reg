@@ -640,8 +640,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           name: fullNameController.text.trim(),
           phone: phoneController.text.trim(),
           userType: UserTypeX.fromString(_userType),
-        ),
-        workingInfo: WorkingInfoDTO(
+          workingInfo: WorkingInfoDTO(
           policeId: showIdNumber ? idNumberController.text.trim() : "",
           generalDepartmentText:
               showWorkFields ? fill(ministryController.text.trim()) : "",
@@ -656,6 +655,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           position: useWorkDropdown ? (selectedPos?.id ?? 0) : 0,
           provinceCity:
               showProvinceCity ? provinceCityController.text.trim() : "",
+        ),
         ),
         vehicles: vehicles
             .map((v) => VehicleDTO(

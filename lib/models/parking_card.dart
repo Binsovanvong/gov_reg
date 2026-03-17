@@ -55,7 +55,6 @@ class ParkingCardRequestRequestDTO {
   final int? requestDate; // yyyymmdd as int32
   final String? requestAtDate; // string($date)
   final UserRequestDTO user;
-  final WorkingInfoDTO workingInfo;
   final List<VehicleDTO> vehicles;
 
   ParkingCardRequestRequestDTO({
@@ -63,7 +62,6 @@ class ParkingCardRequestRequestDTO {
     this.requestDate,
     this.requestAtDate,
     required this.user,
-    required this.workingInfo,
     required this.vehicles,
   });
 
@@ -73,7 +71,6 @@ class ParkingCardRequestRequestDTO {
       if (requestDate != null) "requestDate": requestDate,
       if (requestAtDate != null) "requestAtDate": requestAtDate,
       "user": user.toJson(),
-      "workingInfo": workingInfo.toJson(),
       "vehicles": vehicles.map((v) => v.toJson()).toList(),
     };
   }
@@ -89,6 +86,7 @@ class UserRequestDTO {
   final int? positionId;
   final int? bureauId;
   final UserType? userType;
+  final WorkingInfoDTO? workingInfo; // ← moved here
 
   UserRequestDTO({
     required this.name,
@@ -100,6 +98,7 @@ class UserRequestDTO {
     this.positionId,
     this.bureauId,
     this.userType,
+    this.workingInfo,
   });
 
   Map<String, dynamic> toJson() {
@@ -113,6 +112,7 @@ class UserRequestDTO {
       if (positionId != null) "positionId": positionId,
       if (bureauId != null) "bureauId": bureauId,
       if (userType != null) "userType": userType!.value,
+      if (workingInfo != null) "workingInfo": workingInfo!.toJson(), // ← nested here
     };
   }
 }
