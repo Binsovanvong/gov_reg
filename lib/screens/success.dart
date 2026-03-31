@@ -9,6 +9,7 @@ import 'package:gov_reg/models/parking_card.dart';
 import 'package:gov_reg/routes/approute.dart';
 import 'package:http/http.dart' as http;
 import 'package:photo_manager/photo_manager.dart';
+import 'package:gov_reg/api/api.dart';
 
 class RegisterSuccessMixedScreen extends StatefulWidget {
   const RegisterSuccessMixedScreen({super.key});
@@ -125,6 +126,24 @@ class _RegisterSuccessMixedScreenState
     ));
   }
 
+  Future<void> _loadSelfieFromAttachments() async {
+    if (selfieBytes != null) return;
+
+    final selfieAttachment = _current.attachments.firstWhere(
+      (a) => a.attachmentType == "INVITATION_DOCUMENT",
+      orElse: () => AttachmentDTO(),
+    );
+
+    // ❌ was: final url = selfieAttachment.url;
+    // ✅ use the UUID id to call the backend endpoint
+    final id = selfieAttachment.id;
+    if (id == null || id.isEmpty) return;
+
+    final bytes = await Api.fetchAttachmentBytes(id);
+    if (!mounted) return;
+    if (bytes != null) setState(() => selfieBytes = bytes);
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -158,6 +177,7 @@ class _RegisterSuccessMixedScreenState
 
     precacheImage(const AssetImage("assets/img/about-moi-logo.png"), context);
     _qrFuture = _fetchQrPngOrNull();
+    _loadSelfieFromAttachments();
 
     if (mounted) setState(() {});
   }
@@ -167,8 +187,10 @@ class _RegisterSuccessMixedScreenState
     if (index < 0 || index >= _allResults.length) return;
     setState(() {
       _currentIndex = index;
+      selfieBytes = null;
       _qrFuture = _fetchQrPngOrNull();
     });
+    _loadSelfieFromAttachments();
   }
 
   Future<Uint8List?> _fetchQrPngOrNull() async {

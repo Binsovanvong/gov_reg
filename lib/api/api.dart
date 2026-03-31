@@ -134,10 +134,21 @@ class CreateParkingCardPayload {
 // ─────────────────────────────────────────────
 
 class Api {
-  static const String baseUrl = "http://10.0.2.2:8080";
+  static const String baseUrl = "http://192.168.18.129:8080";
 
   static const String _attachmentTypeVehicle = "VEHICLE_DOCUMENT";
   static const String _attachmentTypeSelfie = "INVITATION_DOCUMENT";
+
+  static Future<Uint8List?> fetchAttachmentBytes(String attachmentId) async {
+    try {
+      final res = await http.get(
+        Uri.parse("$baseUrl/api/v1/attachments/$attachmentId"),
+        headers: {"Accept": "image/*"},
+      );
+      if (res.statusCode == 200) return res.bodyBytes;
+    } catch (_) {}
+    return null;
+  }
 
   // ── internal GET helper ───────────────────
   static Future<http.Response> _get(Uri uri) async {
