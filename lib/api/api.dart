@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:gov_reg/models/parking_card.dart';
 import 'package:http/http.dart' as http;
@@ -134,7 +135,7 @@ class CreateParkingCardPayload {
 // ─────────────────────────────────────────────
 
 class Api {
-  static const String baseUrl = "http://10.0.2.2:8080";
+  static const String baseUrl = "http://172.18.70.200:8080";
 
   static const String _attachmentTypeVehicle = "VEHICLE_DOCUMENT";
   static const String _attachmentTypeSelfie = "INVITATION_DOCUMENT";
