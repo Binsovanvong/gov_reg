@@ -21,7 +21,7 @@ class RegisterSuccessMixedScreen extends StatefulWidget {
 
 class _RegisterSuccessMixedScreenState
     extends State<RegisterSuccessMixedScreen> {
-  static const String baseUrl = "http://175.100.74.227:1234";
+  static const String baseUrl = "https://ees.interior.gov.kh";
 
   Future<Uint8List?> _qrFuture = Future.value(null);
 
@@ -259,14 +259,26 @@ class _RegisterSuccessMixedScreenState
   }
 
   Future<bool> _ensurePhotoPermission() async {
-    final PermissionState ps = await PhotoManager.requestPermissionExtend();
-
-    if (ps.isAuth) return true;
-
-    if (!mounted) return false;
-    _showTopSnackBar("សូមអនុញ្ញាត Photos permission", isSuccess: false);
-    return false;
+  final PermissionState ps = await PhotoManager.requestPermissionExtend();
+  if (ps.isAuth) {
+    return true;
   }
+
+  if (ps.hasAccess) {
+    final List<AssetPathEntity> albums = await PhotoManager.getAssetPathList(onlyAll: true);
+    final List<AssetEntity> recentPhotos = await albums.first.getAssetListRange(start: 0, end: 10);
+    print("Recent photos count: ${recentPhotos.length}");
+    _showTopSnackBar(
+      "អ្នកអាចប្រើបានផ្នែកមួយនៃរូបភាព", 
+      isSuccess: true,
+    );
+    return true;
+  }
+  _showTopSnackBar("សូមអនុញ្ញាត Photos permission", isSuccess: false);
+  await PhotoManager.openSetting();
+
+  return false;
+}
 
   Future<void> _showExportWidgetSafely() async {
     if (!mounted) return;
@@ -501,8 +513,6 @@ class _RegisterSuccessMixedScreenState
 
   @override
   Widget build(BuildContext context) {
-    // 🔥 NEW LOGIC (duration → real date)
-
     DateTime parseStartDate(String? raw) {
       if (raw == null || raw.trim().isEmpty) {
         final now = DateTime.now();
@@ -1057,7 +1067,7 @@ class _MoIStyleBadge extends StatelessWidget {
                     opacity: 0.10,
                     child: Center(
                       child: Image.asset(
-                        "assets/img/logo.png",
+                        "assets/img/about-moi-logo.png",
                         width: 620,
                         height: 620,
                         fit: BoxFit.contain,
@@ -1102,7 +1112,7 @@ class _MoIStyleBadge extends StatelessWidget {
                                 height: 1.0,
                               ),
                             ),
-                            SizedBox(height: 6),
+                            SizedBox(height: 12),
                             Text(
                               "MINISTRY OF INTERIOR",
                               style: TextStyle(
@@ -1520,10 +1530,10 @@ class _MoIStyleBadge extends StatelessWidget {
       bg = Colors.orange;
       label = "កំពុងរង់ចាំពិនិត្យ";
     } else if (status == "approve" || status == "approved") {
-      bg = Colors.green;
+      bg = Colors.blue;
       label = "បានអនុម័ត";
     } else if (status == "active") {
-      bg = Colors.blue;
+      bg = Colors.green;
       label = "កំពុងប្រើប្រាស់";
     } else if (status == "reject" || status == "rejected") {
       bg = Colors.red;

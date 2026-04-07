@@ -18,12 +18,7 @@ class _SplashScreenState extends State<SplashScreen>
   late final Animation<double> _textSlideAnimation;
 
   Timer? _timer;
-
-  static const Color _deepBlue = Color(0xFF06175F);
-  static const Color _navy = Color(0xFF0A2D88);
-  static const Color _royalBlue = Color(0xFF1E3A8A);
   static const Color _gold = Color(0xFFDFB73B);
-
   @override
   void initState() {
     super.initState();
@@ -254,9 +249,9 @@ class _SplashScreenState extends State<SplashScreen>
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              _deepBlue,
-              _navy,
-              _royalBlue,
+            Color(0xFFFFE082), 
+            Color(0xFFFFC107), 
+            Color(0xFFDFB73B), 
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,

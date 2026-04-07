@@ -135,7 +135,7 @@ class CreateParkingCardPayload {
 // ─────────────────────────────────────────────
 
 class Api {
-  static const String baseUrl = "http://175.100.74.227:1234";
+  static const String baseUrl = "https://ees.interior.gov.kh";
 
   static const String _attachmentTypeVehicle = "VEHICLE_DOCUMENT";
   static const String _attachmentTypeSelfie = "INVITATION_DOCUMENT";
@@ -144,7 +144,7 @@ class Api {
     try {
       final res = await http.get(
         Uri.parse("$baseUrl/api/v1/attachments/$attachmentId"),
-        headers: {"Accept": "image/*"},
+        headers: {"Accept": "*/*"},
       );
       if (res.statusCode == 200) return res.bodyBytes;
     } catch (_) {}

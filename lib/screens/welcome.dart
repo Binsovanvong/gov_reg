@@ -5,8 +5,6 @@ class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
   static const Color _navy = Color(0xFF0A2D66);
-  static const Color _deepBlue = Color(0xFF06175F);
-  static const Color _royalBlue = Color(0xFF1E3A8A);
   static const Color _gold = Color(0xFFDFB73B);
 
   @override
@@ -19,9 +17,9 @@ class WelcomeScreen extends StatelessWidget {
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              _deepBlue,
-              Color(0xFF0B2470),
-              _royalBlue,
+            Color(0xFFFFE082), 
+            Color(0xFFFFC107), 
+            Color(0xFFDFB73B), 
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -125,14 +123,14 @@ class WelcomeScreen extends StatelessWidget {
           children: [
             Icon(
               Icons.verified_user_rounded,
-              color: Colors.white.withOpacity(0.95),
+              color: _navy,
               size: 18,
             ),
             const SizedBox(width: 8),
             Text(
               'MINISTRY OF INTERIOR',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.95),
+                color: _navy,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 fontFamily: 'KantumruyPro',
@@ -272,7 +270,7 @@ class WelcomeScreen extends StatelessWidget {
           Navigator.pushNamed(context, Approute.register);
         },
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
+          backgroundColor: Colors.white.withOpacity(0.12),
           foregroundColor: _navy,
           elevation: 0,
           shadowColor: Colors.transparent,
@@ -290,9 +288,9 @@ class WelcomeScreen extends StatelessWidget {
             ),
             SizedBox(width: 10),
             Text(
-              'ចុះឈ្មោះ',
+              'ចូលប្រើប្រាស់',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 22,
                 fontWeight: FontWeight.w800,
                 fontFamily: 'KantumruyPro',
                 color: _navy,
@@ -311,7 +309,7 @@ class WelcomeScreen extends StatelessWidget {
       textAlign: TextAlign.center,
       style: TextStyle(
         color: Colors.white.withOpacity(0.78),
-        fontSize: 13.5,
+        fontSize: 15,
         fontWeight: FontWeight.w500,
         fontFamily: 'KantumruyPro',
       ),

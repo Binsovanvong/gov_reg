@@ -194,7 +194,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool get showWorkFields => isOfficer || (isGuest && showWorkFieldsForGuest);
   bool get showProvinceCity => isNational;
   bool get useDurationDays => isNational || isGuest;
-  bool get selfieRequired => isGuest;
+  bool get selfieRequired =>  isGuest || isNational || isOutsideOfficer || isInsideOfficer;
   bool get useWorkDropdown => isOfficer;
   bool get showReasonField =>
       _userType == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER" ||
@@ -300,7 +300,112 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }),
     ];
   }
+  Future<void> pickFromCamera() async {
+  final picked = await ImagePicker().pickImage(
+    source: ImageSource.camera,
+    imageQuality: 80,
+  );
 
+  if (picked != null) {
+    setState(() {
+      attachFiles.add(File(picked.path));
+      attachFileNames.add(picked.name);
+    });
+  }
+}
+  Future<void> pickFromGallery() async {
+    final pickedFiles = await ImagePicker().pickMultiImage(
+      imageQuality: 80,
+    );
+
+    if (pickedFiles.isNotEmpty) {
+      setState(() {
+        for (var file in pickedFiles) {
+          attachFiles.add(File(file.path));
+          attachFileNames.add(file.name);
+        }
+      });
+    }
+  }
+  void showAttachmentOptions() {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (context) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            /// Top indicator
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            const Text(
+              "ជ្រើសរើសឯកសារ",
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            /// GRID OPTIONS
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _optionItem(
+                  icon: Icons.camera_alt_rounded,
+                  label: "Camera",
+                  color: const Color(0xFF2563EB),
+                  onTap: () {
+                    Navigator.pop(context);
+                    pickFromCamera();
+                  },
+                ),
+                _optionItem(
+                  icon: Icons.image_rounded,
+                  label: "Gallery",
+                  color: const Color(0xFF16A34A),
+                  onTap: () {
+                    Navigator.pop(context);
+                    pickFromGallery();
+                  },
+                ),
+                _optionItem(
+                  icon: Icons.insert_drive_file_rounded,
+                  label: "File",
+                  color: const Color(0xFFF59E0B),
+                  onTap: () {
+                    Navigator.pop(context);
+                    pickAttachFiles();
+                  },
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+          ],
+        ),
+      );
+    },
+  );
+}
   void _snack(
     String msg, {
     bool isError = true,
@@ -1657,7 +1762,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
     );
   }
-
+  Widget _optionItem({
+  required IconData icon,
+  required String label,
+  required Color color,
+  required VoidCallback onTap,
+}) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Column(
+      children: [
+        Container(
+          width: 65,
+          height: 65,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Icon(icon, color: color, size: 30),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        )
+      ],
+    ),
+  );
+}
   Widget uploadMultiAttachment() {
     return _uploadCard(
       title: isGuest ? "ឯកសាររថយន្ត" : "ឯកសារភ្ជាប់",
@@ -1666,7 +1801,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           : "អាចភ្ជាប់ឯកសារបន្ថែមបាន",
       icon: Icons.cloud_upload_rounded,
       gradient: const [Color(0xFF0EA5E9), Color(0xFF2563EB)],
-      onTap: pickAttachFiles,
+      onTap: showAttachmentOptions,
       isError: attachFilesError != null,
       bottomContent: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1963,10 +2098,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
       height: 340,
       width: double.infinity,
       decoration: BoxDecoration(
-        image: DecorationImage(
-          image: AssetImage('assets/img/bgc.png'),
-          fit: BoxFit.cover, 
-        ),
+          gradient: LinearGradient(
+            colors: [
+            Color(0xFFFFE082), 
+            Color(0xFFFFC107), 
+            Color(0xFFDFB73B), 
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
       ),
       child: Column(
         children: [
@@ -1994,7 +2134,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     style: TextStyle(
                       fontSize: 30,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFFE0A428),
+                      color: Colors.white,
                       fontFamily: 'khmer moul light',
                     ),
                   ),
@@ -2003,7 +2143,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     'Ministry of Interior',
                     style: TextStyle(
                       fontSize: 22,
-                      color: Color(0xFFE0A428),
+                      color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontFamily: 'khmer moul light',
                     ),
@@ -2018,7 +2158,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: Color(0xFF0A2D66)
             ),
           ),
           const SizedBox(height: 5),
@@ -2027,7 +2167,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: Color(0xFF0A2D66),
             ),
           ),
         ],
@@ -2382,9 +2522,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 borderRadius: BorderRadius.circular(20),
                 gradient: const LinearGradient(
                   colors: [
-                    Color(0xFF06175F),
-                    Color(0xFF0A2D88),
-                    Color(0xFF1E3A8A),
+                    Color(0xFFFFE082), 
+                    Color(0xFFFFC107), 
+                    Color(0xFFDFB73B), 
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -2412,7 +2552,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         children: [
                           Icon(
                             Icons.send_rounded,
-                            color: Colors.white,
+                            color: Color(0xFF0A2D66),
                             size: 22,
                           ),
                           SizedBox(width: 10),
@@ -2421,7 +2561,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w900,
-                              color: Colors.white,
+                              color: Color(0xFF0A2D66),
                               letterSpacing: 0.3,
                             ),
                           ),
