@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -623,78 +625,92 @@ class _RegisterScreenState extends State<RegisterScreen> {
         selectedPos = p;
         positionController.text = p?.name ?? "";
       });
+  Future<bool> hasInternet() async {
+    final result = await Connectivity().checkConnectivity();
+    return result != ConnectivityResult.none;
+  }
 
   Future<void> _doSearch() async {
-  final query = searchController.text.trim();
-  if (query.isEmpty) return;
-
-  setState(() => isLoading = true);
-
-  try {
-    final results = await Api.searchParkingCardRequest(query);
-
-    if (!mounted) return;
-
-    if (results.isEmpty) {
-      _snack("រកមិនឃើញទិន្នន័យសំណើ");
+    final query = searchController.text.trim();
+    if (query.isEmpty || isLoading) return;
+    final isConnected = await hasInternet();
+    if (!isConnected) {
+      _snack("គ្មានអ៊ីនធឺណិត");
       return;
     }
+    setState(() => isLoading = true);
+    String? pick(String? value, String? fallback) {
+      if (value != null && value.trim().isNotEmpty) return value;
+      return fallback;
+    }
 
-    final fixedResults = results.map((res) {
-      return ParkingCardRequestResponseDTO(
-        id: res.id,
-        name: res.name,
-        code: res.code,
-        token: res.token,
-        userType: res.userType,
-        organization: (res.organization != null && res.organization!.trim().isNotEmpty)
-            ? res.organization
-            : res.generalDepartmentText,
-        position: (res.position != null && res.position!.trim().isNotEmpty)
-            ? res.position
-            : res.positionText,
-        policeId: res.policeId,
-        department: (res.department != null && res.department!.trim().isNotEmpty)
-            ? res.department
-            : res.departmentText,
-        bureau: (res.bureau != null && res.bureau!.trim().isNotEmpty)
-            ? res.bureau
-            : res.bureauText,
-        phone: res.phone,
-        vehicles: res.vehicles,
-        attachments: res.attachments,
-        requestDate: res.requestDate,
-        requestAtDate: res.requestAtDate,
-        parkingRequestStatus: res.parkingRequestStatus,
-        positionText: res.positionText,
-        generalDepartment: res.generalDepartment,
-        generalDepartmentText: res.generalDepartmentText,
-        departmentText: res.departmentText,
-        bureauText: res.bureauText,
-        reason: res.reason,
-        provinceCity: res.provinceCity,
-        createdAt: res.createdAt,
+    try {
+      final results = await Api
+          .searchParkingCardRequest(query)
+          .timeout(const Duration(seconds: 10));
+
+      if (!mounted) return;
+
+      if (results.isEmpty) {
+        _snack("រកមិនឃើញទិន្នន័យសំណើ");
+        return;
+      }
+
+      final fixedResults = results.map((res) {
+        return ParkingCardRequestResponseDTO(
+          id: res.id,
+          name: res.name,
+          code: res.code,
+          token: res.token,
+          userType: res.userType,
+          organization: pick(res.organization, res.generalDepartmentText),
+          position: pick(res.position, res.positionText),
+          policeId: res.policeId,
+          department: pick(res.department, res.departmentText),
+          bureau: pick(res.bureau, res.bureauText),
+          phone: res.phone,
+          vehicles: res.vehicles,
+          attachments: res.attachments,
+          requestDate: res.requestDate,
+          requestAtDate: res.requestAtDate,
+          parkingRequestStatus: res.parkingRequestStatus,
+          positionText: res.positionText,
+          generalDepartment: res.generalDepartment,
+          generalDepartmentText: res.generalDepartmentText,
+          departmentText: res.departmentText,
+          bureauText: res.bureauText,
+          reason: res.reason,
+          provinceCity: res.provinceCity,
+          createdAt: res.createdAt,
+        );
+      }).toList();
+
+      if (fixedResults.isEmpty) {
+        _snack("ទិន្នន័យមិនត្រឹមត្រូវ");
+        return;
+      }
+      Navigator.pushNamed(
+        context,
+        Approute.verifySuccessScreen,
+        arguments: {
+          "response": fixedResults.first,
+          "allResults": fixedResults,
+          "selfieBytes": null,
+          "selfiePath": null,
+        },
       );
-    }).toList();
-
-    Navigator.pushNamed(
-      context,
-      Approute.verifySuccessScreen,
-      arguments: {
-        "response": fixedResults.first,
-        "allResults": fixedResults,
-        "selfieBytes": null,
-        "selfiePath": null,
-      },
-    );
-  } on ApiException catch (e) {
-    _snack(e.message);
-  } catch (e) {
-    _snack(e.toString());
-  } finally {
-    if (mounted) setState(() => isLoading = false);
+    } on SocketException {
+      _snack("គ្មានអ៊ីនធឺណិត");
+    } on TimeoutException {
+      _snack("សេវាកម្មយឺតពេល សូមព្យាយាមម្តងទៀត");
+    } on ApiException catch (e) {
+      _snack(e.message);
+    } catch (e) {
+      _snack("មានបញ្ហាបច្ចេកទេស សូមព្យាយាមម្តងទៀត");
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
   }
-}
 
   Future<void> pickAttachFiles() async {
     setState(() => attachFilesError = null);

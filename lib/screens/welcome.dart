@@ -143,7 +143,7 @@ class WelcomeScreen extends StatelessWidget {
   }
 
   Widget _buildHeroCard(bool isSmall) {
-    final double logoSize = isSmall ? 110 : 132;
+    final double logoSize = isSmall ? 220 : 220;
 
     return Container(
       width: double.infinity,
@@ -180,9 +180,10 @@ class WelcomeScreen extends StatelessWidget {
           Container(
             width: logoSize,
             height: logoSize,
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
+              shape: BoxShape.rectangle,
+              borderRadius: BorderRadius.circular(20),
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
@@ -197,10 +198,12 @@ class WelcomeScreen extends StatelessWidget {
                 ),
               ],
             ),
-            child: Image.asset(
-              'assets/icon/img1.png',
-              fit: BoxFit.contain,
-            ),
+              child: Image.asset(
+                'assets/icon/MOI-EES (IOS).png',
+                fit: BoxFit.contain, 
+                width: logoSize ,
+                height: logoSize,
+              ),
           ),
           SizedBox(height: isSmall ? 20 : 24),
           Text(
@@ -216,7 +219,7 @@ class WelcomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'កម្មវិធី ANPR',
+            'កម្មវិធី MOI-EES',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white,

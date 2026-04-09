@@ -24,6 +24,7 @@ dependencies:
   photo_manager: ^3.0.0
   image: ^4.7.2
   auto_size_text: ^3.0.0
+  connectivity_plus: ^7.1.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -33,9 +34,9 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icon/img.png"
+  image_path: "assets/icon/MOI-EES (IOS).png"
   adaptive_icon_background: "#000000"
-  adaptive_icon_foreground: "assets/icon/img.png"
+  adaptive_icon_foreground: "assets/icon/MOI-EES (IOS).png"
 flutter:
   uses-material-design: true
   assets:
