@@ -12,7 +12,7 @@ dependencies:
   http: ^1.1.0
   http_parser: 4.1.2
   file_picker: ^8.0.0
-  google_fonts: ^6.1.0
+  google_fonts: ^6.3.2
   qr_flutter: ^4.1.0
   url_launcher: ^6.2.6
   shared_preferences: ^2.2.3
@@ -24,12 +24,21 @@ dependencies:
   photo_manager: ^3.0.0
   image: ^4.7.2
   auto_size_text: ^3.0.0
+  connectivity_plus: ^7.1.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
 
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/MOI-EES (IOS).png"
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/icon/MOI-EES (IOS).png"
 flutter:
   uses-material-design: true
   assets:
     - assets/img/
+    - assets/icon/

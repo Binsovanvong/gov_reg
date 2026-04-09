@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:gov_reg/routes/approute.dart';
-import 'package:gov_reg/screens/login.dart';
-import 'package:gov_reg/screens/register.dart';
-import 'package:gov_reg/screens/splahscreen.dart';
-import 'package:gov_reg/screens/success.dart';
-import 'package:gov_reg/screens/welcome.dart';
+import 'package:gov_reg/routes/pageroute.dart';
 
 void main() {
   runApp(const MainApp());
@@ -17,28 +13,13 @@ class MainApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-  debugShowCheckedModeBanner: false,
-  initialRoute: Approute.splash,
-  theme: ThemeData(
-    useMaterial3: true,
-    textTheme: GoogleFonts.notoSansKhmerTextTheme(),
-  ),
-  routes: {
-    Approute.splash: (context) => const SplashScreen(),
-    Approute.welcome: (context) => const WelcomeScreen(),
-    Approute.register: (context) => const RegisterScreen(),
-    Approute.login: (context) => const LoginPage(),
-  },
-  onGenerateRoute: (settings) {
-    if (settings.name == Approute.verifySuccessScreen) {
-      return MaterialPageRoute(
-        builder: (_) => const RegisterSuccessMixedScreen(),
-        settings: settings, 
-      );
-    }
-    return null;
-  },
-
-);
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        textTheme: GoogleFonts.kantumruyProTextTheme(),
+      ),
+      onGenerateRoute: PageRouteGenerator.generateRoute,
+      initialRoute: Approute.splash,
+    );
   }
 }

@@ -1,9 +1,12 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:auto_size_text/auto_size_text.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:gov_reg/api/api.dart';
+import 'package:gov_reg/models/parking_card.dart';
 import 'package:gov_reg/routes/approute.dart';
 import 'package:http/http.dart' as http;
 import 'package:photo_manager/photo_manager.dart';
@@ -16,50 +19,113 @@ class RegisterSuccessMixedScreen extends StatefulWidget {
       _RegisterSuccessMixedScreenState();
 }
 
-class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen> {
-  static const String baseUrl = "http://10.0.2.2:8080";
+class _RegisterSuccessMixedScreenState
+    extends State<RegisterSuccessMixedScreen> {
+  static const String baseUrl = "https://ees.interior.gov.kh";
 
   Future<Uint8List?> _qrFuture = Future.value(null);
 
-  // ✅ safe defaults (no LateInitializationError)
-  String code = "";
-  String token = "";
-  String vehicleType = "";
-  String fullName = "";
-  String phone = "";
-  String userType = "";
-  String parkingRequestStatus = "";
+  ParkingCardRequestResponseDTO? _response;
 
-  int requestDate = 0; // yyyymmdd
-  String? requestAtDate; // dd-MM-yyyy or null
-
-  List vehicles = [];
-  Map? workingInfo;
+  List<ParkingCardRequestResponseDTO> _allResults = [];
+  int _currentIndex = 0;
 
   String selfiePath = "";
   Uint8List? selfieBytes;
 
   final GlobalKey _exportKey = GlobalKey();
+
   bool _saving = false;
   bool _showExportForCapture = false;
 
-  // ---------- RULES ----------
-  bool get isNational =>
-      userType == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER";
-  bool get isSecretaryOrDeputy =>
-      userType == "SECRETARY" || userType == "DEPUTY_SECRETARY";
-  bool get isOfficer =>
+  bool _alive = true;
+  bool _initedArgs = false;
+  OverlayEntry? _topSnackBar;
+
+  ParkingCardRequestResponseDTO get _current => _allResults.isNotEmpty
+      ? _allResults[_currentIndex]
+      : (_response ?? ParkingCardRequestResponseDTO());
+
+  String get code => _current.code ?? "";
+  String get token => _current.token ?? "";
+  String get fullName => _current.name ?? "";
+  String get phone => _current.phone ?? "";
+  String get userType => _current.userType?.value ?? "";
+  String get parkingRequestStatus => _current.parkingRequestStatus?.value ?? "";
+  String get provinceCity => _current.provinceCity ?? "";
+  int get requestDate {
+  final args = (ModalRoute.of(context)?.settings.arguments as Map?) ?? {};
+    final response = args["response"];
+    if (response is ParkingCardRequestResponseDTO &&
+        response.requestDate != null &&
+        response.requestDate! > 0) {
+      return response.requestDate!;
+    }
+    return _current.requestDate ?? 0;
+  }
+
+  String? get requestAtDate {
+    final args = (ModalRoute.of(context)?.settings.arguments as Map?) ?? {};
+    final response = args["response"];
+    if (response is ParkingCardRequestResponseDTO) {
+      return response.requestAtDate;
+    }
+    return _current.requestAtDate;
+  }
+
+  VehicleResponseDTO? get _firstVehicle =>
+      (_current.vehicles != null && _current.vehicles.isNotEmpty)
+          ? _current.vehicles.first
+          : null;
+
+  String get vehicleType => _firstVehicle?.vehicleType ?? "";
+
+  bool get showPoliceId =>
       userType == "INSIDE_OFFICER" || userType == "OUTSIDE_OFFICER";
 
-  // ✅ required behavior:
-  // Guest + National: hide policeId
-  // Secretary/Deputy: hide workinfo + hide policeId
-  // Inside/Outside officer: show all but hide province
-  bool get showPoliceId => isOfficer;
-  bool get showWorkInfo => !isSecretaryOrDeputy;
-  bool get showProvince => isNational; // officers hide province
+  bool get showProvince =>
+      userType == "NATIONAL_SUBORDINATION_ADMINISTRATIVE_OFFICER";
 
-  // ---------------- KHMER DATE FORMAT ----------------
+  bool get showWorkInfo =>
+      userType == "INSIDE_OFFICER" ||
+      userType == "OUTSIDE_OFFICER" ||
+      userType == "GUEST";
+
+  @override
+  void dispose() {
+    _topSnackBar?.remove();
+    _topSnackBar = null;
+    _alive = false;
+    super.dispose();
+  }
+
+  void _showTopSnackBar(String message, {bool isSuccess = true}) {
+    _topSnackBar?.remove();
+    _topSnackBar = null;
+
+    _topSnackBar = OverlayEntry(
+      builder: (context) => _TopSnackBarWidget(
+        message: message,
+        isSuccess: isSuccess,
+        onDismiss: () {
+          _topSnackBar?.remove();
+          _topSnackBar = null;
+        },
+      ),
+    );
+
+    Overlay.of(context).insert(_topSnackBar!);
+  }
+
+  void _showCreativeSuccessTopSnackBar() {
+    _showTopSnackBar("បានទាញទុករូបភាពដោយជោគជ័យ", isSuccess: true);
+  }
+
+  String _safe(dynamic v, {String fallback = "-"}) {
+    final s = (v ?? "").toString().trim();
+    if (s.isEmpty || s.toLowerCase() == "null") return fallback;
+    return s;
+  }
 
   String _formatKhmerDate(DateTime d) {
     const khMonths = [
@@ -78,78 +144,99 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
     ];
 
     String toKhmerNumber(String input) {
-      const en = ['0','1','2','3','4','5','6','7','8','9'];
-      const kh = ['០','១','២','៣','៤','៥','៦','៧','៨','៩'];
-
+      const en = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+      const kh = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
       for (int i = 0; i < en.length; i++) {
         input = input.replaceAll(en[i], kh[i]);
       }
       return input;
     }
 
-    final day = toKhmerNumber(d.day.toString());
-    final year = toKhmerNumber(d.year.toString());
-    final month = khMonths[d.month - 1];
-
-    return "$day $month $year";
+    return "${toKhmerNumber(d.day.toString())} ${khMonths[d.month - 1]} ${toKhmerNumber(d.year.toString())}";
   }
 
-  String _formatYmdIntToKhmer(int yyyymmdd) {
-    final s = yyyymmdd.toString().padLeft(8, '0');
-    if (s.length != 8) return "-";
 
-    final year = int.parse(s.substring(0, 4));
-    final month = int.parse(s.substring(4, 6));
-    final day = int.parse(s.substring(6, 8));
 
-    return _formatKhmerDate(DateTime(year, month, day));
+  Future<void> _loadSelfieFromAttachments() async {
+    if (selfieBytes != null) return;
+    if (_current.attachments.isEmpty) return;
+
+    final selfieAttachment = _current.attachments.firstWhere(
+      (a) => a.attachmentType == "INVITATION_DOCUMENT",
+      orElse: () => AttachmentDTO(),
+    );
+
+    final id = selfieAttachment.id;
+    if (id == null || id.isEmpty) return;
+
+    final bytes = await Api.fetchAttachmentBytes(id);
+    if (!mounted) return;
+
+    if (bytes != null && bytes.isNotEmpty) {
+      setState(() => selfieBytes = bytes);
+    }
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (_initedArgs) return;
+    _initedArgs = true;
 
     final args = (ModalRoute.of(context)?.settings.arguments as Map?) ?? {};
 
-    setState(() {
-      code = (args["code"] ?? "").toString();
-      token = (args["token"] ?? "").toString();
+    final response = args["response"];
+    if (response is ParkingCardRequestResponseDTO) {
+      _response = response;
+    }
 
-      fullName = (args["fullName"] ?? "").toString();
-      phone = (args["phone"] ?? "").toString();
-      userType = (args["userType"] ?? "").toString();
-      parkingRequestStatus = (args["parkingRequestStatus"] ?? "").toString();
+    final allResults = args["allResults"];
+    if (allResults is List<ParkingCardRequestResponseDTO> &&
+        allResults.isNotEmpty) {
+      _allResults = allResults;
+      _currentIndex = 0;
+    } else if (_response != null) {
+      _allResults = [_response!];
+      _currentIndex = 0;
+    }
 
-      requestDate = int.tryParse((args["requestDate"] ?? 0).toString()) ?? 0;
-      requestAtDate = args["requestAtDate"]?.toString();
-
-      vehicleType = (args["vehicleType"] ?? "").toString();
-
-      vehicles = (args["vehicles"] is List) ? (args["vehicles"] as List) : [];
-      workingInfo =
-          (args["workingInfo"] is Map) ? (args["workingInfo"] as Map) : null;
-
-      selfiePath = (args["selfiePath"] ?? "").toString();
-      if (selfiePath.isEmpty && vehicles.isNotEmpty && vehicles.first is Map) {
-        selfiePath = ((vehicles.first as Map)["selfiePath"] ?? "").toString();
-      }
-
-      selfieBytes = (args["selfieBytes"] is Uint8List)
-          ? (args["selfieBytes"] as Uint8List)
-          : null;
-    });
+    selfieBytes = (args["selfieBytes"] is Uint8List)
+        ? args["selfieBytes"] as Uint8List
+        : null;
+    selfiePath = (args["selfiePath"] ?? "").toString();
 
     precacheImage(const AssetImage("assets/img/about-moi-logo.png"), context);
     _qrFuture = _fetchQrPngOrNull();
+    _loadSelfieFromAttachments();
+
+    if (mounted) setState(() {});
   }
 
+  void _switchToResult(int index) {
+    if (index < 0 || index >= _allResults.length) return;
+    setState(() {
+      _currentIndex = index;
+      selfieBytes = null;
+      _qrFuture = _fetchQrPngOrNull();
+    });
+    _loadSelfieFromAttachments();
+  }
 
   Future<Uint8List?> _fetchQrPngOrNull() async {
-    if (token.isEmpty) return null;
-    final uri = Uri.parse("$baseUrl/api/v1/qr/parking/$token");
-    final res = await http.get(uri, headers: {"Accept": "image/png"});
-    if (res.statusCode != 200) return null;
-    return res.bodyBytes;
+    final t = token;
+    if (t.isEmpty) return null;
+
+    try {
+      final res = await http.get(
+        Uri.parse("$baseUrl/api/v1/qr/parking/$t"),
+        headers: {"Accept": "image/png"},
+      );
+      if (!_alive) return null;
+      if (res.statusCode != 200) return null;
+      return res.bodyBytes;
+    } catch (_) {
+      return null;
+    }
   }
 
   String _userTypeKhmer(String v) {
@@ -171,87 +258,117 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
     }
   }
 
+  Future<bool> _ensurePhotoPermission() async {
+    final PermissionState ps = await PhotoManager.requestPermissionExtend();
+      if (ps.isAuth) {
+        return true;
+      }
+      if (ps.hasAccess) {
+        _showTopSnackBar(
+          "សូមអនុញ្ញាត Full Photo Access ដើម្បីទាញទុក",
+          isSuccess: false,
+        );
+        await PhotoManager.openSetting();
+        return false;
+      }
+      _showTopSnackBar("សូមអនុញ្ញាត Photos permission", isSuccess: false);
+      await PhotoManager.openSetting();
+      return false;
+    }
+  Future<void> _showExportWidgetSafely() async {
+    if (!mounted) return;
+    setState(() => _showExportForCapture = true);
+    await WidgetsBinding.instance.endOfFrame;
+    await Future.delayed(const Duration(milliseconds: 80));
+    await WidgetsBinding.instance.endOfFrame;
+  }
+
+  Future<void> _hideExportWidgetSafely() async {
+    if (!mounted) return;
+    setState(() => _showExportForCapture = false);
+    await WidgetsBinding.instance.endOfFrame;
+  }
+
   Future<Uint8List?> _captureExportPng() async {
     final ctx = _exportKey.currentContext;
     if (ctx == null) return null;
 
     final ro = ctx.findRenderObject();
     if (ro is! RenderRepaintBoundary) return null;
-    final boundary = ro;
 
-    for (int i = 0; i < 40; i++) {
+    for (int i = 0; i < 20; i++) {
       await WidgetsBinding.instance.endOfFrame;
-      if (!boundary.debugNeedsPaint && boundary.hasSize) break;
-      await Future.delayed(const Duration(milliseconds: 25));
+      if (!ro.debugNeedsPaint && ro.hasSize) break;
+      await Future.delayed(const Duration(milliseconds: 16));
     }
 
-    if (boundary.debugNeedsPaint || !boundary.hasSize) return null;
+    if (ro.debugNeedsPaint || !ro.hasSize) return null;
 
-    final ui.Image image = await boundary.toImage(pixelRatio: 3.5);
-    final ByteData? bd = await image.toByteData(format: ui.ImageByteFormat.png);
-    return bd?.buffer.asUint8List();
+    try {
+      final dpr = MediaQuery.of(context).devicePixelRatio;
+      final double safePixelRatio = dpr.clamp(1.0, 2.0);
+
+      final ui.Image image = await ro.toImage(pixelRatio: safePixelRatio);
+      try {
+        final ByteData? bd =
+            await image.toByteData(format: ui.ImageByteFormat.png);
+        return bd?.buffer.asUint8List();
+      } finally {
+        image.dispose();
+      }
+    } catch (e) {
+      debugPrint("capture export png error: $e");
+      return null;
+    }
   }
 
   Future<void> _saveToPhotos() async {
     if (_saving) return;
+
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      _showTopSnackBar(
+        "មុខងារនេះអាចប្រើបានតែលើ Android និង iOS ប៉ុណ្ណោះ",
+        isSuccess: false,
+      );
+      return;
+    }
+
     setState(() => _saving = true);
 
     try {
-      if (!Platform.isAndroid && !Platform.isIOS) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text("Save to Photos supports only Android/iOS")),
-        );
-        return;
-      }
+      final hasPermission = await _ensurePhotoPermission();
+      if (!hasPermission) return;
 
-      final PermissionState ps = await PhotoManager.requestPermissionExtend();
-      if (!ps.isAuth) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("សូមអនុញ្ញាត Photos permission")),
-        );
-        return;
-      }
-
-      setState(() => _showExportForCapture = true);
-
-      await WidgetsBinding.instance.endOfFrame;
-      await Future.delayed(const Duration(milliseconds: 250));
-      await WidgetsBinding.instance.endOfFrame;
-      await Future.delayed(const Duration(milliseconds: 250));
-      await WidgetsBinding.instance.endOfFrame;
+      await _showExportWidgetSafely();
 
       final Uint8List? bytes = await _captureExportPng();
 
-      if (mounted) setState(() => _showExportForCapture = false);
+      await _hideExportWidgetSafely();
 
-      if (bytes == null) {
+      if (bytes == null || bytes.isEmpty) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Capture failed ❌")),
-        );
+        _showTopSnackBar("មិនអាចចាប់យករូបភាពបាន", isSuccess: false);
         return;
       }
 
-      final filename =
-          "parking_badge_${DateTime.now().millisecondsSinceEpoch}.png";
-
-      await PhotoManager.editor.saveImage(
+      final AssetEntity saved = await PhotoManager.editor.saveImage(
         bytes,
-        filename: filename,
+        filename: "parking_badge_${DateTime.now().millisecondsSinceEpoch}.png",
         title: "Parking Badge",
       );
 
+      if (saved == null) {
+        if (!mounted) return;
+        _showTopSnackBar("មិនអាចទាញទុករូបភាពបាន", isSuccess: false);
+        return;
+      }
+
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("រក្សាទុកចូល Photos ✅")),
-      );
+      _showCreativeSuccessTopSnackBar();
     } catch (e) {
+      await _hideExportWidgetSafely();
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Error: $e")));
+      _showTopSnackBar("មានបញ្ហា: $e", isSuccess: false);
     } finally {
       if (mounted) {
         setState(() {
@@ -262,28 +379,199 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
     }
   }
 
+  Widget _creativeDownloadButton({
+    required bool isLoading,
+    required VoidCallback? onTap,
+  }) {
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 180),
+      opacity: onTap == null ? 0.6 : 1,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Ink(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFFFFE082),
+                  Color(0xFFFFCA28),
+                  Color(0xFFFFA000),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFFB300).withOpacity(0.35),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.4,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(
+                            Icons.download_rounded,
+                            size: 22,
+                            color: Colors.white,
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            "ទាញទុក",
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              fontSize: 16,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _creativeHomeButton({
+    required VoidCallback? onTap,
+  }) {
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 180),
+      opacity: onTap == null ? 0.6 : 1,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Ink(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFFDFB73B),
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.home_rounded,
+                    size: 21,
+                    color: Color(0xFFDFB73B),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    "ទំព័រដើម",
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFDFB73B),
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    const gold = Color(0xFFDFB73B);
-
-    String issueDateStr = "-";
-    if (requestAtDate != null && requestAtDate!.isNotEmpty) {
-      try {
-        final parts = requestAtDate!.split("-");
-        if (parts.length == 3) {
-          final day = int.parse(parts[0]);
-          final month = int.parse(parts[1]);
-          final year = int.parse(parts[2]);
-          issueDateStr =
-              _formatKhmerDate(DateTime(year, month, day));
-        }
-      } catch (_) {
-        issueDateStr = "-";
+    DateTime parseStartDate(String? raw) {
+      if (raw == null || raw.trim().isEmpty) {
+        final now = DateTime.now();
+        return DateTime(now.year, now.month, now.day);
       }
+
+      try {
+        final parts = raw.split("-");
+        if (parts.length == 3) {
+          // yyyy-MM-dd
+          if (parts[0].length == 4) {
+            return DateTime(
+              int.parse(parts[0]),
+              int.parse(parts[1]),
+              int.parse(parts[2]),
+            );
+          }
+          // dd-MM-yyyy
+          return DateTime(
+            int.parse(parts[2]),
+            int.parse(parts[1]),
+            int.parse(parts[0]),
+          );
+        }
+      } catch (_) {}
+
+      final now = DateTime.now();
+      return DateTime(now.year, now.month, now.day);
     }
 
-    final expiryDateStr =
-        requestDate > 0 ? _formatYmdIntToKhmer(requestDate) : "-";
+    // start date
+    final startDate = parseStartDate(requestAtDate);
+    final issueDateStr = _formatKhmerDate(startDate);
+
+    // end date (🔥 IMPORTANT FIX)
+    String expiryDateStr = "-";
+    if (requestDate > 0) {
+      final endDate = startDate.add(Duration(days: requestDate ));
+      expiryDateStr = _formatKhmerDate(endDate);
+    }
+    final cur = _current;
+    final workingInfoMap = <String, dynamic>{
+      "generalDepartment": _safe(cur.generalDepartment),
+      "department": _safe(cur.department),
+      "bureau": _safe(cur.bureau),
+      "position": _safe(cur.position),
+      "generalDepartmentText": _safe(cur.generalDepartmentText),
+      "organization": _safe(cur.organization),
+      "departmentText": _safe(cur.departmentText),
+      "bureauText": _safe(cur.bureauText),
+      "positionText": _safe(cur.positionText),
+      "provinceCity": _safe(cur.provinceCity),
+      "policeId": _safe(cur.policeId, fallback: ""),
+    };
+    final vehiclesMaps = cur.vehicles
+    .map((v) => {
+          "plateNumber": v.plateNumber ?? "",
+          "brand": v.brand ?? "",
+          "madeYear": (v.madeYear ?? 0).toString(),
+          "plateSubCategory": v.plateSubCategory ?? "",
+          "plateCode": v.plateCode ?? "",
+          "vehicleType": v.vehicleType ?? "",
+        })
+    .toList();
 
     final badgeWidget = MediaQuery(
       data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
@@ -295,8 +583,9 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
         vehicleType: vehicleType,
         parkingRequestStatus: parkingRequestStatus,
         userTypeText: _userTypeKhmer(userType),
-        vehicles: vehicles,
-        workingInfo: workingInfo,
+        rawUserType: userType,
+        vehicles: vehiclesMaps,
+        workingInfo: workingInfoMap,
         selfieBytes: selfieBytes,
         selfiePath: selfiePath,
         qrFuture: _qrFuture,
@@ -305,186 +594,349 @@ class _RegisterSuccessMixedScreenState extends State<RegisterSuccessMixedScreen>
         showPoliceId: showPoliceId,
         showWorkInfo: showWorkInfo,
         showProvince: showProvince,
+        provinceCity: provinceCity,
       ),
     );
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    side: const BorderSide(color: Color(0xFFFFCA28)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    "ត្រឡប់ក្រោយ",
-                    style: TextStyle(fontWeight: FontWeight.w900, color: gold),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFFFFCA28),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  onPressed: _saving ? null : _saveToPhotos,
-                  child: _saving
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.download_rounded,
-                                size: 18, color: Colors.white),
-                            SizedBox(width: 8),
-                            Text(
-                              "ទាញទុក",
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
+    return PopScope(
+      canPop: !_saving,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF4F6FA),
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: Container(
+            color: Colors.white,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_allResults.length > 1) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left),
+                        onPressed: _currentIndex > 0
+                            ? () => _switchToResult(_currentIndex - 1)
+                            : null,
+                      ),
+                      Text(
+                        "${_currentIndex + 1} / ${_allResults.length}",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
                         ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor:  Color(0xFFFFCA28),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right),
+                        onPressed: _currentIndex < _allResults.length - 1
+                            ? () => _switchToResult(_currentIndex + 1)
+                            : null,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: _creativeDownloadButton(
+                        isLoading: _saving,
+                        onTap: _saving ? null : _saveToPhotos,
+                      ),
                     ),
-                  ),
-                  onPressed: () => Navigator.pushNamed(context, Approute.welcome),
-                  child: const Text(
-                    "ទៅទំព័រដើម",
-                    style: TextStyle(
-                        fontWeight: FontWeight.w900, color: Colors.white),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _creativeHomeButton(
+                        onTap: _saving
+                            ? null
+                            : () =>
+                                Navigator.pushNamed(context, Approute.welcome),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
-      body: SafeArea(
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final h = constraints.maxHeight;
-                final w = constraints.maxWidth;
-
-                // ✅ Fit by height to avoid bottom overflow
-                return Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: SizedBox(
-                    height: h,
-                    width: w,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: SizedBox(
-                        height: h,
-                        child: FittedBox(
-                          fit: BoxFit.fitHeight,
-                          alignment: Alignment.topLeft,
-                          child: SizedBox(
-                            width: _MoIStyleBadge.badgeW,
-                            height: _MoIStyleBadge.badgeH,
-                            child: badgeWidget,
+        body: SafeArea(
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  return Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: SizedBox(
+                      height: constraints.maxHeight,
+                      width: constraints.maxWidth,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: SizedBox(
+                          height: constraints.maxHeight,
+                          child: FittedBox(
+                            fit: BoxFit.fitHeight,
+                            alignment: Alignment.topLeft,
+                            child: SizedBox(
+                              width: _MoIStyleBadge.badgeW,
+                              height: _MoIStyleBadge.badgeH,
+                              child: badgeWidget,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                );
-              },
-            ),
-
-            // hidden painted widget for capture (FULL SIZE, NOT SCALED)
-            if (_showExportForCapture)
-              Positioned(
-                left: -4000,
-                top: 0,
-                child: IgnorePointer(
-                  ignoring: true,
-                  child: Opacity(
-                    opacity: 0.01,
-                    child: SizedBox(
-                      width: _MoIStyleBadge.badgeW,
-                      height: _MoIStyleBadge.badgeH,
+                  );
+                },
+              ),
+              if (_showExportForCapture)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  child: IgnorePointer(
+                    ignoring: true,
+                    child: Opacity(
+                      opacity: 0.02,
                       child: RepaintBoundary(
                         key: _exportKey,
                         child: MediaQuery(
                           data: MediaQuery.of(context)
                               .copyWith(textScaler: TextScaler.noScaling),
-                          child: _MoIStyleBadge(
-                            fullName: fullName,
-                            phone: phone,
-                            code: code,
-                            token: token,
-                            parkingRequestStatus: parkingRequestStatus,
-                            userTypeText: _userTypeKhmer(userType),
-                            vehicles: vehicles,
-                            vehicleType: vehicleType,
-                            workingInfo: workingInfo,
-                            selfieBytes: selfieBytes,
-                            selfiePath: selfiePath,
-                            qrFuture: _qrFuture,
-                            issueDateStr: issueDateStr,
-                            expiryDateStr: expiryDateStr,
-                            showPoliceId: showPoliceId,
-                            showWorkInfo: showWorkInfo,
-                            showProvince: showProvince,
+                          child: SizedBox(
+                            width: _MoIStyleBadge.badgeW,
+                            height: _MoIStyleBadge.badgeH,
+                            child: _MoIStyleBadge(
+                              fullName: fullName,
+                              phone: phone,
+                              code: code,
+                              token: token,
+                              vehicleType: vehicleType,
+                              parkingRequestStatus: parkingRequestStatus,
+                              userTypeText: _userTypeKhmer(userType),
+                              rawUserType: userType,
+                              vehicles: vehiclesMaps,
+                              workingInfo: workingInfoMap,
+                              selfieBytes: selfieBytes,
+                              selfiePath: selfiePath,
+                              qrFuture: _qrFuture,
+                              issueDateStr: issueDateStr,
+                              expiryDateStr: expiryDateStr,
+                              showPoliceId: showPoliceId,
+                              showWorkInfo: showWorkInfo,
+                              showProvince: showProvince,
+                              provinceCity: provinceCity,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// =========================
-/// ✅ Badge widget
-/// =========================
+class _TopSnackBarWidget extends StatefulWidget {
+  final String message;
+  final bool isSuccess;
+  final VoidCallback onDismiss;
+
+  const _TopSnackBarWidget({
+    required this.message,
+    required this.isSuccess,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_TopSnackBarWidget> createState() => _TopSnackBarWidgetState();
+}
+
+class _TopSnackBarWidgetState extends State<_TopSnackBarWidget>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<Offset> _slideAnimation;
+  late final Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 380),
+      reverseDuration: const Duration(milliseconds: 260),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, -1.2),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      ),
+    );
+
+    _fadeAnimation = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOut,
+      ),
+    );
+
+    _controller.forward();
+
+    Future.delayed(const Duration(seconds: 3), () async {
+      if (mounted) {
+        await _hide();
+      }
+    });
+  }
+
+  Future<void> _hide() async {
+    if (!_controller.isDismissed) {
+      await _controller.reverse();
+    }
+    widget.onDismiss();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final topInset = MediaQuery.of(context).padding.top + 10;
+
+    final gradientColors = widget.isSuccess
+        ? const [Color(0xFF11998E), Color(0xFF38EF7D)]
+        : const [Color(0xFFE53935), Color(0xFFFF6F61)];
+
+    final glowColor =
+        widget.isSuccess ? const Color(0xFF11998E) : const Color(0xFFE53935);
+
+    final icon =
+        widget.isSuccess ? Icons.check_circle_rounded : Icons.error_rounded;
+
+    final title = widget.isSuccess ? "ជោគជ័យ" : "បរាជ័យ";
+
+    return Positioned(
+      top: topInset,
+      left: 16,
+      right: 16,
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: SlideTransition(
+          position: _slideAnimation,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: gradientColors,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: glowColor.withOpacity(0.28),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.28),
+                  width: 1.1,
+                ),
+              ),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.18),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        icon,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            widget.message,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: _hide,
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.close_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MoIStyleBadge extends StatelessWidget {
   final String fullName;
   final String phone;
   final String code;
   final String token;
   final String userTypeText;
+  final String rawUserType;
   final String parkingRequestStatus;
   final List vehicles;
   final Map? workingInfo;
@@ -497,6 +949,7 @@ class _MoIStyleBadge extends StatelessWidget {
   final bool showPoliceId;
   final bool showWorkInfo;
   final bool showProvince;
+  final String provinceCity;
 
   const _MoIStyleBadge({
     required this.fullName,
@@ -505,6 +958,7 @@ class _MoIStyleBadge extends StatelessWidget {
     required this.vehicleType,
     required this.token,
     required this.userTypeText,
+    required this.rawUserType,
     required this.parkingRequestStatus,
     required this.vehicles,
     required this.workingInfo,
@@ -516,10 +970,11 @@ class _MoIStyleBadge extends StatelessWidget {
     required this.showPoliceId,
     required this.showWorkInfo,
     required this.showProvince,
+    required this.provinceCity,
   });
 
   static const double badgeW = 1180;
-  static const double badgeH = 950;
+  static const double badgeH = 1000;
 
   static const _navy = Color(0xFF0A2D66);
   static const _gold = Color(0xFFDFB73B);
@@ -544,38 +999,6 @@ class _MoIStyleBadge extends StatelessWidget {
         return v.isEmpty ? "-" : v;
     }
   }
-  String provinceEn(String v) {
-    const map = {
-      "ភ្នំពេញ": "PHNOM PENH",
-      "កណ្តាល": "KANDAL",
-      "បន្ទាយមានជ័យ": "BANTEAY MEANCHEY",
-      "បាត់ដំបង": "BATTAMBANG",
-      "កំពង់ចាម": "KAMPONG CHAM",
-      "កំពង់ឆ្នាំង": "KAMPONG CHHNANG",
-      "កំពង់ស្ពឺ": "KAMPONG SPEU",
-      "កំពង់ធំ": "KAMPONG THOM",
-      "កំពត": "KAMPOT",
-      "កែប": "KEP",
-      "កោះកុង": "KOH KONG",
-      "ក្រចេះ": "KRATIE",
-      "មណ្ឌលគិរី": "MONDULKIRI",
-      "ឧត្តរមានជ័យ": "ODDAR MEANCHEY",
-      "ប៉ៃលិន": "PAILIN",
-      "ព្រះសីហនុ": "PREAH SIHANOUK",
-      "ព្រះវិហារ": "PREAH VIHEAR",
-      "ព្រៃវែង": "PREY VENG",
-      "ពោធិ៍សាត់": "PURSAT",
-      "សៀមរាប": "SIEM REAP",
-      "ស្ទឹងត្រែង": "STUNG TRENG",
-      "ស្វាយរៀង": "SVAY RIENG",
-      "តាកែវ": "TAKEO",
-      "ត្បូងឃ្មុំ": "TBOUNG KHMUM",
-      "រតនគិរី": "RATANAKIRI",
-      "កម្ពុជា": "CAMBODIA",
-      "នគរបាល": "POLICE",
-    };
-    return map[v] ?? v;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -584,18 +1007,30 @@ class _MoIStyleBadge extends StatelessWidget {
     final plate = s(v?["plateNumber"]);
     final brand = s(v?["brand"]);
     final year = s(v?["madeYear"]);
+    final subcategory = s(v?["plateSubCategory"]);
+    final plateCode = s(v?["plateCode"]);
 
-    // ✅ Backend returns plateSubCategory (Khmer name) and plateCode (English DB code)
-    final subcategory = s(v?["plateSubCategory"]);   // Khmer label e.g. "បាត់ដំបង"
-    final plateCode = s(v?["plateCode"]);             // English code e.g. "BATTAMBANG"
+    final Map<String, dynamic> info =
+        Map<String, dynamic>.from(workingInfo ?? {});
 
-    final info = workingInfo ?? {};
-    final ministry = s(info["generalDepartmentText"]);
-    final dept = s(info["departmentText"]);
-    final office = s(info["burauText"]);
-    final position = s(info["positionText"]);
-    final policeId = s(info["policeId"]);
-    final provinceCity = s(info["provinceCity"]);
+    String pick(List<String> keys, {String fallback = "-"}) {
+      for (final k in keys) {
+        final val = info[k];
+        final ss = s(val);
+        if (ss.isNotEmpty && ss.toLowerCase() != "null") return ss;
+      }
+      return fallback;
+    }
+
+    final ministry = rawUserType == "GUEST"
+        ? pick(["organization", "generalDepartmentText", "generalDepartment"])
+        : pick(["generalDepartment", "generalDepartmentText", "organization"]);
+
+    final dept = pick(["department", "departmentText"]);
+    final office = pick(["bureau", "bureauText"]);
+    final position = pick(["position", "positionText"]);
+    final policeId = pick(["policeId"], fallback: "");
+    final provCity = pick(["provinceCity", "province", "province_city"]);
 
     return Material(
       color: Colors.transparent,
@@ -622,8 +1057,6 @@ class _MoIStyleBadge extends StatelessWidget {
                     ),
                   ),
                 ),
-
-                // watermark logo (center)
                 Positioned.fill(
                   child: Opacity(
                     opacity: 0.10,
@@ -638,8 +1071,6 @@ class _MoIStyleBadge extends StatelessWidget {
                     ),
                   ),
                 ),
-
-                // TOP HEADER: logo + title + QR
                 Positioned(
                   left: 36,
                   right: 36,
@@ -676,7 +1107,7 @@ class _MoIStyleBadge extends StatelessWidget {
                                 height: 1.0,
                               ),
                             ),
-                            SizedBox(height: 6),
+                            SizedBox(height: 12),
                             Text(
                               "MINISTRY OF INTERIOR",
                               style: TextStyle(
@@ -690,6 +1121,20 @@ class _MoIStyleBadge extends StatelessWidget {
                           ],
                         ),
                       ),
+                      SizedBox(width: 100),
+                      Text(
+                        "ប័ណ្ណចេញ/ចូល",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 40,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF06175F),
+                          letterSpacing: 0.5,
+                          height: 1.2,
+                          fontFamily: 'khmer moul light',
+                        ),
+                      ),
+                      Spacer(),
                       Container(
                         width: 130,
                         height: 130,
@@ -723,15 +1168,12 @@ class _MoIStyleBadge extends StatelessWidget {
                     ],
                   ),
                 ),
-
                 Positioned(
                   left: 36,
                   right: 36,
                   top: 170,
                   child: Container(height: 2, color: _line),
                 ),
-
-                // LEFT PHOTO BOX
                 Positioned(
                   left: 46,
                   top: 210,
@@ -750,8 +1192,6 @@ class _MoIStyleBadge extends StatelessWidget {
                     ),
                   ),
                 ),
-
-                // LEFT PLATE BOX
                 Positioned(
                   left: 46,
                   top: 550,
@@ -767,8 +1207,6 @@ class _MoIStyleBadge extends StatelessWidget {
                     child: Column(
                       children: [
                         const SizedBox(height: 12),
-
-                        // 🔹 Top label = subcategory
                         Text(
                           subcategory.isEmpty ? "-" : subcategory,
                           style: const TextStyle(
@@ -778,10 +1216,7 @@ class _MoIStyleBadge extends StatelessWidget {
                             height: 1.0,
                           ),
                         ),
-
                         const SizedBox(height: 14),
-
-                        // 🔹 Big plate number
                         Text(
                           plate.isEmpty ? "-" : plate,
                           style: const TextStyle(
@@ -792,10 +1227,7 @@ class _MoIStyleBadge extends StatelessWidget {
                             height: 1.0,
                           ),
                         ),
-
                         const Spacer(),
-
-                        // 🔹 Bottom red label (subcategory)
                         Container(
                           height: 46,
                           width: double.infinity,
@@ -806,8 +1238,9 @@ class _MoIStyleBadge extends StatelessWidget {
                           ),
                           alignment: Alignment.center,
                           child: Text(
-                            plateCode.isNotEmpty ? plateCode : (subcategory.isEmpty ? "-" : subcategory),
-                            
+                            plateCode.isNotEmpty
+                                ? plateCode
+                                : (subcategory.isEmpty ? "-" : subcategory),
                             style: const TextStyle(
                               color: _footerRed,
                               fontWeight: FontWeight.w900,
@@ -820,8 +1253,6 @@ class _MoIStyleBadge extends StatelessWidget {
                     ),
                   ),
                 ),
-
-                // RIGHT MAIN CONTENT
                 Positioned(
                   left: 380,
                   right: 46,
@@ -859,7 +1290,6 @@ class _MoIStyleBadge extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 18),
-
                       _twoColRowSafe(
                         leftLabel: "នាមត្រកូល និងនាមខ្លួន",
                         leftValue: fullName,
@@ -867,17 +1297,24 @@ class _MoIStyleBadge extends StatelessWidget {
                         rightValue: userTypeText,
                       ),
                       const SizedBox(height: 14),
-
-                      if (showPoliceId || showProvince) ...[
+                      if (showPoliceId) ...[
                         _twoColRowSafe(
-                          leftLabel: showPoliceId ? "អត្តលេខ" : "",
-                          leftValue: showPoliceId ? policeId : "",
-                          rightLabel: showProvince ? "ខេត្ត/រាជធានី" : "",
-                          rightValue: showProvince ? provinceCity : "",
+                          leftLabel: "អត្តលេខ",
+                          leftValue: policeId,
+                          rightLabel: "",
+                          rightValue: "",
                         ),
                         const SizedBox(height: 14),
                       ],
-
+                      if (showProvince) ...[
+                        _twoColRowSafe(
+                          leftLabel: "ខេត្ត/រាជធានី",
+                          leftValue: provCity,
+                          rightLabel: "",
+                          rightValue: "",
+                        ),
+                        const SizedBox(height: 14),
+                      ],
                       if (showWorkInfo) ...[
                         _twoColRowSafe(
                           leftLabel: "ក្រសួង/ស្ថាប័ន",
@@ -894,9 +1331,7 @@ class _MoIStyleBadge extends StatelessWidget {
                         ),
                         const SizedBox(height: 14),
                       ],
-
                       _blueSectionTitle("ព័ត៌មាន ${vehicleTypeKh(vehicleType)}"),
-
                       const SizedBox(height: 12),
                       _twoColRowSafe(
                         leftLabel: "ស្លាកលេខ",
@@ -911,25 +1346,31 @@ class _MoIStyleBadge extends StatelessWidget {
                         rightLabel: "លេខទូរស័ព្ទ",
                         rightValue: phone,
                       ),
-                      Spacer(),
+                      const SizedBox(height: 18),
                       Row(
-                        children: [
-                          Text("សុពលភាពពី ", style: TextStyle(
-                            color: Color(0xFF8A94A6),
-                            fontWeight: FontWeight.w900,
-                            fontSize: 18,
-                            height: 1.0,
-                          )),
+                        children: const [
+                          Text(
+                            "សុពលភាពពី ",
+                            style: TextStyle(
+                              color: Color(0xFF8A94A6),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 18,
+                              height: 1.0,
+                            ),
+                          ),
                           Spacer(),
-                          Text("សុពលភាពដល់ ", style: TextStyle(
-                            color: Color(0xFF8A94A6),
-                            fontWeight: FontWeight.w900,
-                            fontSize: 18,
-                            height: 1.0,
-                          )),
+                          Text(
+                            "សុពលភាពដល់ ",
+                            style: TextStyle(
+                              color: Color(0xFF8A94A6),
+                              fontWeight: FontWeight.w900,
+                              fontSize: 18,
+                              height: 1.0,
+                            ),
+                          ),
                         ],
                       ),
-                      SizedBox(height: 10),
+                      const SizedBox(height: 10),
                       SizedBox(
                         width: double.infinity,
                         child: Row(
@@ -959,7 +1400,6 @@ class _MoIStyleBadge extends StatelessWidget {
                     ],
                   ),
                 ),
-
                 Positioned(
                   left: 0,
                   right: 0,
@@ -1030,16 +1470,18 @@ class _MoIStyleBadge extends StatelessWidget {
                     : Alignment.centerLeft,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 420),
-                  child: Text(
-                    (value.trim().isEmpty) ? "-" : value.trim(),
-                    maxLines: 3,
+                  child: AutoSizeText(
+                    value.trim().isEmpty ? "-" : value.trim(),
+                    maxLines: 1,
+                    minFontSize: 24,
+                    stepGranularity: 1,
                     overflow: TextOverflow.ellipsis,
-                    softWrap: true,
+                    softWrap: false,
                     textAlign: textAlign,
                     style: const TextStyle(
                       color: _navy,
                       fontWeight: FontWeight.w900,
-                      fontSize: 30,
+                      fontSize: 28,
                       height: 1.08,
                     ),
                   ),
@@ -1073,7 +1515,6 @@ class _MoIStyleBadge extends StatelessWidget {
 
   static Widget _parkingStatusFooter(String? rawStatus) {
     final status = (rawStatus ?? "").trim().toLowerCase();
-
     Color bg;
     String label;
 
@@ -1127,8 +1568,7 @@ class _MoIStyleBadge extends StatelessWidget {
       );
     }
 
-    final canRead = path.isNotEmpty && File(path).existsSync();
-    if (canRead) {
+    if (path.isNotEmpty && File(path).existsSync()) {
       return Image.file(
         File(path),
         fit: BoxFit.cover,
