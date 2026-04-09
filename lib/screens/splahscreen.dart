@@ -186,27 +186,6 @@ class _SplashScreenState extends State<SplashScreen>
               height: 1.35,
             ),
           ),
-          const SizedBox(height: 18),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.10),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.12),
-              ),
-            ),
-            child: Text(
-                'General Department of Digital Technology and Media',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.92),
-                  fontSize: 13.5,
-                  height: 1.45,
-                  fontFamily: 'KantumruyPro',
-                ),
-              ),
-          ),
         ],
       ),
     );
@@ -249,9 +228,8 @@ class _SplashScreenState extends State<SplashScreen>
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
-            Color(0xFFFFE082), 
-            Color(0xFFFFC107), 
-            Color(0xFFDFB73B), 
+            Color(0xFFFFCA28),
+            Color(0xFFFFCA28),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,

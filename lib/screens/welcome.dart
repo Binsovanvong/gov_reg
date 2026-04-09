@@ -17,9 +17,8 @@ class WelcomeScreen extends StatelessWidget {
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
-            Color(0xFFFFE082), 
-            Color(0xFFFFC107), 
-            Color(0xFFDFB73B), 
+            Color(0xFFFFCA28),
+            Color(0xFFFFCA28),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -33,8 +32,6 @@ class WelcomeScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 22),
                 child: Column(
                   children: [
-                    const SizedBox(height: 10),
-                    _buildTopBadge(),
                     const SizedBox(height: 18),
                     Expanded(
                       child: Center(
@@ -46,7 +43,6 @@ class WelcomeScreen extends StatelessWidget {
                               SizedBox(height: isSmall ? 24 : 30),
                               _buildRegisterButton(context),
                               SizedBox(height: isSmall ? 20 : 26),
-                              _buildSecondaryText(),
                             ],
                           ),
                         ),
@@ -106,42 +102,7 @@ class WelcomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTopBadge() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.10),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.14),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.verified_user_rounded,
-              color: _navy,
-              size: 18,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'MINISTRY OF INTERIOR',
-              style: TextStyle(
-                color: _navy,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'KantumruyPro',
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
+  
   Widget _buildHeroCard(bool isSmall) {
     final double logoSize = isSmall ? 220 : 220;
 
@@ -231,11 +192,11 @@ class WelcomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            'ប្រព័ន្ធស្នើសុំប័ណ្ណចេញចូលយានយន្ត\nសម្រាប់ការប្រើប្រាស់ប្រកបដោយភាពងាយស្រួល និងទំនើប',
+            'ប្រព័ន្ធគ្រប់គ្រងការចេញចូលយានយន្តក្រសួងមហាផ្ទៃ\nប្រើប្រាស់ប្រកបដោយភាពងាយស្រួល និងទំនើប',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white.withOpacity(0.82),
-              fontSize: isSmall ? 13 : 14.5,
+              fontSize: isSmall ? 16 : 16,
               height: 1.55,
               fontWeight: FontWeight.w500,
               fontFamily: 'KantumruyPro',
@@ -254,8 +215,8 @@ class WelcomeScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         gradient: const LinearGradient(
           colors: [
-            Color(0xFFFFD95A),
-            Color(0xFFDFB73B),
+            Color(0xFFFFCA28),
+            Color(0xFFFFCA28),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -306,18 +267,7 @@ class WelcomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSecondaryText() {
-    return Text(
-      'ចាប់ផ្ដើមប្រើប្រាស់ប្រព័ន្ធឥឡូវនេះ',
-      textAlign: TextAlign.center,
-      style: TextStyle(
-        color: Colors.white.withOpacity(0.78),
-        fontSize: 15,
-        fontWeight: FontWeight.w500,
-        fontFamily: 'KantumruyPro',
-      ),
-    );
-  }
+  
 
   Widget _buildFooter() {
     return Padding(

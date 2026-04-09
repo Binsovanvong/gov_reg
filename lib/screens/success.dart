@@ -5,11 +5,11 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:gal/gal.dart';
 import 'package:gov_reg/api/api.dart';
 import 'package:gov_reg/models/parking_card.dart';
 import 'package:gov_reg/routes/approute.dart';
 import 'package:http/http.dart' as http;
-import 'package:photo_manager/photo_manager.dart';
 
 class RegisterSuccessMixedScreen extends StatefulWidget {
   const RegisterSuccessMixedScreen({super.key});
@@ -54,7 +54,7 @@ class _RegisterSuccessMixedScreenState
   String get parkingRequestStatus => _current.parkingRequestStatus?.value ?? "";
   String get provinceCity => _current.provinceCity ?? "";
   int get requestDate {
-  final args = (ModalRoute.of(context)?.settings.arguments as Map?) ?? {};
+    final args = (ModalRoute.of(context)?.settings.arguments as Map?) ?? {};
     final response = args["response"];
     if (response is ParkingCardRequestResponseDTO &&
         response.requestDate != null &&
@@ -154,8 +154,6 @@ class _RegisterSuccessMixedScreenState
 
     return "${toKhmerNumber(d.day.toString())} ${khMonths[d.month - 1]} ${toKhmerNumber(d.year.toString())}";
   }
-
-
 
   Future<void> _loadSelfieFromAttachments() async {
     if (selfieBytes != null) return;
@@ -258,23 +256,6 @@ class _RegisterSuccessMixedScreenState
     }
   }
 
-  Future<bool> _ensurePhotoPermission() async {
-    final PermissionState ps = await PhotoManager.requestPermissionExtend();
-      if (ps.isAuth) {
-        return true;
-      }
-      if (ps.hasAccess) {
-        _showTopSnackBar(
-          "សូមអនុញ្ញាត Full Photo Access ដើម្បីទាញទុក",
-          isSuccess: false,
-        );
-        await PhotoManager.openSetting();
-        return false;
-      }
-      _showTopSnackBar("សូមអនុញ្ញាត Photos permission", isSuccess: false);
-      await PhotoManager.openSetting();
-      return false;
-    }
   Future<void> _showExportWidgetSafely() async {
     if (!mounted) return;
     setState(() => _showExportForCapture = true);
@@ -322,6 +303,7 @@ class _RegisterSuccessMixedScreenState
     }
   }
 
+  // ─── UPDATED: no permission required, uses gal package ───────────────────
   Future<void> _saveToPhotos() async {
     if (_saving) return;
 
@@ -336,9 +318,6 @@ class _RegisterSuccessMixedScreenState
     setState(() => _saving = true);
 
     try {
-      final hasPermission = await _ensurePhotoPermission();
-      if (!hasPermission) return;
-
       await _showExportWidgetSafely();
 
       final Uint8List? bytes = await _captureExportPng();
@@ -351,17 +330,11 @@ class _RegisterSuccessMixedScreenState
         return;
       }
 
-      final AssetEntity saved = await PhotoManager.editor.saveImage(
+      await Gal.putImageBytes(
         bytes,
-        filename: "parking_badge_${DateTime.now().millisecondsSinceEpoch}.png",
-        title: "Parking Badge",
+        name:
+            "parking_badge_${DateTime.now().millisecondsSinceEpoch}.png",
       );
-
-      if (saved == null) {
-        if (!mounted) return;
-        _showTopSnackBar("មិនអាចទាញទុករូបភាពបាន", isSuccess: false);
-        return;
-      }
 
       if (!mounted) return;
       _showCreativeSuccessTopSnackBar();
@@ -378,6 +351,7 @@ class _RegisterSuccessMixedScreenState
       }
     }
   }
+  // ─────────────────────────────────────────────────────────────────────────
 
   Widget _creativeDownloadButton({
     required bool isLoading,
@@ -517,7 +491,6 @@ class _RegisterSuccessMixedScreenState
       try {
         final parts = raw.split("-");
         if (parts.length == 3) {
-          // yyyy-MM-dd
           if (parts[0].length == 4) {
             return DateTime(
               int.parse(parts[0]),
@@ -525,7 +498,6 @@ class _RegisterSuccessMixedScreenState
               int.parse(parts[2]),
             );
           }
-          // dd-MM-yyyy
           return DateTime(
             int.parse(parts[2]),
             int.parse(parts[1]),
@@ -538,16 +510,15 @@ class _RegisterSuccessMixedScreenState
       return DateTime(now.year, now.month, now.day);
     }
 
-    // start date
     final startDate = parseStartDate(requestAtDate);
     final issueDateStr = _formatKhmerDate(startDate);
 
-    // end date (🔥 IMPORTANT FIX)
     String expiryDateStr = "-";
     if (requestDate > 0) {
-      final endDate = startDate.add(Duration(days: requestDate ));
+      final endDate = startDate.add(Duration(days: requestDate));
       expiryDateStr = _formatKhmerDate(endDate);
     }
+
     final cur = _current;
     final workingInfoMap = <String, dynamic>{
       "generalDepartment": _safe(cur.generalDepartment),
@@ -563,15 +534,15 @@ class _RegisterSuccessMixedScreenState
       "policeId": _safe(cur.policeId, fallback: ""),
     };
     final vehiclesMaps = cur.vehicles
-    .map((v) => {
-          "plateNumber": v.plateNumber ?? "",
-          "brand": v.brand ?? "",
-          "madeYear": (v.madeYear ?? 0).toString(),
-          "plateSubCategory": v.plateSubCategory ?? "",
-          "plateCode": v.plateCode ?? "",
-          "vehicleType": v.vehicleType ?? "",
-        })
-    .toList();
+        .map((v) => {
+              "plateNumber": v.plateNumber ?? "",
+              "brand": v.brand ?? "",
+              "madeYear": (v.madeYear ?? 0).toString(),
+              "plateSubCategory": v.plateSubCategory ?? "",
+              "plateCode": v.plateCode ?? "",
+              "vehicleType": v.vehicleType ?? "",
+            })
+        .toList();
 
     final badgeWidget = MediaQuery(
       data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
@@ -1121,9 +1092,9 @@ class _MoIStyleBadge extends StatelessWidget {
                           ],
                         ),
                       ),
-                      SizedBox(width: 100),
-                      Text(
-                        "ប័ណ្ណចេញ/ចូល",
+                      const SizedBox(width: 100),
+                      const Text(
+                        "បណ្ណចេញ/ចូល",
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 40,
@@ -1134,13 +1105,14 @@ class _MoIStyleBadge extends StatelessWidget {
                           fontFamily: 'khmer moul light',
                         ),
                       ),
-                      Spacer(),
+                      const Spacer(),
                       Container(
                         width: 130,
                         height: 130,
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          border: Border.all(color: Colors.black54, width: 2),
+                          border:
+                              Border.all(color: Colors.black54, width: 2),
                         ),
                         padding: const EdgeInsets.all(6),
                         child: FutureBuilder<Uint8List?>(
@@ -1264,7 +1236,8 @@ class _MoIStyleBadge extends StatelessWidget {
                       Container(
                         height: 62,
                         color: _navy,
-                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 18),
                         child: Row(
                           children: [
                             const Expanded(
@@ -1331,7 +1304,8 @@ class _MoIStyleBadge extends StatelessWidget {
                         ),
                         const SizedBox(height: 14),
                       ],
-                      _blueSectionTitle("ព័ត៌មាន ${vehicleTypeKh(vehicleType)}"),
+                      _blueSectionTitle(
+                          "ព័ត៌មាន ${vehicleTypeKh(vehicleType)}"),
                       const SizedBox(height: 12),
                       _twoColRowSafe(
                         leftLabel: "ស្លាកលេខ",
@@ -1374,7 +1348,8 @@ class _MoIStyleBadge extends StatelessWidget {
                       SizedBox(
                         width: double.infinity,
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment:
+                              MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
                               "ថ្ងៃទី $issueDateStr",
