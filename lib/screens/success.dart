@@ -258,10 +258,13 @@ class _RegisterSuccessMixedScreenState
 
   Future<void> _showExportWidgetSafely() async {
     if (!mounted) return;
+
     setState(() => _showExportForCapture = true);
-    await Future.delayed(const Duration(milliseconds: 50));
+
+    await Future.delayed(const Duration(milliseconds: 150));
     await WidgetsBinding.instance.endOfFrame;
   }
+
   Future<void> _hideExportWidgetSafely() async {
     if (!mounted) return;
 
@@ -271,7 +274,7 @@ class _RegisterSuccessMixedScreenState
   }
   Future<Uint8List?> _captureExportPng() async {
     try {
-      await Future.delayed(const Duration(milliseconds: 50));
+      await Future.delayed(const Duration(milliseconds: 400));
 
       final context = _exportKey.currentContext;
       if (context == null) {
@@ -287,22 +290,21 @@ class _RegisterSuccessMixedScreenState
         return null;
       }
 
-      if (boundary.debugNeedsPaint) {
-        print("⏳ still painting...");
-        await Future.delayed(const Duration(milliseconds: 50));
-        return null;
+      int retry = 0;
+      while (boundary.debugNeedsPaint && retry < 5) {
+        await Future.delayed(const Duration(milliseconds: 120));
+        retry++;
       }
 
-      final image = await boundary.toImage(pixelRatio: 2.0);
-
+      final image = await boundary.toImage(
+        pixelRatio: 1.5, 
+      );
       final byteData =
           await image.toByteData(format: ui.ImageByteFormat.png);
-
       if (byteData == null) {
         print("❌ byteData null");
         return null;
       }
-
       return byteData.buffer.asUint8List();
     } catch (e, stack) {
       print("❌ capture error: $e");
@@ -310,7 +312,6 @@ class _RegisterSuccessMixedScreenState
       return null;
     }
   }
-
   Future<void> _saveToPhotos() async {
     if (_saving) return;
 
@@ -319,11 +320,13 @@ class _RegisterSuccessMixedScreenState
     try {
       await _showExportWidgetSafely();
 
+      // ✅ wait QR render (important)
+      await _qrFuture;
+      await Future.delayed(const Duration(milliseconds: 250));
+
       final bytes = await _captureExportPng();
 
       await _hideExportWidgetSafely();
-
-      print("BYTES LENGTH: ${bytes?.length}");
 
       if (bytes == null) {
         _showTopSnackBar("❌ Capture failed", isSuccess: false);
@@ -658,48 +661,43 @@ class _RegisterSuccessMixedScreenState
                 },
               ),
               if (_showExportForCapture)
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  child: IgnorePointer(
-                    ignoring: true,
-                    child: Opacity(
-                      opacity: 0.1,
-                      child: RepaintBoundary(
-                        key: _exportKey,
-                        child: MediaQuery(
-                          data: MediaQuery.of(context)
-                              .copyWith(textScaler: TextScaler.noScaling),
-                          child: SizedBox(
-                            width: _MoIStyleBadge.badgeW,
-                            height: _MoIStyleBadge.badgeH,
-                            child: _MoIStyleBadge(
-                              fullName: fullName,
-                              phone: phone,
-                              code: code,
-                              token: token,
-                              vehicleType: vehicleType,
-                              parkingRequestStatus: parkingRequestStatus,
-                              userTypeText: _userTypeKhmer(userType),
-                              rawUserType: userType,
-                              vehicles: vehiclesMaps,
-                              workingInfo: workingInfoMap,
-                              selfieBytes: selfieBytes,
-                              selfiePath: selfiePath,
-                              qrFuture: _qrFuture,
-                              issueDateStr: issueDateStr,
-                              expiryDateStr: expiryDateStr,
-                              showPoliceId: showPoliceId,
-                              showWorkInfo: showWorkInfo,
-                              showProvince: showProvince,
-                              provinceCity: provinceCity,
-                            ),
-                          ),
-                        ),
+                if (_showExportForCapture)
+              Positioned(
+                left: -9999, 
+                top: 0,
+                child: RepaintBoundary(
+                  key: _exportKey,
+                  child: MediaQuery(
+                    data: MediaQuery.of(context)
+                        .copyWith(textScaler: TextScaler.noScaling),
+                    child: SizedBox(
+                      width: _MoIStyleBadge.badgeW,
+                      height: _MoIStyleBadge.badgeH,
+                      child: _MoIStyleBadge(
+                        fullName: fullName,
+                        phone: phone,
+                        code: code,
+                        token: token,
+                        vehicleType: vehicleType,
+                        parkingRequestStatus: parkingRequestStatus,
+                        userTypeText: _userTypeKhmer(userType),
+                        rawUserType: userType,
+                        vehicles: vehiclesMaps,
+                        workingInfo: workingInfoMap,
+                        selfieBytes: selfieBytes,
+                        selfiePath: selfiePath,
+                        qrFuture: _qrFuture,
+                        issueDateStr: issueDateStr,
+                        expiryDateStr: expiryDateStr,
+                        showPoliceId: showPoliceId,
+                        showWorkInfo: showWorkInfo,
+                        showProvince: showProvince,
+                        provinceCity: provinceCity,
                       ),
                     ),
                   ),
                 ),
+              ),
             ],
           ),
         ),
