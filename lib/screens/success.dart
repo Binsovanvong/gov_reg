@@ -259,100 +259,95 @@ class _RegisterSuccessMixedScreenState
   Future<void> _showExportWidgetSafely() async {
     if (!mounted) return;
     setState(() => _showExportForCapture = true);
-    await WidgetsBinding.instance.endOfFrame;
-    await Future.delayed(const Duration(milliseconds: 80));
+    await Future.delayed(const Duration(milliseconds: 50));
     await WidgetsBinding.instance.endOfFrame;
   }
-
   Future<void> _hideExportWidgetSafely() async {
     if (!mounted) return;
+
     setState(() => _showExportForCapture = false);
+
     await WidgetsBinding.instance.endOfFrame;
   }
-
   Future<Uint8List?> _captureExportPng() async {
-    final ctx = _exportKey.currentContext;
-    if (ctx == null) return null;
-
-    final ro = ctx.findRenderObject();
-    if (ro is! RenderRepaintBoundary) return null;
-
-    for (int i = 0; i < 20; i++) {
-      await WidgetsBinding.instance.endOfFrame;
-      if (!ro.debugNeedsPaint && ro.hasSize) break;
-      await Future.delayed(const Duration(milliseconds: 16));
-    }
-
-    if (ro.debugNeedsPaint || !ro.hasSize) return null;
-
     try {
-      final dpr = MediaQuery.of(context).devicePixelRatio;
-      final double safePixelRatio = dpr.clamp(1.0, 2.0);
+      await Future.delayed(const Duration(milliseconds: 50));
 
-      final ui.Image image = await ro.toImage(pixelRatio: safePixelRatio);
-      try {
-        final ByteData? bd =
-            await image.toByteData(format: ui.ImageByteFormat.png);
-        return bd?.buffer.asUint8List();
-      } finally {
-        image.dispose();
+      final context = _exportKey.currentContext;
+      if (context == null) {
+        print("❌ context null");
+        return null;
       }
-    } catch (e) {
-      debugPrint("capture export png error: $e");
+
+      final boundary =
+          context.findRenderObject() as RenderRepaintBoundary?;
+
+      if (boundary == null) {
+        print("❌ boundary null");
+        return null;
+      }
+
+      if (boundary.debugNeedsPaint) {
+        print("⏳ still painting...");
+        await Future.delayed(const Duration(milliseconds: 50));
+        return null;
+      }
+
+      final image = await boundary.toImage(pixelRatio: 2.0);
+
+      final byteData =
+          await image.toByteData(format: ui.ImageByteFormat.png);
+
+      if (byteData == null) {
+        print("❌ byteData null");
+        return null;
+      }
+
+      return byteData.buffer.asUint8List();
+    } catch (e, stack) {
+      print("❌ capture error: $e");
+      print(stack);
       return null;
     }
   }
 
-  // ─── UPDATED: no permission required, uses gal package ───────────────────
   Future<void> _saveToPhotos() async {
     if (_saving) return;
-
-    if (!Platform.isAndroid && !Platform.isIOS) {
-      _showTopSnackBar(
-        "មុខងារនេះអាចប្រើបានតែលើ Android និង iOS ប៉ុណ្ណោះ",
-        isSuccess: false,
-      );
-      return;
-    }
 
     setState(() => _saving = true);
 
     try {
       await _showExportWidgetSafely();
 
-      final Uint8List? bytes = await _captureExportPng();
+      final bytes = await _captureExportPng();
 
       await _hideExportWidgetSafely();
 
-      if (bytes == null || bytes.isEmpty) {
-        if (!mounted) return;
-        _showTopSnackBar("មិនអាចចាប់យករូបភាពបាន", isSuccess: false);
+      print("BYTES LENGTH: ${bytes?.length}");
+
+      if (bytes == null) {
+        _showTopSnackBar("❌ Capture failed", isSuccess: false);
         return;
       }
 
-      await Gal.putImageBytes(
-        bytes,
-        name:
-            "parking_badge_${DateTime.now().millisecondsSinceEpoch}.png",
-      );
-
-      if (!mounted) return;
-      _showCreativeSuccessTopSnackBar();
-    } catch (e) {
-      await _hideExportWidgetSafely();
-      if (!mounted) return;
-      _showTopSnackBar("មានបញ្ហា: $e", isSuccess: false);
+      try {
+        await Gal.putImageBytes(bytes);
+        _showCreativeSuccessTopSnackBar();
+      } catch (e, stack) {
+        print("❌ SAVE ERROR: $e");
+        print(stack);
+        _showTopSnackBar("❌ Save failed", isSuccess: false);
+      }
+    } catch (e, stack) {
+      print("❌ FULL ERROR: $e");
+      print(stack);
+      _showTopSnackBar("❌ Unexpected error", isSuccess: false);
     } finally {
       if (mounted) {
-        setState(() {
-          _saving = false;
-          _showExportForCapture = false;
-        });
+        setState(() => _saving = false);
       }
     }
   }
-  // ─────────────────────────────────────────────────────────────────────────
-
   Widget _creativeDownloadButton({
     required bool isLoading,
     required VoidCallback? onTap,
@@ -669,7 +664,7 @@ class _RegisterSuccessMixedScreenState
                   child: IgnorePointer(
                     ignoring: true,
                     child: Opacity(
-                      opacity: 0.02,
+                      opacity: 0.1,
                       child: RepaintBoundary(
                         key: _exportKey,
                         child: MediaQuery(

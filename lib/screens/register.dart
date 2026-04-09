@@ -2340,14 +2340,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       height: 340,
       width: double.infinity,
       decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              const Color(0xFFFFCA28),
-              const Color(0xFFFFCA28),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          // gradient: LinearGradient(
+          //   colors: [
+          //     const Color(0xFFFFCA28),
+          //     const Color(0xFFFFCA28),
+          //   ],
+          //   begin: Alignment.topLeft,
+          //   end: Alignment.bottomRight,
+          // ),
+          image: const DecorationImage(
+            image: AssetImage('assets/icon/back.png'),
+            fit: BoxFit.cover,
+          )
       ),
       child: Column(
         children: [
@@ -2375,7 +2379,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     style: TextStyle(
                       fontSize: 30,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: Color(0xFFDFB73B),
                       fontFamily: 'khmer moul light',
                     ),
                   ),
@@ -2384,7 +2388,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     'Ministry of Interior',
                     style: TextStyle(
                       fontSize: 22,
-                      color: Colors.white,
+                      color: Color(0xFFDFB73B),
                       fontWeight: FontWeight.bold,
                       fontFamily: 'khmer moul light',
                     ),
@@ -2399,7 +2403,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF0A2D66)
+              color: Color(0xFFDFB73B),
             ),
           ),
           const SizedBox(height: 5),
@@ -2408,7 +2412,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF0A2D66),
+              color: Color(0xFFDFB73B),
             ),
           ),
         ],
@@ -2846,7 +2850,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!allowedUserTypes.contains(_userType)) _userType = "GUEST";
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -2867,6 +2870,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         color: Colors.black12,
                       )
                     ],
+                    border: Border.all(
+                      color: Color(0xFFDFB73B))
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

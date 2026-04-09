@@ -116,17 +116,9 @@ class WelcomeScreen extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
-        gradient: LinearGradient(
-          colors: [
-            Colors.white.withOpacity(0.14),
-            Colors.white.withOpacity(0.08),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.white,
         border: Border.all(
-          color: Colors.white.withOpacity(0.14),
-          width: 1.2,
+          color: Color(0xFFDFB73B)
         ),
         boxShadow: [
           BoxShadow(
@@ -146,18 +138,18 @@ class WelcomeScreen extends StatelessWidget {
               shape: BoxShape.rectangle,
               borderRadius: BorderRadius.circular(20),
               color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.white.withOpacity(0.10),
-                  blurRadius: 30,
-                  spreadRadius: 4,
-                ),
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.14),
-                  blurRadius: 24,
-                  offset: const Offset(0, 12),
-                ),
-              ],
+              // boxShadow: [
+              //   BoxShadow(
+              //     color: Colors.white.withOpacity(0.10),
+              //     blurRadius: 30,
+              //     spreadRadius: 4,
+              //   ),
+              //   BoxShadow(
+              //     color: Colors.black.withOpacity(0.14),
+              //     blurRadius: 24,
+              //     offset: const Offset(0, 12),
+              //   ),
+              // ],
             ),
               child: Image.asset(
                 'assets/icon/MOI-EES (IOS).png',
@@ -171,8 +163,8 @@ class WelcomeScreen extends StatelessWidget {
             'សូមស្វាគមន៍មកកាន់',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.95),
-              fontSize: isSmall ? 21 : 26,
+              color: _gold,
+              fontSize: isSmall ? 24 : 30,
               fontWeight: FontWeight.bold,
               fontFamily: 'khmer moul light',
               height: 1.35,
@@ -183,7 +175,7 @@ class WelcomeScreen extends StatelessWidget {
             'កម្មវិធី MOI-EES',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white,
+              color: _gold,
               fontSize: isSmall ? 24 : 30,
               fontWeight: FontWeight.w900,
               fontFamily: 'khmer moul light',
@@ -195,8 +187,8 @@ class WelcomeScreen extends StatelessWidget {
             'ប្រព័ន្ធគ្រប់គ្រងការចេញចូលយានយន្តក្រសួងមហាផ្ទៃ\nប្រើប្រាស់ប្រកបដោយភាពងាយស្រួល និងទំនើប',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.82),
-              fontSize: isSmall ? 16 : 16,
+              color: _gold.withOpacity(0.92),
+              fontSize: isSmall ? 12 : 12,
               height: 1.55,
               fontWeight: FontWeight.w500,
               fontFamily: 'KantumruyPro',
