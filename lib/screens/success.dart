@@ -261,10 +261,9 @@ class _RegisterSuccessMixedScreenState
 
     setState(() => _showExportForCapture = true);
 
-    await Future.delayed(const Duration(milliseconds: 150));
+    await Future.delayed(const Duration(milliseconds: 200));
     await WidgetsBinding.instance.endOfFrame;
   }
-
   Future<void> _hideExportWidgetSafely() async {
     if (!mounted) return;
 
@@ -274,7 +273,7 @@ class _RegisterSuccessMixedScreenState
   }
   Future<Uint8List?> _captureExportPng() async {
     try {
-      await Future.delayed(const Duration(milliseconds: 400));
+      await Future.delayed(const Duration(milliseconds: 500));
 
       final context = _exportKey.currentContext;
       if (context == null) {
@@ -289,22 +288,23 @@ class _RegisterSuccessMixedScreenState
         print("❌ boundary null");
         return null;
       }
-
       int retry = 0;
-      while (boundary.debugNeedsPaint && retry < 5) {
-        await Future.delayed(const Duration(milliseconds: 120));
+      while (boundary.debugNeedsPaint && retry < 10) {
+        await Future.delayed(const Duration(milliseconds: 100));
         retry++;
       }
-
       final image = await boundary.toImage(
-        pixelRatio: 1.5, 
+        pixelRatio: ui.window.devicePixelRatio, 
       );
+
       final byteData =
           await image.toByteData(format: ui.ImageByteFormat.png);
+
       if (byteData == null) {
         print("❌ byteData null");
         return null;
       }
+
       return byteData.buffer.asUint8List();
     } catch (e, stack) {
       print("❌ capture error: $e");
@@ -314,15 +314,11 @@ class _RegisterSuccessMixedScreenState
   }
   Future<void> _saveToPhotos() async {
     if (_saving) return;
-
     setState(() => _saving = true);
-
     try {
       await _showExportWidgetSafely();
-
-      // ✅ wait QR render (important)
       await _qrFuture;
-      await Future.delayed(const Duration(milliseconds: 250));
+      await Future.delayed(const Duration(milliseconds: 700));
 
       final bytes = await _captureExportPng();
 
@@ -334,7 +330,9 @@ class _RegisterSuccessMixedScreenState
       }
 
       try {
+        await Future.delayed(const Duration(milliseconds: 200)); // iOS stability
         await Gal.putImageBytes(bytes);
+
         _showCreativeSuccessTopSnackBar();
       } catch (e, stack) {
         print("❌ SAVE ERROR: $e");
