@@ -10,6 +10,7 @@ import 'package:gov_reg/api/api.dart';
 import 'package:gov_reg/models/parking_card.dart';
 import 'package:gov_reg/routes/approute.dart';
 import 'package:http/http.dart' as http;
+import 'package:permission_handler/permission_handler.dart';
 
 class RegisterSuccessMixedScreen extends StatefulWidget {
   const RegisterSuccessMixedScreen({super.key});
@@ -125,6 +126,66 @@ class _RegisterSuccessMixedScreenState
     final s = (v ?? "").toString().trim();
     if (s.isEmpty || s.toLowerCase() == "null") return fallback;
     return s;
+  }
+
+  Future<bool> _requestPhotoPermissions() async {
+    try {
+      Permission permission;
+      
+      if (Platform.isIOS) {
+        permission = Permission.photos;
+      } else if (Platform.isAndroid) {
+        // Try photos permission first (Android 13+)
+        permission = Permission.photos;
+        var status = await permission.status;
+        if (status.isGranted) return true;
+        
+        // If not available, try storage permission (older Android)
+        if (status.isPermanentlyDenied || status.isRestricted) {
+          permission = Permission.storage;
+        }
+      } else {
+        return false;
+      }
+
+      final status = await permission.request();
+      
+      if (status.isGranted) {
+        return true;
+      } else if (status.isPermanentlyDenied) {
+        // Show dialog to guide user to settings
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text("Permission Required"),
+              content: const Text(
+                "Photo library access is required to save images. Please enable it in app settings."
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text("Cancel"),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    openAppSettings();
+                  },
+                  child: const Text("Open Settings"),
+                ),
+              ],
+            ),
+          );
+        }
+        return false;
+      }
+      
+      return false;
+    } catch (e) {
+      print("Permission request error: $e");
+      return false;
+    }
   }
 
   String _formatKhmerDate(DateTime d) {
@@ -288,11 +349,20 @@ class _RegisterSuccessMixedScreenState
         print("❌ boundary null");
         return null;
       }
+      
+      // Wait longer for images to load
       int retry = 0;
-      while (boundary.debugNeedsPaint && retry < 10) {
-        await Future.delayed(const Duration(milliseconds: 100));
+      while ((boundary.debugNeedsPaint || boundary.size.isEmpty) && retry < 20) {
+        await Future.delayed(const Duration(milliseconds: 200));
         retry++;
+        print("Waiting for paint... retry $retry");
       }
+      
+      if (boundary.size.isEmpty) {
+        print("❌ boundary size is empty");
+        return null;
+      }
+
       final image = await boundary.toImage(
         pixelRatio: ui.window.devicePixelRatio, 
       );
@@ -316,9 +386,16 @@ class _RegisterSuccessMixedScreenState
     if (_saving) return;
     setState(() => _saving = true);
     try {
+      // Request permissions first
+      final hasPermission = await _requestPhotoPermissions();
+      if (!hasPermission) {
+        _showTopSnackBar("❌ Permission denied. Cannot save image.", isSuccess: false);
+        return;
+      }
+
       await _showExportWidgetSafely();
       await _qrFuture;
-      await Future.delayed(const Duration(milliseconds: 700));
+      await Future.delayed(const Duration(milliseconds: 1500)); // Increased wait time
 
       final bytes = await _captureExportPng();
 
@@ -337,7 +414,16 @@ class _RegisterSuccessMixedScreenState
       } catch (e, stack) {
         print("❌ SAVE ERROR: $e");
         print(stack);
-        _showTopSnackBar("❌ Save failed", isSuccess: false);
+        
+        // Provide platform-specific error messages
+        String errorMessage = "❌ Save failed";
+        if (Platform.isIOS) {
+          errorMessage = "❌ Failed to save to Photos. Check permissions.";
+        } else if (Platform.isAndroid) {
+          errorMessage = "❌ Failed to save to Gallery. Check storage permissions.";
+        }
+        
+        _showTopSnackBar(errorMessage, isSuccess: false);
       }
     } catch (e, stack) {
       print("❌ FULL ERROR: $e");
@@ -659,43 +745,42 @@ class _RegisterSuccessMixedScreenState
                 },
               ),
               if (_showExportForCapture)
-                if (_showExportForCapture)
-              Positioned(
-                left: -9999, 
-                top: 0,
-                child: RepaintBoundary(
-                  key: _exportKey,
-                  child: MediaQuery(
-                    data: MediaQuery.of(context)
-                        .copyWith(textScaler: TextScaler.noScaling),
-                    child: SizedBox(
-                      width: _MoIStyleBadge.badgeW,
-                      height: _MoIStyleBadge.badgeH,
-                      child: _MoIStyleBadge(
-                        fullName: fullName,
-                        phone: phone,
-                        code: code,
-                        token: token,
-                        vehicleType: vehicleType,
-                        parkingRequestStatus: parkingRequestStatus,
-                        userTypeText: _userTypeKhmer(userType),
-                        rawUserType: userType,
-                        vehicles: vehiclesMaps,
-                        workingInfo: workingInfoMap,
-                        selfieBytes: selfieBytes,
-                        selfiePath: selfiePath,
-                        qrFuture: _qrFuture,
-                        issueDateStr: issueDateStr,
-                        expiryDateStr: expiryDateStr,
-                        showPoliceId: showPoliceId,
-                        showWorkInfo: showWorkInfo,
-                        showProvince: showProvince,
-                        provinceCity: provinceCity,
+                Positioned(
+                  left: -9999, 
+                  top: 0,
+                  child: RepaintBoundary(
+                    key: _exportKey,
+                    child: MediaQuery(
+                      data: MediaQuery.of(context)
+                          .copyWith(textScaler: TextScaler.noScaling),
+                      child: SizedBox(
+                        width: _MoIStyleBadge.badgeW,
+                        height: _MoIStyleBadge.badgeH,
+                        child: _MoIStyleBadge(
+                          fullName: fullName,
+                          phone: phone,
+                          code: code,
+                          token: token,
+                          vehicleType: vehicleType,
+                          parkingRequestStatus: parkingRequestStatus,
+                          userTypeText: _userTypeKhmer(userType),
+                          rawUserType: userType,
+                          vehicles: vehiclesMaps,
+                          workingInfo: workingInfoMap,
+                          selfieBytes: selfieBytes,
+                          selfiePath: selfiePath,
+                          qrFuture: _qrFuture,
+                          issueDateStr: issueDateStr,
+                          expiryDateStr: expiryDateStr,
+                          showPoliceId: showPoliceId,
+                          showWorkInfo: showWorkInfo,
+                          showProvince: showProvince,
+                          provinceCity: provinceCity,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
