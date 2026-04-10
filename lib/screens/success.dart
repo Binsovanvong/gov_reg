@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:ui' as ui;
-
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -130,62 +129,84 @@ class _RegisterSuccessMixedScreenState
 
   Future<bool> _requestPhotoPermissions() async {
     try {
-      Permission permission;
-      
       if (Platform.isIOS) {
-        permission = Permission.photos;
-      } else if (Platform.isAndroid) {
-        // Try photos permission first (Android 13+)
-        permission = Permission.photos;
-        var status = await permission.status;
+        final status = await Permission.photosAddOnly.status;
         if (status.isGranted) return true;
-        
-        // If not available, try storage permission (older Android)
-        if (status.isPermanentlyDenied || status.isRestricted) {
-          permission = Permission.storage;
-        }
-      } else {
-        return false;
-      }
 
-      final status = await permission.request();
-      
-      if (status.isGranted) {
-        return true;
-      } else if (status.isPermanentlyDenied) {
-        // Show dialog to guide user to settings
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text("Permission Required"),
-              content: const Text(
-                "Photo library access is required to save images. Please enable it in app settings."
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text("Cancel"),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    openAppSettings();
-                  },
-                  child: const Text("Open Settings"),
-                ),
-              ],
-            ),
+        final result = await Permission.photosAddOnly.request();
+        if (result.isGranted) return true;
+
+        if (result.isPermanentlyDenied) {
+          _showPermissionSettingsDialog(
+            title: "Permission Required",
+            message:
+                "Photo library access is required to save images. Please enable it in app settings.",
           );
         }
         return false;
       }
-      
+
+      if (Platform.isAndroid) {
+        final primary = Permission.photos;
+        var result = await primary.request();
+        if (result.isGranted) return true;
+
+        // On older Android versions, photo permission may not be available.
+        if (result.isDenied || result.isRestricted || result.isPermanentlyDenied) {
+          final storageResult = await Permission.storage.request();
+          if (storageResult.isGranted) return true;
+
+          if (storageResult.isPermanentlyDenied) {
+            _showPermissionSettingsDialog(
+              title: "Permission Required",
+              message:
+                  "Storage access is required to save images. Please enable it in app settings.",
+            );
+          }
+        }
+
+        return false;
+      }
+
       return false;
     } catch (e) {
       print("Permission request error: $e");
       return false;
     }
+  }
+
+  void _showPermissionSettingsDialog({
+    required String title,
+    required String message,
+  }) {
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              final opened = await openAppSettings();
+              if (!opened && mounted) {
+                _showTopSnackBar(
+                  "❌ Cannot open system settings. Please open Settings manually.",
+                  isSuccess: false,
+                );
+              }
+            },
+            child: const Text("Open Settings"),
+          ),
+        ],
+      ),
+    );
   }
 
   String _formatKhmerDate(DateTime d) {
