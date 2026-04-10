@@ -128,45 +128,42 @@ class _RegisterSuccessMixedScreenState
   }
 
   Future<bool> _requestPhotoPermissions() async {
-    try {
-      if (Platform.isIOS) {
-        // ONLY request add-only permission (best for saving images)
-        final result = await Permission.photosAddOnly.request();
+  try {
+    if (Platform.isIOS) {
+      // Requesting full 'photos' permission ensures the Settings row appears
+      PermissionStatus status = await Permission.photos.status;
 
-        print("📸 iOS photosAddOnly permission: $result");
-
-        if (result.isGranted || result.isLimited) {
-          return true;
-        }
-
-        if (result.isPermanentlyDenied) {
-          await openAppSettings();
-        }
-
-        return false;
+      if (status.isDenied) {
+        status = await Permission.photos.request();
       }
 
-      if (Platform.isAndroid) {
-        final result = await Permission.photos.request();
+      print("📸 iOS Photos permission status: $status");
 
-        if (result.isGranted) return true;
-
-        final storage = await Permission.storage.request();
-        if (storage.isGranted) return true;
-
-        if (storage.isPermanentlyDenied) {
-          await openAppSettings();
-        }
-
-        return false;
+      if (status.isGranted || status.isLimited) {
+        return true;
       }
 
-      return false;
-    } catch (e) {
-      print("❌ Permission error: $e");
+      if (status.isPermanentlyDenied) {
+        await openAppSettings();
+      }
       return false;
     }
+
+    if (Platform.isAndroid) {
+      // Android 13+ uses photos, older uses storage
+      final result = await Permission.photos.request();
+      if (result.isGranted) return true;
+
+      final storage = await Permission.storage.request();
+      return storage.isGranted;
+    }
+
+    return false;
+  } catch (e) {
+    print("❌ Permission error: $e");
+    return false;
   }
+}
   String _formatKhmerDate(DateTime d) {
     const khMonths = [
       "មករា",
@@ -399,7 +396,7 @@ class _RegisterSuccessMixedScreenState
       await Gal.putImageBytes(bytes);
 
       _showCreativeSuccessTopSnackBar();
-      
+
     } catch (e, stack) {
       print("❌ SAVE ERROR: $e");
       print(stack);
