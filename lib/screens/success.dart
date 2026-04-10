@@ -130,11 +130,26 @@ class _RegisterSuccessMixedScreenState
   Future<bool> _requestPhotoPermissions() async {
     try {
       if (Platform.isIOS) {
-        final status = await Permission.photosAddOnly.status;
-        if (status.isGranted) return true;
+        final status = await Permission.photos.status;
+        if (status.isGranted || status.isLimited) return true;
 
-        final result = await Permission.photosAddOnly.request();
-        if (result.isGranted) return true;
+        final result = await Permission.photos.request();
+        if (result.isGranted || result.isLimited) return true;
+
+        // If general photo permission is refused, try add-only access as a fallback.
+        if (result.isDenied || result.isRestricted) {
+          final addOnlyResult = await Permission.photosAddOnly.request();
+          if (addOnlyResult.isGranted || addOnlyResult.isLimited) return true;
+
+          if (addOnlyResult.isPermanentlyDenied) {
+            _showPermissionSettingsDialog(
+              title: "Permission Required",
+              message:
+                  "Photo library access is required to save images. Please enable it in app settings.",
+            );
+          }
+          return false;
+        }
 
         if (result.isPermanentlyDenied) {
           _showPermissionSettingsDialog(
@@ -143,6 +158,7 @@ class _RegisterSuccessMixedScreenState
                 "Photo library access is required to save images. Please enable it in app settings.",
           );
         }
+
         return false;
       }
 
