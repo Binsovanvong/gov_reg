@@ -130,55 +130,32 @@ class _RegisterSuccessMixedScreenState
   Future<bool> _requestPhotoPermissions() async {
     try {
       if (Platform.isIOS) {
-        final status = await Permission.photos.status;
-        if (status.isGranted || status.isLimited) return true;
+        // ONLY request add-only permission (best for saving images)
+        final result = await Permission.photosAddOnly.request();
 
-        final result = await Permission.photos.request();
-        if (result.isGranted || result.isLimited) return true;
+        print("📸 iOS photosAddOnly permission: $result");
 
-        // If general photo permission is refused, try add-only access as a fallback.
-        if (result.isDenied || result.isRestricted) {
-          final addOnlyResult = await Permission.photosAddOnly.request();
-          if (addOnlyResult.isGranted || addOnlyResult.isLimited) return true;
-
-          if (addOnlyResult.isPermanentlyDenied) {
-            _showPermissionSettingsDialog(
-              title: "Permission Required",
-              message:
-                  "Photo library access is required to save images. Please enable it in app settings.",
-            );
-          }
-          return false;
+        if (result.isGranted || result.isLimited) {
+          return true;
         }
 
         if (result.isPermanentlyDenied) {
-          _showPermissionSettingsDialog(
-            title: "Permission Required",
-            message:
-                "Photo library access is required to save images. Please enable it in app settings.",
-          );
+          await openAppSettings();
         }
 
         return false;
       }
 
       if (Platform.isAndroid) {
-        final primary = Permission.photos;
-        var result = await primary.request();
+        final result = await Permission.photos.request();
+
         if (result.isGranted) return true;
 
-        // On older Android versions, photo permission may not be available.
-        if (result.isDenied || result.isRestricted || result.isPermanentlyDenied) {
-          final storageResult = await Permission.storage.request();
-          if (storageResult.isGranted) return true;
+        final storage = await Permission.storage.request();
+        if (storage.isGranted) return true;
 
-          if (storageResult.isPermanentlyDenied) {
-            _showPermissionSettingsDialog(
-              title: "Permission Required",
-              message:
-                  "Storage access is required to save images. Please enable it in app settings.",
-            );
-          }
+        if (storage.isPermanentlyDenied) {
+          await openAppSettings();
         }
 
         return false;
@@ -186,45 +163,10 @@ class _RegisterSuccessMixedScreenState
 
       return false;
     } catch (e) {
-      print("Permission request error: $e");
+      print("❌ Permission error: $e");
       return false;
     }
   }
-
-  void _showPermissionSettingsDialog({
-    required String title,
-    required String message,
-  }) {
-    if (!mounted) return;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              final opened = await openAppSettings();
-              if (!opened && mounted) {
-                _showTopSnackBar(
-                  "❌ Cannot open system settings. Please open Settings manually.",
-                  isSuccess: false,
-                );
-              }
-            },
-            child: const Text("Open Settings"),
-          ),
-        ],
-      ),
-    );
-  }
-
   String _formatKhmerDate(DateTime d) {
     const khMonths = [
       "មករា",
@@ -421,21 +363,31 @@ class _RegisterSuccessMixedScreenState
   }
   Future<void> _saveToPhotos() async {
     if (_saving) return;
+
     setState(() => _saving = true);
+
     try {
-      // Request permissions first
+      // 1. Request permission
       final hasPermission = await _requestPhotoPermissions();
+
       if (!hasPermission) {
-        _showTopSnackBar("❌ Permission denied. Cannot save image.", isSuccess: false);
+        _showTopSnackBar(
+          "❌ Permission denied. Please allow access in Settings.",
+          isSuccess: false,
+        );
         return;
       }
 
+      // 2. Show export widget
       await _showExportWidgetSafely();
-      await _qrFuture;
-      await Future.delayed(const Duration(milliseconds: 1500)); // Increased wait time
 
+      // wait UI render
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      // 3. Capture image
       final bytes = await _captureExportPng();
 
+      // 4. Hide export widget
       await _hideExportWidgetSafely();
 
       if (bytes == null) {
@@ -443,29 +395,19 @@ class _RegisterSuccessMixedScreenState
         return;
       }
 
-      try {
-        await Future.delayed(const Duration(milliseconds: 200)); // iOS stability
-        await Gal.putImageBytes(bytes);
+      // 5. Save to gallery
+      await Gal.putImageBytes(bytes);
 
-        _showCreativeSuccessTopSnackBar();
-      } catch (e, stack) {
-        print("❌ SAVE ERROR: $e");
-        print(stack);
-        
-        // Provide platform-specific error messages
-        String errorMessage = "❌ Save failed";
-        if (Platform.isIOS) {
-          errorMessage = "❌ Failed to save to Photos. Check permissions.";
-        } else if (Platform.isAndroid) {
-          errorMessage = "❌ Failed to save to Gallery. Check storage permissions.";
-        }
-        
-        _showTopSnackBar(errorMessage, isSuccess: false);
-      }
+      _showCreativeSuccessTopSnackBar();
+      
     } catch (e, stack) {
-      print("❌ FULL ERROR: $e");
+      print("❌ SAVE ERROR: $e");
       print(stack);
-      _showTopSnackBar("❌ Unexpected error", isSuccess: false);
+
+      _showTopSnackBar(
+        "❌ Failed to save image",
+        isSuccess: false,
+      );
     } finally {
       if (mounted) {
         setState(() => _saving = false);
