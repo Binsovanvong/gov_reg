@@ -16,12 +16,14 @@ def flutter_root
     raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
   end
 
-  return ENV['FLUTTER_ROOT'] if ENV['FLUTTER_ROOT'] && !ENV['FLUTTER_ROOT'].empty?
+  # Use the environment variable if available (set by Flutter CI), otherwise compute the path
+  flutter_root = ENV['FLUTTER_ROOT']
+  return flutter_root if flutter_root && !flutter_root.empty?
 
   File.expand_path(File.join(__dir__, '..', '..', 'flutter'))
 end
 
-require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+require File.expand_path(File.join(flutter_root, 'packages', 'flutter_tools', 'bin', 'podhelper'))
 
 target 'Runner' do
   use_frameworks!
