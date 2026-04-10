@@ -1,39 +1,30 @@
-# Uncomment this line to define a global platform for your project
+# Podfile
+# Run `pod install` or `pod update` to regenerate this file.
+
 platform :ios, '13.0'
 
 # CocoaPods analytics sends network stats. Uncomment the line below to disable.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
-project 'Runner', {
-  'Debug' => :debug,
-  'Profile' => :release,
-  'Release' => :release,
-}
-
 def flutter_root
-  generated_xcode_build_settings_path = File.expand_path(File.join(__dir__, 'Flutter', 'Generated.xcconfig'))
+  generated_xcode_build_settings_path = File.expand_path(File.join('Flutter', 'Generated.xcconfig'), __dir__)
   unless File.exist?(generated_xcode_build_settings_path)
     raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
   end
-
-  # Use the environment variable if available (set by Flutter CI), otherwise compute the path
-  flutter_root = ENV['FLUTTER_ROOT']
-  return flutter_root if flutter_root && !flutter_root.empty?
-
-  File.expand_path(File.join(__dir__, '..', '..', 'flutter'))
+  File.expand_path(File.join(File.dirname(generated_xcode_build_settings_path), '..', '..'))
 end
 
-require File.expand_path(File.join(flutter_root, 'packages', 'flutter_tools', 'bin', 'podhelper'))
-
-target 'Runner' do
-  use_frameworks!
-  use_modular_headers!
-
-  install_all_flutter_pods(flutter_root)
-end
+require File.join(flutter_root, 'packages', 'flutter_tools', 'bin', 'podhelper')
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
   end
+end
+
+target 'Runner' do
+  use_frameworks!
+  use_modular_headers!
+
+  install_all_flutter_pods File.dirname(File.realpath(__FILE__))
 end
