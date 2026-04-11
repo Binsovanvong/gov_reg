@@ -25,6 +25,7 @@ class _RegisterSuccessMixedScreenState
   static const String baseUrl = "https://ees.interior.gov.kh";
 
   Future<Uint8List?> _qrFuture = Future.value(null);
+  Uint8List? _qrBytes;
 
   ParkingCardRequestResponseDTO? _response;
 
@@ -231,6 +232,16 @@ class _RegisterSuccessMixedScreenState
     }
   }
 
+  Future<void> _loadQrBytes() async {
+    try {
+      final bytes = await _fetchQrPngOrNull();
+      if (!mounted) return;
+      setState(() {
+        _qrBytes = bytes;
+      });
+    } catch (_) {}
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -260,7 +271,15 @@ class _RegisterSuccessMixedScreenState
     selfiePath = (args["selfiePath"] ?? "").toString();
 
     precacheImage(const AssetImage("assets/img/about-moi-logo.png"), context);
+
     _qrFuture = _fetchQrPngOrNull();
+    _qrFuture.then((bytes) {
+      if (!mounted) return;
+      setState(() {
+        _qrBytes = bytes;
+      });
+    });
+
     _loadSelfieFromAttachments();
 
     if (mounted) setState(() {});
@@ -268,11 +287,21 @@ class _RegisterSuccessMixedScreenState
 
   void _switchToResult(int index) {
     if (index < 0 || index >= _allResults.length) return;
+
     setState(() {
       _currentIndex = index;
       selfieBytes = null;
+      _qrBytes = null;
       _qrFuture = _fetchQrPngOrNull();
     });
+
+    _qrFuture.then((bytes) {
+      if (!mounted) return;
+      setState(() {
+        _qrBytes = bytes;
+      });
+    });
+
     _loadSelfieFromAttachments();
   }
 
@@ -315,7 +344,7 @@ class _RegisterSuccessMixedScreenState
   Future<Uint8List?> _captureExportBadgePng() async {
     try {
       await WidgetsBinding.instance.endOfFrame;
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 500));
       await WidgetsBinding.instance.endOfFrame;
 
       final exportContext = _exportBadgeKey.currentContext;
@@ -331,28 +360,20 @@ class _RegisterSuccessMixedScreenState
         return null;
       }
 
-      int retry = 0;
-      while ((boundary.debugNeedsPaint || boundary.size.isEmpty) && retry < 20) {
+      for (int i = 0; i < 30; i++) {
+        if (!boundary.debugNeedsPaint && boundary.size.isEmpty) break;
         await Future.delayed(const Duration(milliseconds: 100));
         await WidgetsBinding.instance.endOfFrame;
-        retry++;
-        debugPrint("waiting export badge paint retry: $retry");
       }
 
       if (boundary.debugNeedsPaint || boundary.size.isEmpty) {
-        debugPrint("capture failed: export boundary not ready");
+        debugPrint("capture failed: export boundary still not ready");
         return null;
       }
-
-      debugPrint("export boundary size: ${boundary.size}");
 
       final image = await boundary.toImage(pixelRatio: 3.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-
-      if (byteData == null) {
-        debugPrint("capture failed: byteData null");
-        return null;
-      }
+      if (byteData == null) return null;
 
       return byteData.buffer.asUint8List();
     } catch (e, stack) {
@@ -368,10 +389,6 @@ class _RegisterSuccessMixedScreenState
     setState(() => _saving = true);
 
     try {
-      debugPrint("start save");
-      debugPrint("token: $token");
-      debugPrint("selfieBytes: ${selfieBytes?.length}");
-
       final hasPermission = await _requestPhotoPermissions();
 
       if (!hasPermission) {
@@ -384,9 +401,14 @@ class _RegisterSuccessMixedScreenState
 
       await _loadSelfieFromAttachments();
 
-      if (token.isNotEmpty) {
+      if (token.isNotEmpty && _qrBytes == null) {
         try {
-          await _qrFuture;
+          final bytes = await _qrFuture;
+          if (mounted) {
+            setState(() {
+              _qrBytes = bytes;
+            });
+          }
         } catch (_) {}
       }
 
@@ -406,7 +428,6 @@ class _RegisterSuccessMixedScreenState
     } catch (e, stack) {
       debugPrint("SAVE ERROR: $e");
       debugPrintStack(stackTrace: stack);
-
       _showTopSnackBar("❌ Failed to save image", isSuccess: false);
     } finally {
       if (mounted) {
@@ -625,7 +646,7 @@ class _RegisterSuccessMixedScreenState
             workingInfo: workingInfoMap,
             selfieBytes: selfieBytes,
             selfiePath: selfiePath,
-            qrFuture: _qrFuture,
+            qrBytes: _qrBytes,
             issueDateStr: issueDateStr,
             expiryDateStr: expiryDateStr,
             showPoliceId: showPoliceId,
@@ -734,16 +755,17 @@ class _RegisterSuccessMixedScreenState
               ),
             ),
 
-            Positioned(
-              left: -10000,
-              top: 0,
+            Positioned.fill(
               child: IgnorePointer(
-                child: Opacity(
-                  opacity: 0.01,
-                  child: SizedBox(
-                    width: _MoIStyleBadge.badgeW,
-                    height: _MoIStyleBadge.badgeH,
-                    child: exportBadgeWidget,
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: Opacity(
+                    opacity: 0.01,
+                    child: SizedBox(
+                      width: _MoIStyleBadge.badgeW,
+                      height: _MoIStyleBadge.badgeH,
+                      child: exportBadgeWidget,
+                    ),
                   ),
                 ),
               ),
@@ -955,7 +977,7 @@ class _MoIStyleBadge extends StatelessWidget {
   final Map? workingInfo;
   final Uint8List? selfieBytes;
   final String selfiePath;
-  final Future<Uint8List?> qrFuture;
+  final Uint8List? qrBytes;
   final String issueDateStr;
   final String expiryDateStr;
   final String vehicleType;
@@ -977,7 +999,7 @@ class _MoIStyleBadge extends StatelessWidget {
     required this.workingInfo,
     required this.selfieBytes,
     required this.selfiePath,
-    required this.qrFuture,
+    required this.qrBytes,
     required this.issueDateStr,
     required this.expiryDateStr,
     required this.showPoliceId,
@@ -1156,11 +1178,8 @@ class _MoIStyleBadge extends StatelessWidget {
                           border: Border.all(color: Colors.black54, width: 2),
                         ),
                         padding: const EdgeInsets.all(6),
-                        child: FutureBuilder<Uint8List?>(
-                          future: qrFuture,
-                          builder: (_, snap) {
-                            if (!snap.hasData || snap.data == null) {
-                              return const Center(
+                        child: qrBytes == null
+                            ? const Center(
                                 child: Text(
                                   "NO QR",
                                   style: TextStyle(
@@ -1168,15 +1187,12 @@ class _MoIStyleBadge extends StatelessWidget {
                                     color: Colors.black54,
                                   ),
                                 ),
-                              );
-                            }
-                            return Image.memory(
-                              snap.data!,
-                              fit: BoxFit.contain,
-                              filterQuality: FilterQuality.high,
-                            );
-                          },
-                        ),
+                              )
+                            : Image.memory(
+                                qrBytes!,
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.high,
+                              ),
                       ),
                     ],
                   ),
