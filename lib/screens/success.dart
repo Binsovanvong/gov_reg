@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -53,6 +54,7 @@ class _RegisterSuccessMixedScreenState
   String get userType => _current.userType?.value ?? "";
   String get parkingRequestStatus => _current.parkingRequestStatus?.value ?? "";
   String get provinceCity => _current.provinceCity ?? "";
+
   int get requestDate {
     final args = (ModalRoute.of(context)?.settings.arguments as Map?) ?? {};
     final response = args["response"];
@@ -128,42 +130,61 @@ class _RegisterSuccessMixedScreenState
   }
 
   Future<bool> _requestPhotoPermissions() async {
-  try {
-    if (Platform.isIOS) {
-      // Requesting full 'photos' permission ensures the Settings row appears
-      PermissionStatus status = await Permission.photos.status;
+    try {
+      if (Platform.isIOS) {
+        PermissionStatus status = await Permission.photosAddOnly.status;
 
-      if (status.isDenied) {
-        status = await Permission.photos.request();
+        if (status.isDenied || status.isRestricted) {
+          status = await Permission.photosAddOnly.request();
+        }
+
+        debugPrint("📸 iOS photosAddOnly permission status: $status");
+
+        if (status.isGranted || status.isLimited) {
+          return true;
+        }
+
+        if (status.isPermanentlyDenied) {
+          await openAppSettings();
+        }
+
+        return false;
       }
 
-      print("📸 iOS Photos permission status: $status");
+      if (Platform.isAndroid) {
+        PermissionStatus photos = await Permission.photos.status;
 
-      if (status.isGranted || status.isLimited) {
-        return true;
+        if (photos.isDenied) {
+          photos = await Permission.photos.request();
+        }
+
+        if (photos.isGranted || photos.isLimited) {
+          return true;
+        }
+
+        PermissionStatus storage = await Permission.storage.status;
+        if (storage.isDenied) {
+          storage = await Permission.storage.request();
+        }
+
+        if (storage.isGranted) {
+          return true;
+        }
+
+        if (photos.isPermanentlyDenied || storage.isPermanentlyDenied) {
+          await openAppSettings();
+        }
+
+        return false;
       }
 
-      if (status.isPermanentlyDenied) {
-        await openAppSettings();
-      }
+      return true;
+    } catch (e) {
+      debugPrint("❌ Permission error: $e");
       return false;
     }
-
-    if (Platform.isAndroid) {
-      // Android 13+ uses photos, older uses storage
-      final result = await Permission.photos.request();
-      if (result.isGranted) return true;
-
-      final storage = await Permission.storage.request();
-      return storage.isGranted;
-    }
-
-    return false;
-  } catch (e) {
-    print("❌ Permission error: $e");
-    return false;
   }
-}
+
   String _formatKhmerDate(DateTime d) {
     const khMonths = [
       "មករា",
@@ -295,111 +316,106 @@ class _RegisterSuccessMixedScreenState
 
   Future<void> _showExportWidgetSafely() async {
     if (!mounted) return;
-
     setState(() => _showExportForCapture = true);
 
-    await Future.delayed(const Duration(milliseconds: 200));
+    await Future.delayed(const Duration(milliseconds: 100));
     await WidgetsBinding.instance.endOfFrame;
+    await Future.delayed(const Duration(milliseconds: 100));
   }
+
   Future<void> _hideExportWidgetSafely() async {
     if (!mounted) return;
-
     setState(() => _showExportForCapture = false);
-
     await WidgetsBinding.instance.endOfFrame;
   }
+
   Future<Uint8List?> _captureExportPng() async {
     try {
-      await Future.delayed(const Duration(milliseconds: 500));
+      await WidgetsBinding.instance.endOfFrame;
+      await Future.delayed(const Duration(milliseconds: 300));
 
-      final context = _exportKey.currentContext;
-      if (context == null) {
-        print("❌ context null");
+      final exportContext = _exportKey.currentContext;
+      if (exportContext == null) {
+        debugPrint("❌ export context null");
         return null;
       }
 
       final boundary =
-          context.findRenderObject() as RenderRepaintBoundary?;
-
+          exportContext.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) {
-        print("❌ boundary null");
+        debugPrint("❌ boundary null");
         return null;
       }
-      
-      // Wait longer for images to load
+
       int retry = 0;
       while ((boundary.debugNeedsPaint || boundary.size.isEmpty) && retry < 20) {
-        await Future.delayed(const Duration(milliseconds: 200));
+        await Future.delayed(const Duration(milliseconds: 100));
+        await WidgetsBinding.instance.endOfFrame;
         retry++;
-        print("Waiting for paint... retry $retry");
+        debugPrint("⏳ waiting for paint... retry $retry");
       }
-      
+
       if (boundary.size.isEmpty) {
-        print("❌ boundary size is empty");
+        debugPrint("❌ boundary size is empty");
         return null;
       }
 
-      final image = await boundary.toImage(
-        pixelRatio: ui.window.devicePixelRatio, 
+      final pixelRatio = View.of(exportContext).devicePixelRatio;
+
+      final ui.Image image = await boundary.toImage(
+        pixelRatio: pixelRatio,
       );
 
-      final byteData =
-          await image.toByteData(format: ui.ImageByteFormat.png);
+      final byteData = await image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
 
       if (byteData == null) {
-        print("❌ byteData null");
+        debugPrint("❌ byteData null");
         return null;
       }
 
       return byteData.buffer.asUint8List();
     } catch (e, stack) {
-      print("❌ capture error: $e");
-      print(stack);
+      debugPrint("❌ capture error: $e");
+      debugPrintStack(stackTrace: stack);
       return null;
     }
   }
+
   Future<void> _saveToPhotos() async {
     if (_saving) return;
 
     setState(() => _saving = true);
 
     try {
-      // 1. Request permission
       final hasPermission = await _requestPhotoPermissions();
 
       if (!hasPermission) {
         _showTopSnackBar(
-          "❌ Permission denied. Please allow access in Settings.",
+          "❌ Permission denied. Please allow photo access in Settings.",
           isSuccess: false,
         );
         return;
       }
 
-      // 2. Show export widget
       await _showExportWidgetSafely();
 
-      // wait UI render
-      await Future.delayed(const Duration(milliseconds: 800));
-
-      // 3. Capture image
       final bytes = await _captureExportPng();
 
-      // 4. Hide export widget
       await _hideExportWidgetSafely();
 
-      if (bytes == null) {
+      if (bytes == null || bytes.isEmpty) {
         _showTopSnackBar("❌ Capture failed", isSuccess: false);
         return;
       }
 
-      // 5. Save to gallery
       await Gal.putImageBytes(bytes);
 
       _showCreativeSuccessTopSnackBar();
-
     } catch (e, stack) {
-      print("❌ SAVE ERROR: $e");
-      print(stack);
+      debugPrint("❌ SAVE ERROR: $e");
+      debugPrintStack(stackTrace: stack);
 
       _showTopSnackBar(
         "❌ Failed to save image",
@@ -411,6 +427,7 @@ class _RegisterSuccessMixedScreenState
       }
     }
   }
+
   Widget _creativeDownloadButton({
     required bool isLoading,
     required VoidCallback? onTap,
@@ -692,7 +709,6 @@ class _RegisterSuccessMixedScreenState
         ),
         body: SafeArea(
           child: Stack(
-            clipBehavior: Clip.none,
             children: [
               LayoutBuilder(
                 builder: (context, constraints) {
@@ -720,38 +736,47 @@ class _RegisterSuccessMixedScreenState
                   );
                 },
               ),
+
               if (_showExportForCapture)
                 Positioned(
-                  left: -9999, 
+                  left: 0,
                   top: 0,
-                  child: RepaintBoundary(
-                    key: _exportKey,
-                    child: MediaQuery(
-                      data: MediaQuery.of(context)
-                          .copyWith(textScaler: TextScaler.noScaling),
-                      child: SizedBox(
-                        width: _MoIStyleBadge.badgeW,
-                        height: _MoIStyleBadge.badgeH,
-                        child: _MoIStyleBadge(
-                          fullName: fullName,
-                          phone: phone,
-                          code: code,
-                          token: token,
-                          vehicleType: vehicleType,
-                          parkingRequestStatus: parkingRequestStatus,
-                          userTypeText: _userTypeKhmer(userType),
-                          rawUserType: userType,
-                          vehicles: vehiclesMaps,
-                          workingInfo: workingInfoMap,
-                          selfieBytes: selfieBytes,
-                          selfiePath: selfiePath,
-                          qrFuture: _qrFuture,
-                          issueDateStr: issueDateStr,
-                          expiryDateStr: expiryDateStr,
-                          showPoliceId: showPoliceId,
-                          showWorkInfo: showWorkInfo,
-                          showProvince: showProvince,
-                          provinceCity: provinceCity,
+                  child: IgnorePointer(
+                    child: Opacity(
+                      opacity: 0.01,
+                      child: RepaintBoundary(
+                        key: _exportKey,
+                        child: MediaQuery(
+                          data: MediaQuery.of(context)
+                              .copyWith(textScaler: TextScaler.noScaling),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: SizedBox(
+                              width: _MoIStyleBadge.badgeW,
+                              height: _MoIStyleBadge.badgeH,
+                              child: _MoIStyleBadge(
+                                fullName: fullName,
+                                phone: phone,
+                                code: code,
+                                token: token,
+                                vehicleType: vehicleType,
+                                parkingRequestStatus: parkingRequestStatus,
+                                userTypeText: _userTypeKhmer(userType),
+                                rawUserType: userType,
+                                vehicles: vehiclesMaps,
+                                workingInfo: workingInfoMap,
+                                selfieBytes: selfieBytes,
+                                selfiePath: selfiePath,
+                                qrFuture: _qrFuture,
+                                issueDateStr: issueDateStr,
+                                expiryDateStr: expiryDateStr,
+                                showPoliceId: showPoliceId,
+                                showWorkInfo: showWorkInfo,
+                                showProvince: showProvince,
+                                provinceCity: provinceCity,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -1288,8 +1313,7 @@ class _MoIStyleBadge extends StatelessWidget {
                       Container(
                         height: 62,
                         color: _navy,
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 18),
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
                         child: Row(
                           children: [
                             const Expanded(
@@ -1356,8 +1380,7 @@ class _MoIStyleBadge extends StatelessWidget {
                         ),
                         const SizedBox(height: 14),
                       ],
-                      _blueSectionTitle(
-                          "ព័ត៌មាន ${vehicleTypeKh(vehicleType)}"),
+                      _blueSectionTitle("ព័ត៌មាន ${vehicleTypeKh(vehicleType)}"),
                       const SizedBox(height: 12),
                       _twoColRowSafe(
                         leftLabel: "ស្លាកលេខ",
@@ -1400,8 +1423,7 @@ class _MoIStyleBadge extends StatelessWidget {
                       SizedBox(
                         width: double.infinity,
                         child: Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
                               "ថ្ងៃទី $issueDateStr",
