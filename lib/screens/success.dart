@@ -34,11 +34,9 @@ class _RegisterSuccessMixedScreenState
   String selfiePath = "";
   Uint8List? selfieBytes;
 
-  final GlobalKey _exportKey = GlobalKey();
+  final GlobalKey _visibleBadgeKey = GlobalKey();
 
   bool _saving = false;
-  bool _showExportForCapture = false;
-
   bool _alive = true;
   bool _initedArgs = false;
   OverlayEntry? _topSnackBar;
@@ -313,54 +311,42 @@ class _RegisterSuccessMixedScreenState
     }
   }
 
-  Future<void> _showExportWidgetSafely() async {
-    if (!mounted) return;
-
-    setState(() => _showExportForCapture = true);
-
-    await Future.delayed(const Duration(milliseconds: 100));
-    await WidgetsBinding.instance.endOfFrame;
-    await Future.delayed(const Duration(milliseconds: 150));
-  }
-
-  Future<void> _hideExportWidgetSafely() async {
-    if (!mounted) return;
-
-    setState(() => _showExportForCapture = false);
-    await WidgetsBinding.instance.endOfFrame;
-  }
-
-  Future<Uint8List?> _captureExportPng() async {
+  Future<Uint8List?> _captureVisibleBadgePng() async {
     try {
       await WidgetsBinding.instance.endOfFrame;
-      await Future.delayed(const Duration(milliseconds: 250));
+      await Future.delayed(const Duration(milliseconds: 500));
+      await WidgetsBinding.instance.endOfFrame;
+      await Future.delayed(const Duration(milliseconds: 500));
 
-      final exportContext = _exportKey.currentContext;
-      if (exportContext == null) {
-        debugPrint("capture failed: exportContext is null");
+      final badgeContext = _visibleBadgeKey.currentContext;
+      if (badgeContext == null) {
+        debugPrint("capture failed: visible badge context null");
         return null;
       }
 
-      final boundary = exportContext.findRenderObject() as RenderRepaintBoundary?;
+      final boundary = badgeContext.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) {
-        debugPrint("capture failed: boundary is null");
+        debugPrint("capture failed: boundary null");
         return null;
       }
 
       int retry = 0;
-      while ((boundary.debugNeedsPaint || boundary.size.isEmpty) && retry < 20) {
-        await Future.delayed(const Duration(milliseconds: 120));
+      while ((boundary.debugNeedsPaint || boundary.size.isEmpty) && retry < 30) {
+        await Future.delayed(const Duration(milliseconds: 150));
         await WidgetsBinding.instance.endOfFrame;
         retry++;
-        debugPrint("waiting paint retry: $retry");
+        debugPrint("waiting visible badge paint retry: $retry");
       }
+
+      debugPrint("boundary size: ${boundary.size}");
 
       if (boundary.size.isEmpty) {
         debugPrint("capture failed: boundary size empty");
         return null;
       }
 
-      final pixelRatio = View.of(exportContext).devicePixelRatio;
+      final pixelRatio =
+          MediaQuery.of(badgeContext).devicePixelRatio.clamp(1.0, 2.0);
 
       final image = await boundary.toImage(pixelRatio: pixelRatio);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -384,6 +370,10 @@ class _RegisterSuccessMixedScreenState
     setState(() => _saving = true);
 
     try {
+      debugPrint("start save");
+      debugPrint("token: $token");
+      debugPrint("selfieBytes: ${selfieBytes?.length}");
+
       final hasPermission = await _requestPhotoPermissions();
 
       if (!hasPermission) {
@@ -394,11 +384,16 @@ class _RegisterSuccessMixedScreenState
         return;
       }
 
-      await _showExportWidgetSafely();
+      if (token.isNotEmpty) {
+        try {
+          await _qrFuture;
+        } catch (_) {}
+      }
 
-      final bytes = await _captureExportPng();
+      await Future.delayed(const Duration(milliseconds: 300));
+      await WidgetsBinding.instance.endOfFrame;
 
-      await _hideExportWidgetSafely();
+      final bytes = await _captureVisibleBadgePng();
 
       if (bytes == null || bytes.isEmpty) {
         _showTopSnackBar("❌ Capture failed", isSuccess: false);
@@ -614,26 +609,29 @@ class _RegisterSuccessMixedScreenState
 
     final badgeWidget = MediaQuery(
       data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
-      child: _MoIStyleBadge(
-        fullName: fullName,
-        phone: phone,
-        code: code,
-        token: token,
-        vehicleType: vehicleType,
-        parkingRequestStatus: parkingRequestStatus,
-        userTypeText: _userTypeKhmer(userType),
-        rawUserType: userType,
-        vehicles: vehiclesMaps,
-        workingInfo: workingInfoMap,
-        selfieBytes: selfieBytes,
-        selfiePath: selfiePath,
-        qrFuture: _qrFuture,
-        issueDateStr: issueDateStr,
-        expiryDateStr: expiryDateStr,
-        showPoliceId: showPoliceId,
-        showWorkInfo: showWorkInfo,
-        showProvince: showProvince,
-        provinceCity: provinceCity,
+      child: RepaintBoundary(
+        key: _visibleBadgeKey,
+        child: _MoIStyleBadge(
+          fullName: fullName,
+          phone: phone,
+          code: code,
+          token: token,
+          vehicleType: vehicleType,
+          parkingRequestStatus: parkingRequestStatus,
+          userTypeText: _userTypeKhmer(userType),
+          rawUserType: userType,
+          vehicles: vehiclesMaps,
+          workingInfo: workingInfoMap,
+          selfieBytes: selfieBytes,
+          selfiePath: selfiePath,
+          qrFuture: _qrFuture,
+          issueDateStr: issueDateStr,
+          expiryDateStr: expiryDateStr,
+          showPoliceId: showPoliceId,
+          showWorkInfo: showWorkInfo,
+          showProvince: showProvince,
+          provinceCity: provinceCity,
+        ),
       ),
     );
 
@@ -701,80 +699,31 @@ class _RegisterSuccessMixedScreenState
           ),
         ),
         body: SafeArea(
-          child: Stack(
-            children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  return Padding(
-                    padding: const EdgeInsets.all(12),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Padding(
+                padding: const EdgeInsets.all(12),
+                child: SizedBox(
+                  height: constraints.maxHeight,
+                  width: constraints.maxWidth,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
                     child: SizedBox(
                       height: constraints.maxHeight,
-                      width: constraints.maxWidth,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
+                      child: FittedBox(
+                        fit: BoxFit.fitHeight,
+                        alignment: Alignment.topLeft,
                         child: SizedBox(
-                          height: constraints.maxHeight,
-                          child: FittedBox(
-                            fit: BoxFit.fitHeight,
-                            alignment: Alignment.topLeft,
-                            child: SizedBox(
-                              width: _MoIStyleBadge.badgeW,
-                              height: _MoIStyleBadge.badgeH,
-                              child: badgeWidget,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              if (_showExportForCapture)
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  child: IgnorePointer(
-                    child: Opacity(
-                      opacity: 0.01,
-                      child: RepaintBoundary(
-                        key: _exportKey,
-                        child: MediaQuery(
-                          data: MediaQuery.of(context)
-                              .copyWith(textScaler: TextScaler.noScaling),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: SizedBox(
-                              width: _MoIStyleBadge.badgeW,
-                              height: _MoIStyleBadge.badgeH,
-                              child: _MoIStyleBadge(
-                                fullName: fullName,
-                                phone: phone,
-                                code: code,
-                                token: token,
-                                vehicleType: vehicleType,
-                                parkingRequestStatus: parkingRequestStatus,
-                                userTypeText: _userTypeKhmer(userType),
-                                rawUserType: userType,
-                                vehicles: vehiclesMaps,
-                                workingInfo: workingInfoMap,
-                                selfieBytes: selfieBytes,
-                                selfiePath: selfiePath,
-                                qrFuture: _qrFuture,
-                                issueDateStr: issueDateStr,
-                                expiryDateStr: expiryDateStr,
-                                showPoliceId: showPoliceId,
-                                showWorkInfo: showWorkInfo,
-                                showProvince: showProvince,
-                                provinceCity: provinceCity,
-                              ),
-                            ),
-                          ),
+                          width: _MoIStyleBadge.badgeW,
+                          height: _MoIStyleBadge.badgeH,
+                          child: badgeWidget,
                         ),
                       ),
                     ),
                   ),
                 ),
-            ],
+              );
+            },
           ),
         ),
       ),
