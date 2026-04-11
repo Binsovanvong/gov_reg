@@ -1,8 +1,8 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:auto_size_text/auto_size_text.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:gal/gal.dart';
@@ -138,7 +138,7 @@ class _RegisterSuccessMixedScreenState
           status = await Permission.photosAddOnly.request();
         }
 
-        debugPrint("📸 iOS photosAddOnly permission status: $status");
+        debugPrint("iOS photosAddOnly status: $status");
 
         if (status.isGranted || status.isLimited) {
           return true;
@@ -153,7 +153,6 @@ class _RegisterSuccessMixedScreenState
 
       if (Platform.isAndroid) {
         PermissionStatus photos = await Permission.photos.status;
-
         if (photos.isDenied) {
           photos = await Permission.photos.request();
         }
@@ -180,7 +179,7 @@ class _RegisterSuccessMixedScreenState
 
       return true;
     } catch (e) {
-      debugPrint("❌ Permission error: $e");
+      debugPrint("Permission error: $e");
       return false;
     }
   }
@@ -316,15 +315,17 @@ class _RegisterSuccessMixedScreenState
 
   Future<void> _showExportWidgetSafely() async {
     if (!mounted) return;
+
     setState(() => _showExportForCapture = true);
 
     await Future.delayed(const Duration(milliseconds: 100));
     await WidgetsBinding.instance.endOfFrame;
-    await Future.delayed(const Duration(milliseconds: 100));
+    await Future.delayed(const Duration(milliseconds: 150));
   }
 
   Future<void> _hideExportWidgetSafely() async {
     if (!mounted) return;
+
     setState(() => _showExportForCapture = false);
     await WidgetsBinding.instance.endOfFrame;
   }
@@ -332,52 +333,46 @@ class _RegisterSuccessMixedScreenState
   Future<Uint8List?> _captureExportPng() async {
     try {
       await WidgetsBinding.instance.endOfFrame;
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 250));
 
       final exportContext = _exportKey.currentContext;
       if (exportContext == null) {
-        debugPrint("❌ export context null");
+        debugPrint("capture failed: exportContext is null");
         return null;
       }
 
-      final boundary =
-          exportContext.findRenderObject() as RenderRepaintBoundary?;
+      final boundary = exportContext.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) {
-        debugPrint("❌ boundary null");
+        debugPrint("capture failed: boundary is null");
         return null;
       }
 
       int retry = 0;
       while ((boundary.debugNeedsPaint || boundary.size.isEmpty) && retry < 20) {
-        await Future.delayed(const Duration(milliseconds: 100));
+        await Future.delayed(const Duration(milliseconds: 120));
         await WidgetsBinding.instance.endOfFrame;
         retry++;
-        debugPrint("⏳ waiting for paint... retry $retry");
+        debugPrint("waiting paint retry: $retry");
       }
 
       if (boundary.size.isEmpty) {
-        debugPrint("❌ boundary size is empty");
+        debugPrint("capture failed: boundary size empty");
         return null;
       }
 
       final pixelRatio = View.of(exportContext).devicePixelRatio;
 
-      final ui.Image image = await boundary.toImage(
-        pixelRatio: pixelRatio,
-      );
-
-      final byteData = await image.toByteData(
-        format: ui.ImageByteFormat.png,
-      );
+      final image = await boundary.toImage(pixelRatio: pixelRatio);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
 
       if (byteData == null) {
-        debugPrint("❌ byteData null");
+        debugPrint("capture failed: byteData null");
         return null;
       }
 
       return byteData.buffer.asUint8List();
     } catch (e, stack) {
-      debugPrint("❌ capture error: $e");
+      debugPrint("capture error: $e");
       debugPrintStack(stackTrace: stack);
       return null;
     }
@@ -393,7 +388,7 @@ class _RegisterSuccessMixedScreenState
 
       if (!hasPermission) {
         _showTopSnackBar(
-          "❌ Permission denied. Please allow photo access in Settings.",
+          "❌ Permission denied. Please allow Photos access in Settings.",
           isSuccess: false,
         );
         return;
@@ -414,13 +409,10 @@ class _RegisterSuccessMixedScreenState
 
       _showCreativeSuccessTopSnackBar();
     } catch (e, stack) {
-      debugPrint("❌ SAVE ERROR: $e");
+      debugPrint("SAVE ERROR: $e");
       debugPrintStack(stackTrace: stack);
 
-      _showTopSnackBar(
-        "❌ Failed to save image",
-        isSuccess: false,
-      );
+      _showTopSnackBar("❌ Failed to save image", isSuccess: false);
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -608,6 +600,7 @@ class _RegisterSuccessMixedScreenState
       "provinceCity": _safe(cur.provinceCity),
       "policeId": _safe(cur.policeId, fallback: ""),
     };
+
     final vehiclesMaps = cur.vehicles
         .map((v) => {
               "plateNumber": v.plateNumber ?? "",
@@ -736,7 +729,6 @@ class _RegisterSuccessMixedScreenState
                   );
                 },
               ),
-
               if (_showExportForCapture)
                 Positioned(
                   left: 0,
@@ -1188,8 +1180,7 @@ class _MoIStyleBadge extends StatelessWidget {
                         height: 130,
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          border:
-                              Border.all(color: Colors.black54, width: 2),
+                          border: Border.all(color: Colors.black54, width: 2),
                         ),
                         padding: const EdgeInsets.all(6),
                         child: FutureBuilder<Uint8List?>(
