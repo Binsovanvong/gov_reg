@@ -232,16 +232,6 @@ class _RegisterSuccessMixedScreenState
     }
   }
 
-  Future<void> _loadQrBytes() async {
-    try {
-      final bytes = await _fetchQrPngOrNull();
-      if (!mounted) return;
-      setState(() {
-        _qrBytes = bytes;
-      });
-    } catch (_) {}
-  }
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -344,7 +334,9 @@ class _RegisterSuccessMixedScreenState
   Future<Uint8List?> _captureExportBadgePng() async {
     try {
       await WidgetsBinding.instance.endOfFrame;
-      await Future.delayed(const Duration(milliseconds: 500));
+      await Future.delayed(
+        Duration(milliseconds: Platform.isIOS ? 900 : 500),
+      );
       await WidgetsBinding.instance.endOfFrame;
 
       final exportContext = _exportBadgeKey.currentContext;
@@ -361,19 +353,29 @@ class _RegisterSuccessMixedScreenState
       }
 
       for (int i = 0; i < 30; i++) {
-        if (!boundary.debugNeedsPaint && boundary.size.isEmpty) break;
+        if (!boundary.debugNeedsPaint &&
+            boundary.size.width > 0 &&
+            boundary.size.height > 0) {
+          break;
+        }
         await Future.delayed(const Duration(milliseconds: 100));
         await WidgetsBinding.instance.endOfFrame;
       }
 
-      if (boundary.debugNeedsPaint || boundary.size.isEmpty) {
+      if (boundary.debugNeedsPaint ||
+          boundary.size.width <= 0 ||
+          boundary.size.height <= 0) {
         debugPrint("capture failed: export boundary still not ready");
         return null;
       }
 
-      final image = await boundary.toImage(pixelRatio: 3.0);
+      final image = await boundary.toImage(pixelRatio: Platform.isIOS ? 2.0 : 2.5);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) return null;
+
+      if (byteData == null) {
+        debugPrint("capture failed: byteData null");
+        return null;
+      }
 
       return byteData.buffer.asUint8List();
     } catch (e, stack) {
@@ -412,7 +414,9 @@ class _RegisterSuccessMixedScreenState
         } catch (_) {}
       }
 
-      await Future.delayed(const Duration(milliseconds: 500));
+      await Future.delayed(
+        Duration(milliseconds: Platform.isIOS ? 700 : 400),
+      );
       await WidgetsBinding.instance.endOfFrame;
 
       final bytes = await _captureExportBadgePng();
@@ -755,16 +759,23 @@ class _RegisterSuccessMixedScreenState
               ),
             ),
 
-            Positioned.fill(
+            Positioned(
+              top: 0,
+              left: 0,
               child: IgnorePointer(
-                child: Align(
-                  alignment: Alignment.topLeft,
-                  child: Opacity(
-                    opacity: 0.01,
-                    child: SizedBox(
-                      width: _MoIStyleBadge.badgeW,
-                      height: _MoIStyleBadge.badgeH,
-                      child: exportBadgeWidget,
+                child: ClipRect(
+                  child: SizedBox(
+                    width: 1,
+                    height: 1,
+                    child: OverflowBox(
+                      maxWidth: _MoIStyleBadge.badgeW,
+                      maxHeight: _MoIStyleBadge.badgeH,
+                      alignment: Alignment.topLeft,
+                      child: SizedBox(
+                        width: _MoIStyleBadge.badgeW,
+                        height: _MoIStyleBadge.badgeH,
+                        child: exportBadgeWidget,
+                      ),
                     ),
                   ),
                 ),
