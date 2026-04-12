@@ -1,16 +1,15 @@
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:gal/gal.dart';
 import 'package:gov_reg/api/api.dart';
 import 'package:gov_reg/models/parking_card.dart';
 import 'package:gov_reg/routes/approute.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
+import 'package:screenshot/screenshot.dart';
 
 class RegisterSuccessMixedScreen extends StatefulWidget {
   const RegisterSuccessMixedScreen({super.key});
@@ -24,19 +23,17 @@ class _RegisterSuccessMixedScreenState
     extends State<RegisterSuccessMixedScreen> {
   static const String baseUrl = "https://ees.interior.gov.kh";
 
+  final ScreenshotController _screenshotController = ScreenshotController();
+
   Future<Uint8List?> _qrFuture = Future.value(null);
   Uint8List? _qrBytes;
 
   ParkingCardRequestResponseDTO? _response;
-
   List<ParkingCardRequestResponseDTO> _allResults = [];
   int _currentIndex = 0;
 
   String selfiePath = "";
   Uint8List? selfieBytes;
-
-  final GlobalKey _visibleBadgeKey = GlobalKey();
-  final GlobalKey _exportBadgeKey = GlobalKey();
 
   bool _saving = false;
   bool _alive = true;
@@ -132,13 +129,10 @@ class _RegisterSuccessMixedScreenState
   Future<bool> _requestPhotoPermissions() async {
     try {
       if (Platform.isIOS) {
-        PermissionStatus status = await Permission.photosAddOnly.status;
-
+        var status = await Permission.photosAddOnly.status;
         if (status.isDenied || status.isRestricted) {
           status = await Permission.photosAddOnly.request();
         }
-
-        debugPrint("iOS photosAddOnly status: $status");
 
         if (status.isGranted || status.isLimited) {
           return true;
@@ -147,25 +141,22 @@ class _RegisterSuccessMixedScreenState
         if (status.isPermanentlyDenied) {
           await openAppSettings();
         }
-
         return false;
       }
 
       if (Platform.isAndroid) {
-        PermissionStatus photos = await Permission.photos.status;
+        var photos = await Permission.photos.status;
         if (photos.isDenied) {
           photos = await Permission.photos.request();
         }
-
         if (photos.isGranted || photos.isLimited) {
           return true;
         }
 
-        PermissionStatus storage = await Permission.storage.status;
+        var storage = await Permission.storage.status;
         if (storage.isDenied) {
           storage = await Permission.storage.request();
         }
-
         if (storage.isGranted) {
           return true;
         }
@@ -173,7 +164,6 @@ class _RegisterSuccessMixedScreenState
         if (photos.isPermanentlyDenied || storage.isPermanentlyDenied) {
           await openAppSettings();
         }
-
         return false;
       }
 
@@ -265,9 +255,7 @@ class _RegisterSuccessMixedScreenState
     _qrFuture = _fetchQrPngOrNull();
     _qrFuture.then((bytes) {
       if (!mounted) return;
-      setState(() {
-        _qrBytes = bytes;
-      });
+      setState(() => _qrBytes = bytes);
     });
 
     _loadSelfieFromAttachments();
@@ -287,9 +275,7 @@ class _RegisterSuccessMixedScreenState
 
     _qrFuture.then((bytes) {
       if (!mounted) return;
-      setState(() {
-        _qrBytes = bytes;
-      });
+      setState(() => _qrBytes = bytes);
     });
 
     _loadSelfieFromAttachments();
@@ -331,55 +317,19 @@ class _RegisterSuccessMixedScreenState
     }
   }
 
-  Future<Uint8List?> _captureExportBadgePng() async {
+  Future<Uint8List?> _captureBadgePng() async {
     try {
       await WidgetsBinding.instance.endOfFrame;
       await Future.delayed(
-        Duration(milliseconds: Platform.isIOS ? 900 : 500),
+        Duration(milliseconds: Platform.isIOS ? 800 : 400),
       );
-      await WidgetsBinding.instance.endOfFrame;
 
-      final exportContext = _exportBadgeKey.currentContext;
-      if (exportContext == null) {
-        debugPrint("capture failed: export context null");
-        return null;
-      }
-
-      final boundary =
-          exportContext.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) {
-        debugPrint("capture failed: export boundary null");
-        return null;
-      }
-
-      for (int i = 0; i < 30; i++) {
-        if (!boundary.debugNeedsPaint &&
-            boundary.size.width > 0 &&
-            boundary.size.height > 0) {
-          break;
-        }
-        await Future.delayed(const Duration(milliseconds: 100));
-        await WidgetsBinding.instance.endOfFrame;
-      }
-
-      if (boundary.debugNeedsPaint ||
-          boundary.size.width <= 0 ||
-          boundary.size.height <= 0) {
-        debugPrint("capture failed: export boundary still not ready");
-        return null;
-      }
-
-      final image = await boundary.toImage(pixelRatio: Platform.isIOS ? 2.0 : 2.5);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-
-      if (byteData == null) {
-        debugPrint("capture failed: byteData null");
-        return null;
-      }
-
-      return byteData.buffer.asUint8List();
+      return await _screenshotController.capture(
+        delay: Duration(milliseconds: Platform.isIOS ? 300 : 150),
+        pixelRatio: Platform.isIOS ? 2.0 : 2.5,
+      );
     } catch (e, stack) {
-      debugPrint("capture error: $e");
+      debugPrint("screenshot capture error: $e");
       debugPrintStack(stackTrace: stack);
       return null;
     }
@@ -407,9 +357,7 @@ class _RegisterSuccessMixedScreenState
         try {
           final bytes = await _qrFuture;
           if (mounted) {
-            setState(() {
-              _qrBytes = bytes;
-            });
+            setState(() => _qrBytes = bytes);
           }
         } catch (_) {}
       }
@@ -419,7 +367,7 @@ class _RegisterSuccessMixedScreenState
       );
       await WidgetsBinding.instance.endOfFrame;
 
-      final bytes = await _captureExportBadgePng();
+      final bytes = await _captureBadgePng();
 
       if (bytes == null || bytes.isEmpty) {
         _showTopSnackBar("❌ Capture failed", isSuccess: false);
@@ -427,7 +375,6 @@ class _RegisterSuccessMixedScreenState
       }
 
       await Gal.putImageBytes(bytes);
-
       _showCreativeSuccessTopSnackBar();
     } catch (e, stack) {
       debugPrint("SAVE ERROR: $e");
@@ -632,38 +579,33 @@ class _RegisterSuccessMixedScreenState
             })
         .toList();
 
-    Widget buildBadge({required Key repaintKey}) {
-      return MediaQuery(
-        data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
-        child: RepaintBoundary(
-          key: repaintKey,
-          child: _MoIStyleBadge(
-            fullName: fullName,
-            phone: phone,
-            code: code,
-            token: token,
-            vehicleType: vehicleType,
-            parkingRequestStatus: parkingRequestStatus,
-            userTypeText: _userTypeKhmer(userType),
-            rawUserType: userType,
-            vehicles: vehiclesMaps,
-            workingInfo: workingInfoMap,
-            selfieBytes: selfieBytes,
-            selfiePath: selfiePath,
-            qrBytes: _qrBytes,
-            issueDateStr: issueDateStr,
-            expiryDateStr: expiryDateStr,
-            showPoliceId: showPoliceId,
-            showWorkInfo: showWorkInfo,
-            showProvince: showProvince,
-            provinceCity: provinceCity,
-          ),
+    final badgeWidget = MediaQuery(
+      data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
+      child: Screenshot(
+        controller: _screenshotController,
+        child: _MoIStyleBadge(
+          fullName: fullName,
+          phone: phone,
+          code: code,
+          token: token,
+          vehicleType: vehicleType,
+          parkingRequestStatus: parkingRequestStatus,
+          userTypeText: _userTypeKhmer(userType),
+          rawUserType: userType,
+          vehicles: vehiclesMaps,
+          workingInfo: workingInfoMap,
+          selfieBytes: selfieBytes,
+          selfiePath: selfiePath,
+          qrBytes: _qrBytes,
+          issueDateStr: issueDateStr,
+          expiryDateStr: expiryDateStr,
+          showPoliceId: showPoliceId,
+          showWorkInfo: showWorkInfo,
+          showProvince: showProvince,
+          provinceCity: provinceCity,
         ),
-      );
-    }
-
-    final visibleBadgeWidget = buildBadge(repaintKey: _visibleBadgeKey);
-    final exportBadgeWidget = buildBadge(repaintKey: _exportBadgeKey);
+      ),
+    );
 
     return PopScope(
       canPop: !_saving,
@@ -728,60 +670,33 @@ class _RegisterSuccessMixedScreenState
             ),
           ),
         ),
-        body: Stack(
-          children: [
-            SafeArea(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return Padding(
-                    padding: const EdgeInsets.all(12),
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Padding(
+                padding: const EdgeInsets.all(12),
+                child: SizedBox(
+                  height: constraints.maxHeight,
+                  width: constraints.maxWidth,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
                     child: SizedBox(
                       height: constraints.maxHeight,
-                      width: constraints.maxWidth,
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
+                      child: FittedBox(
+                        fit: BoxFit.fitHeight,
+                        alignment: Alignment.topLeft,
                         child: SizedBox(
-                          height: constraints.maxHeight,
-                          child: FittedBox(
-                            fit: BoxFit.fitHeight,
-                            alignment: Alignment.topLeft,
-                            child: SizedBox(
-                              width: _MoIStyleBadge.badgeW,
-                              height: _MoIStyleBadge.badgeH,
-                              child: visibleBadgeWidget,
-                            ),
-                          ),
+                          width: _MoIStyleBadge.badgeW,
+                          height: _MoIStyleBadge.badgeH,
+                          child: badgeWidget,
                         ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            Positioned(
-              top: 0,
-              left: 0,
-              child: IgnorePointer(
-                child: ClipRect(
-                  child: SizedBox(
-                    width: 1,
-                    height: 1,
-                    child: OverflowBox(
-                      maxWidth: _MoIStyleBadge.badgeW,
-                      maxHeight: _MoIStyleBadge.badgeH,
-                      alignment: Alignment.topLeft,
-                      child: SizedBox(
-                        width: _MoIStyleBadge.badgeW,
-                        height: _MoIStyleBadge.badgeH,
-                        child: exportBadgeWidget,
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
-          ],
+              );
+            },
+          ),
         ),
       ),
     );
