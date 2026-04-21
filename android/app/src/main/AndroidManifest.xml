@@ -1,9 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Android 13+ -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
-    <!-- Android 12 and below -->
+
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
@@ -15,11 +14,13 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
-        android:label="ANPR"
+        android:label="MOI-EES"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="false"
-        android:networkSecurityConfig="@xml/network_security_config">
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:allowBackup="false"
+        android:fullBackupContent="false">
 
         <activity
             android:name=".MainActivity"
