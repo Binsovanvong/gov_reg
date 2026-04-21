@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Need camera access to take a photo.</string>
+	<string>This app uses the camera to capture vehicle images for license plate recognition.</string>
 
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app needs access to your photo library.</string>
+	<string>This app needs access to your photo library to select vehicle images for license plate recognition.</string>
 
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>This app needs permission to save images to your Photos.</string>
+	<string>This app needs permission to save processed vehicle images to your Photos.</string>
 
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
