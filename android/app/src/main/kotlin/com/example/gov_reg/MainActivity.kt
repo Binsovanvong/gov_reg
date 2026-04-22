@@ -1,4 +1,4 @@
-package com.example.gov_reg
+package com.gov_reg.myapp
 
 import io.flutter.embedding.android.FlutterActivity
 
