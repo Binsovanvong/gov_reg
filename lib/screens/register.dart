@@ -827,7 +827,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 🔵 HEADER (DARK BLUE)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 28),
@@ -884,8 +883,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ],
                 ),
               ),
-
-              // 🔽 BODY
               Padding(
                 padding: const EdgeInsets.fromLTRB(22, 24, 22, 22),
                 child: Column(
@@ -901,8 +898,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-
-                    // ⚠️ WARNING BOX (BLUE STYLE)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
@@ -947,11 +942,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
 
                     const SizedBox(height: 24),
-
-                    // 🔘 BUTTONS
                     Row(
                       children: [
-                        // ❌ CANCEL
                         Expanded(
                           child: Material(
                             color: Colors.transparent,
@@ -991,8 +983,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
 
                         const SizedBox(width: 12),
-
-                        // ✅ CONFIRM
                         Expanded(
                           child: Material(
                             color: Colors.transparent,
