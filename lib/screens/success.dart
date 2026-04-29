@@ -1023,7 +1023,7 @@ class _MoIStyleBadge extends StatelessWidget {
                     opacity: 0.10,
                     child: Center(
                       child: Image.asset(
-                        "assets/img/about-moi-logo.png",
+                        "assets/img/logo_moi.png",
                         width: 620,
                         height: 620,
                         fit: BoxFit.contain,

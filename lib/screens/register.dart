@@ -93,6 +93,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void initState() {
     super.initState();
+
+    final firstVehicle = _VehicleForm();
+    _listenVehiclePlate(firstVehicle);
+    vehicles.add(firstVehicle);
+
     _loadWorkDropdownsIfNeeded(userTypeOverride: _userType);
     _initDefaultSubcategories();
   }
@@ -100,13 +105,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _initDefaultSubcategories() async {
     final carSubs = await Api.fetchPlateSubCategories("REGULAR");
     final motoSubs = await Api.fetchPlateSubCategories("REGULAR");
-    if (!mounted) return;
+
+    if (!mounted || vehicles.isEmpty) return;
+
     setState(() {
       vehicles.first.carSubcategories = carSubs;
       vehicles.first.motoSubcategories = motoSubs;
     });
   }
-
   static const int maxFiles = 5;
   final List<File> attachFiles = [];
   final List<String> attachFileNames = [];
@@ -133,8 +139,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   int? selectedDurationDays;
   String? durationError;
 
-  final List<_VehicleForm> vehicles = [_VehicleForm()];
-
+  final List<_VehicleForm> vehicles = [];
+  void _listenVehiclePlate(_VehicleForm v) {
+    v.plate.addListener(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
   int? _lastRequestDurationDays;
   String? _lastRequestAtDateStr;
 
@@ -2417,7 +2429,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   Text(
                     'ENTRY/EXIT SYSTEM',
                     style: TextStyle(
-                      fontSize: 26,
+                      fontSize: 22,
                       color: Color(0xFFDFB73B),
                       fontWeight: FontWeight.bold,
                       fontFamily: 'khmer moul light',
@@ -3084,12 +3096,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     groupValue: v.vehicleType,
                                     title: const Text("រថយន្ត"),
                                     onChanged: (x) async {
-                                      setState(() => v.vehicleType = x!);
+                                      setState(() {
+                                        v.vehicleType = x!;
+                                        v.plate.text = _formatPlateLive(v, v.plate.text);
+                                      });
+
                                       if (v.carSubcategories.isEmpty) {
-                                        final subs =
-                                            await Api.fetchPlateSubCategories(
-                                          v.carPlateType,
-                                        );
+                                        final subs = await Api.fetchPlateSubCategories(v.carPlateType);
                                         if (!mounted) return;
                                         setState(() => v.carSubcategories = subs);
                                       }
@@ -3102,12 +3115,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                     groupValue: v.vehicleType,
                                     title: const Text("ម៉ូតូ"),
                                     onChanged: (x) async {
-                                      setState(() => v.vehicleType = x!);
+                                      setState(() {
+                                        v.vehicleType = x!;
+                                        v.plate.text = _formatPlateLive(v, v.plate.text);
+                                      });
+
                                       if (v.motoSubcategories.isEmpty) {
-                                        final subs =
-                                            await Api.fetchPlateSubCategories(
-                                          v.motoPlateType,
-                                        );
+                                        final subs = await Api.fetchPlateSubCategories(v.motoPlateType);
                                         if (!mounted) return;
                                         setState(() => v.motoSubcategories = subs);
                                       }
@@ -3130,30 +3144,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                             const SizedBox(height: 10),
                             Center(
-                              child: plateBox(
-                                label: () {
-                                  final isMoto = v.vehicleType == "MOTORBIKE";
-                                  final code = isMoto
-                                      ? v.motoPlateSubcategory
-                                      : v.carPlateSubcategory;
-                                  final subs = isMoto
-                                      ? v.motoSubcategories
-                                      : v.carSubcategories;
-                                  if (code == null) return "";
-                                  try {
-                                    return subs
-                                        .firstWhere((s) => s.code == code)
-                                        .name;
-                                  } catch (_) {
-                                    return code;
-                                  }
-                                }(),
-                                code: _normalizePlate(v.plate.text).isEmpty
-                                    ? "----"
-                                    : _normalizePlate(v.plate.text),
-                                keyText: getPlateKey(v),
+                                child: ValueListenableBuilder<TextEditingValue>(
+                                  valueListenable: v.plate,
+                                  builder: (context, value, child) {
+                                    return plateBox(
+                                      label: () {
+                                        final isMoto = v.vehicleType == "MOTORBIKE";
+                                        final code = isMoto
+                                            ? v.motoPlateSubcategory
+                                            : v.carPlateSubcategory;
+                                        final subs = isMoto
+                                            ? v.motoSubcategories
+                                            : v.carSubcategories;
+
+                                        if (code == null) return "";
+
+                                        try {
+                                          return subs.firstWhere((s) => s.code == code).name;
+                                        } catch (_) {
+                                          return code;
+                                        }
+                                      }(),
+                                      code: _normalizePlate(value.text).isEmpty
+                                          ? "----"
+                                          : _normalizePlate(value.text),
+                                      keyText: getPlateKey(v),
+                                    );
+                                  },
+                                ),
                               ),
-                            ),
                             oneInput(
                               label: "ពណ៌",
                               hint: "ពណ៌រថយន្ត",
