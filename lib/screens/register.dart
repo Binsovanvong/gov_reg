@@ -827,16 +827,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // 🔵 HEADER (DARK BLUE)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 28),
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [Color(0xFFFFCA28),Color(0xFFFFCA28),],
+                    colors: [
+                      Color(0xFF0A2D66),
+                      Color(0xFF06175F),
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                  borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(32)),
                 ),
                 child: Column(
                   children: [
@@ -872,13 +877,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       width: 40,
                       height: 3,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFDFB73B),
+                        color: Color(0xFF4FC3F7), // light blue accent
                         borderRadius: BorderRadius.circular(99),
                       ),
                     ),
                   ],
                 ),
               ),
+
+              // 🔽 BODY
               Padding(
                 padding: const EdgeInsets.fromLTRB(22, 24, 22, 22),
                 child: Column(
@@ -889,19 +896,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       style: TextStyle(
                         fontSize: 16,
                         height: 1.65,
-                        color: Colors.grey,
+                        color: Colors.grey[700],
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 16),
+
+                    // ⚠️ WARNING BOX (BLUE STYLE)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFF8E1),
+                        color: const Color(0xFFE3F2FD),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: const Color(0xFFFFE082),
+                          color: const Color(0xFF90CAF9),
                           width: 1.4,
                         ),
                       ),
@@ -912,12 +921,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             width: 36,
                             height: 36,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFDFB73B).withOpacity(0.15),
+                              color: const Color(0xFF0A2D66).withOpacity(0.1),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
-                              Icons.warning_amber_rounded,
-                              color: Color(0xFFDFB73B),
+                              Icons.info_outline,
+                              color: Color(0xFF0A2D66),
                               size: 20,
                             ),
                           ),
@@ -928,7 +937,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF92620A),
+                                color: Color(0xFF0A2D66),
                                 height: 1.55,
                               ),
                             ),
@@ -936,9 +945,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ],
                       ),
                     ),
+
                     const SizedBox(height: 24),
+
+                    // 🔘 BUTTONS
                     Row(
                       children: [
+                        // ❌ CANCEL
                         Expanded(
                           child: Material(
                             color: Colors.transparent,
@@ -946,19 +959,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               borderRadius: BorderRadius.circular(16),
                               onTap: () => Navigator.pop(ctx, false),
                               child: Ink(
-                                padding: const EdgeInsets.symmetric(vertical: 15),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 15),
                                 decoration: BoxDecoration(
-                                  color: Colors.red,
+                                  color: Colors.grey.shade200,
                                   borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: Colors.grey.shade300),
                                 ),
                                 child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.center,
                                   children: [
                                     Icon(
                                       Icons.close_rounded,
                                       size: 18,
-                                      color: Colors.white,
+                                      color: Colors.grey[800],
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
@@ -966,7 +980,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       style: TextStyle(
                                         fontSize: 15,
                                         fontWeight: FontWeight.w800,
-                                        color: Colors.white
+                                        color: Colors.grey[800],
                                       ),
                                     ),
                                   ],
@@ -975,7 +989,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                           ),
                         ),
+
                         const SizedBox(width: 12),
+
+                        // ✅ CONFIRM
                         Expanded(
                           child: Material(
                             color: Colors.transparent,
@@ -983,9 +1000,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               borderRadius: BorderRadius.circular(16),
                               onTap: () => Navigator.pop(ctx, true),
                               child: Ink(
-                                padding: const EdgeInsets.symmetric(vertical: 15),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 15),
                                 decoration: BoxDecoration(
-                                  color: Colors.green,
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      Color(0xFF0A2D66),
+                                      Color(0xFF06175F),
+                                    ],
+                                  ),
                                   borderRadius: BorderRadius.circular(16),
                                   boxShadow: [
                                     BoxShadow(
@@ -997,7 +1020,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   ],
                                 ),
                                 child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.center,
                                   children: [
                                     Icon(
                                       Icons.check_rounded,
@@ -2337,19 +2361,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _header() {
     return Container(
-      height: 340,
+      height: 350,
       width: double.infinity,
       decoration: BoxDecoration(
-          // gradient: LinearGradient(
-          //   colors: [
-          //     const Color(0xFFFFCA28),
-          //     const Color(0xFFFFCA28),
-          //   ],
-          //   begin: Alignment.topLeft,
-          //   end: Alignment.bottomRight,
-          // ),
           image: const DecorationImage(
-            image: AssetImage('assets/icon/back.png'),
+            image: AssetImage('assets/img/bgc.jpg'),
             fit: BoxFit.cover,
           )
       ),
@@ -2360,24 +2376,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Padding(
-                padding: const EdgeInsets.all(8.0),
+                padding: const EdgeInsets.all(2.0),
                 child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white,
+                  width: 150,
+                  height: 150,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle, 
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.35),
+                        blurRadius: 25,
+                        offset: const Offset(0, 12),
+                      ),
+                      BoxShadow(
+                        color: const Color(0xFF3B82F6).withOpacity(0.25),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
-                  child: Image.asset('assets/img/about-moi-logo.png',
-                      height: 90),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle, 
+                      color: Colors.white,
+                    ),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/img/LOGO ROUND.png',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
                 ),
               ),
               const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'ក្រសួងមហាផ្ទៃ',
+                    'ប្រព័ន្ធច្រកចេញ-ចូល',
                     style: TextStyle(
-                      fontSize: 30,
+                      fontSize: 26,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFFDFB73B),
                       fontFamily: 'khmer moul light',
@@ -2385,9 +2425,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   SizedBox(height: 8),
                   Text(
-                    'Ministry of Interior',
+                    'Exit-Entry System',
                     style: TextStyle(
-                      fontSize: 22,
+                      fontSize: 26,
                       color: Color(0xFFDFB73B),
                       fontWeight: FontWeight.bold,
                       fontFamily: 'khmer moul light',

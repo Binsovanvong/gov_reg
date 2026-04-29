@@ -1049,7 +1049,7 @@ class _MoIStyleBadge extends StatelessWidget {
                         ),
                         padding: const EdgeInsets.all(12),
                         child: Image.asset(
-                          "assets/img/about-moi-logo.png",
+                          "assets/img/logo_moi.png",
                           fit: BoxFit.contain,
                           filterQuality: FilterQuality.high,
                         ),

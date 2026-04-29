@@ -14,44 +14,20 @@ class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _fadeAnimation;
-  late final Animation<double> _scaleAnimation;
-  late final Animation<double> _textSlideAnimation;
 
   Timer? _timer;
-  static const Color _gold = Color(0xFFDFB73B);
+
   @override
   void initState() {
     super.initState();
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
+      duration: const Duration(milliseconds: 1200),
     );
 
-    _fadeAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    );
-
-    _scaleAnimation = Tween<double>(
-      begin: 0.82,
-      end: 1.0,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeOutBack,
-      ),
-    );
-
-    _textSlideAnimation = Tween<double>(
-      begin: 18,
-      end: 0,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: Curves.easeOutCubic,
-      ),
-    );
+    _fadeAnimation =
+        CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
 
     _controller.forward();
 
@@ -67,143 +43,125 @@ class _SplashScreenState extends State<SplashScreen>
     _controller.dispose();
     super.dispose();
   }
-
-  Widget _buildBackgroundGlow() {
+  Widget _buildBackground() {
     return Stack(
       children: [
         Positioned(
-          top: -70,
-          left: -40,
-          child: Container(
-            width: 220,
-            height: 220,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.05),
-            ),
-          ),
+          top: -120,
+          left: -80,
+          child: _circle(320, Colors.white.withOpacity(0.05)),
         ),
         Positioned(
-          right: -50,
-          top: 130,
-          child: Container(
-            width: 180,
-            height: 180,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _gold.withOpacity(0.08),
-            ),
-          ),
+          top: 150,
+          right: -80,
+          child: _circle(220, Colors.white.withOpacity(0.04)),
         ),
         Positioned(
-          bottom: -80,
-          left: 20,
-          child: Container(
-            width: 220,
-            height: 220,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.lightBlueAccent.withOpacity(0.05),
-            ),
-          ),
+          bottom: -140,
+          left: -60,
+          child: _circle(300, Colors.white.withOpacity(0.04)),
         ),
       ],
     );
   }
 
-  Widget _buildLogo() {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: Container(
-          height: 190,
-          width: 190,
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.white.withOpacity(0.08),
-                blurRadius: 30,
-                spreadRadius: 4,
-              ),
-              BoxShadow(
-                color: Colors.black.withOpacity(0.18),
-                blurRadius: 28,
-                offset: const Offset(0, 14),
-              ),
-            ],
-            border: Border.all(
-              color: Colors.white.withOpacity(0.25),
-              width: 1.2,
-            ),
-          ),
-          child: Image.asset(
-            'assets/img/about-moi-logo.png',
-            fit: BoxFit.contain,
-          ),
-        ),
+  Widget _circle(double size, Color color) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
       ),
     );
   }
-
-  Widget _buildTexts() {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Opacity(
-          opacity: _fadeAnimation.value,
-          child: Transform.translate(
-            offset: Offset(0, _textSlideAnimation.value),
-            child: child,
+  Widget _buildLogo() {
+  return FadeTransition(
+    opacity: _fadeAnimation,
+    child: Container(
+      height: 250,
+      width: 250,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle, 
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.30),
+            blurRadius: 30,
+            offset: const Offset(0, 12),
           ),
-        );
-      },
+        ],
+      ),
+      child: ClipOval( 
+        child: Image.asset(
+          'assets/img/LOGO ROUND.png',
+          fit: BoxFit.contain,
+        ),
+      ),
+    ),
+  );
+}
+  Widget _buildTexts() {
+    return FadeTransition(
+      opacity: _fadeAnimation,
       child: Column(
         children: [
-          const Text(
-            'ក្រសួងមហាផ្ទៃ',
-            textAlign: TextAlign.center,
+          const SizedBox(height: 22),
+
+          Text(
+            'កម្មវិធី EES',
             style: TextStyle(
-              color: Colors.white,
+              foreground: Paint()
+                ..shader = const LinearGradient(
+                  colors: [
+                    Colors.white,
+                    Colors.white70,
+                  ],
+                ).createShader(const Rect.fromLTWH(0, 0, 200, 70)),
               fontSize: 28,
               fontWeight: FontWeight.bold,
-              fontFamily: 'khmer moul light',
-              height: 1.35,
             ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            'Ministry of Interior',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.92),
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.3,
-              height: 1.35,
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 22,
+              vertical: 16,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.2),
+              ),
+            ),
+            child: Text(
+              'General Department of Digital Technology and Media',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 15,
+                height: 1.4,
+              ),
             ),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildBottomLoader() {
+  Widget _buildLoader() {
     return FadeTransition(
       opacity: _fadeAnimation,
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            width: 26,
-            height: 26,
+            width: 28,
+            height: 28,
             child: CircularProgressIndicator(
-              strokeWidth: 2.4,
+              strokeWidth: 2.5,
               valueColor: AlwaysStoppedAnimation<Color>(
-                Colors.white.withOpacity(0.95),
+                Colors.white.withOpacity(0.9),
               ),
             ),
           ),
@@ -211,9 +169,8 @@ class _SplashScreenState extends State<SplashScreen>
           Text(
             'កំពុងដំណើរការ...',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.82),
-              fontSize: 13.5,
-              fontWeight: FontWeight.w500,
+              color: Colors.white.withOpacity(0.8),
+              fontSize: 14,
             ),
           ),
         ],
@@ -221,6 +178,7 @@ class _SplashScreenState extends State<SplashScreen>
     );
   }
 
+  // ================= UI =================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -228,8 +186,9 @@ class _SplashScreenState extends State<SplashScreen>
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
-            Color(0xFFFFCA28),
-            Color(0xFFFFCA28),
+              Color(0xFF142B6F),
+              Color(0xFF1E3A8A),
+              Color(0xFF233F8F),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -237,22 +196,19 @@ class _SplashScreenState extends State<SplashScreen>
         ),
         child: Stack(
           children: [
-            _buildBackgroundGlow(),
+            _buildBackground(),
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Center(
-                  child: Column(
-                    children: [
-                      const Spacer(),
-                      _buildLogo(),
-                      const SizedBox(height: 28),
-                      _buildTexts(),
-                      const Spacer(),
-                      _buildBottomLoader(),
-                      const SizedBox(height: 28),
-                    ],
-                  ),
+                child: Column(
+                  children: [
+                    const Spacer(),
+                    _buildLogo(),
+                    _buildTexts(),
+                    const Spacer(),
+                    _buildLoader(),
+                    const SizedBox(height: 30),
+                  ],
                 ),
               ),
             ),

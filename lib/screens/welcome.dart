@@ -3,12 +3,16 @@ import 'package:gov_reg/routes/approute.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
-  static const Color _gold = Color(0xFFDFB73B);
-  static const Color _goldBright = Color(0xFFF4D46A);
-  static const Color _goldDeep = Color(0xFFB88A16);
-  static const Color _goldSoftText = Color(0xFF9C7A16);
-  static const Color _bgTop = Color(0xFFFFD54F);
-  static const Color _bgBottom = Color(0xFFFFB300);
+
+  // 🎨 NEW COLORS (from your screenshot)
+  static const Color _bgTop = Color(0xFF0F2A6D);
+  static const Color _bgMid = Color(0xFF1B3A8A);
+  static const Color _bgBottom = Color(0xFF25479B);
+
+  static const Color _blue = Color(0xFF3B82F6);
+  static const Color _blueLight = Color(0xFF60A5FA);
+  static const Color _gold = Color(0xFFE7C14D);
+  static const Color _goldDark = Color(0xFFD4AF37);
 
   @override
   Widget build(BuildContext context) {
@@ -19,9 +23,13 @@ class WelcomeScreen extends StatelessWidget {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [_bgTop, _bgBottom],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            colors: [
+              _bgTop,
+              _bgMid,
+              _bgBottom,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
         ),
         child: Stack(
@@ -57,30 +65,28 @@ class WelcomeScreen extends StatelessWidget {
       ),
     );
   }
-
-  // ================= BACKGROUND =================
   Widget _buildBackgroundDecoration() {
     return Stack(
       children: [
         Positioned(
           top: -60,
           left: -40,
-          child: _circle(180, Colors.white.withOpacity(0.12)),
+          child: _circle(180, Colors.white.withOpacity(0.06)),
         ),
         Positioned(
           top: 80,
           right: -50,
-          child: _circle(220, Colors.white.withOpacity(0.08)),
+          child: _circle(220, Colors.white.withOpacity(0.04)),
         ),
         Positioned(
           bottom: 120,
           left: -30,
-          child: _circle(160, _goldBright.withOpacity(0.15)),
+          child: _circle(160, Colors.white.withOpacity(0.05)),
         ),
         Positioned(
           bottom: -70,
           right: -20,
-          child: _circle(220, Colors.white.withOpacity(0.10)),
+          child: _circle(220, Colors.white.withOpacity(0.04)),
         ),
       ],
     );
@@ -93,8 +99,6 @@ class WelcomeScreen extends StatelessWidget {
       decoration: BoxDecoration(shape: BoxShape.circle, color: color),
     );
   }
-
-  // ================= HERO =================
   Widget _buildHeroCard(bool isSmall) {
     final double logoSize = isSmall ? 120 : 140;
 
@@ -103,17 +107,8 @@ class WelcomeScreen extends StatelessWidget {
       padding: const EdgeInsets.all(26),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(34),
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFFCF2), Color(0xFFFFF7E1)],
-        ),
-        border: Border.all(color: _goldBright.withOpacity(0.7)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.10),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
-          ),
-        ],
+        color: Colors.white.withOpacity(0.12),
+        border: Border.all(color: Colors.white.withOpacity(0.2)),
       ),
       child: Column(
         children: [
@@ -123,24 +118,18 @@ class WelcomeScreen extends StatelessWidget {
           Text(
             'សូមស្វាគមន៍មកកាន់',
             style: TextStyle(
-              color: _goldDeep,
+              color: Colors.white,
               fontSize: isSmall ? 24 : 28,
               fontWeight: FontWeight.bold,
               fontFamily: 'khmer moul light',
             ),
           ),
           const SizedBox(height: 8),
+
           Text(
-            'កម្មវិធី MOI-EES',
+            'កម្មវិធី EES',
             style: TextStyle(
-              foreground: Paint()
-                ..shader = const LinearGradient(
-                  colors: [
-                    Color(0xFFF4D46A),
-                    Color(0xFFDFB73B),
-                    Color(0xFFB88A16),
-                  ],
-                ).createShader(const Rect.fromLTWH(0, 0, 300, 70)),
+              color: Colors.white,
               fontSize: isSmall ? 26 : 30,
               fontWeight: FontWeight.w900,
               fontFamily: 'khmer moul light',
@@ -154,80 +143,72 @@ class WelcomeScreen extends StatelessWidget {
             height: 4,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [_goldBright, _gold, _goldDeep],
+                colors: [_blueLight, _blue],
               ),
               borderRadius: BorderRadius.circular(999),
             ),
           ),
 
           const SizedBox(height: 18),
-
-          Text(
-            'ប្រព័ន្ធគ្រប់គ្រងការចេញចូលយានយន្តក្រសួងមហាផ្ទៃ\nប្រើប្រាស់ប្រកបដោយភាពងាយស្រួល ទំនើប និងមានសុវត្ថិភាព',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: _goldSoftText,
-              fontSize: 12, 
-              height: 1.6,    
-              fontFamily: 'KantumruyPro',
-              fontWeight: FontWeight.w500, 
-              letterSpacing: 0.2,
-            ),
-          ),
         ],
       ),
     );
   }
-
-  // ================= NEW LOGO (FULL IMAGE) =================
   Widget _buildPremiumLogo(double size) {
-    return Container(
-      width: size + 40,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFF4CC), Color(0xFFFFE082)],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: _gold.withOpacity(0.30),
-            blurRadius: 25,
-            offset: const Offset(0, 12),
-          ),
+  return Container(
+    width: size + 70,
+    height: size + 70,
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      shape: BoxShape.circle, 
+      gradient: LinearGradient(
+        colors: [
+          Colors.white.withOpacity(0.95),
+          Colors.white.withOpacity(0.85),
         ],
-        border: Border.all(color: _goldBright, width: 1.5),
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
       ),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.25),
+          blurRadius: 25,
+          offset: const Offset(0, 12),
+        ),
+        BoxShadow(
+          color: const Color(0xFF3B82F6).withOpacity(0.25), 
+          blurRadius: 20,
+          offset: const Offset(0, 8),
+        ),
+      ],
+    ),
+    child: ClipOval(
       child: Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-        ),
+        color: Colors.white.withOpacity(0.95),
         child: Image.asset(
-          'assets/icon/MOI-EES (IOS).png',
-          fit: BoxFit.contain,
+          'assets/img/LOGO ROUND.png',
+          fit: BoxFit.cover,
         ),
       ),
-    );
-  }
-
-  // ================= GOLD BUTTON =================
+    ),
+  );
+}
   Widget _buildRegisterButton(BuildContext context) {
     return Container(
       width: double.infinity,
       height: 60,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(30),
         gradient: const LinearGradient(
           colors: [
-            Color(0xFFF4D46A),
-            Color(0xFFDFB73B),
+            _gold,
+            _goldDark,
           ],
         ),
         boxShadow: [
           BoxShadow(
-            color: _gold.withOpacity(0.35),
+            color: _gold.withOpacity(0.4),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -241,24 +222,17 @@ class WelcomeScreen extends StatelessWidget {
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(30),
           ),
         ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.login_rounded, color: Colors.white),
-            SizedBox(width: 10),
-            Text(
-              'ចូលប្រើប្រាស់',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-                fontFamily: 'KantumruyPro',
-                color: Colors.white,
-              ),
-            ),
-          ],
+        child: const Text(
+          'ចូលប្រើប្រាស់',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            fontFamily: 'KantumruyPro',
+            color: Colors.black,
+          ),
         ),
       ),
     );
@@ -272,53 +246,25 @@ class WelcomeScreen extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              Colors.white.withOpacity(0.20),
-              Colors.white.withOpacity(0.08),
-            ],
-          ),
+          color: Colors.white.withOpacity(0.12),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: _gold.withOpacity(0.35),
-            width: 1.2,
+            color: Colors.white.withOpacity(0.2),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: _gold.withOpacity(0.20),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
         ),
         child: Row(
           children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [_goldBright, _gold],
-                ),
-              ),
-              child: const Icon(
-                Icons.shield_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
-            ),
+            const Icon(Icons.shield, color: Colors.white),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 'General Department of Digital Technology and Media',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: _goldDeep,
+                  color: Colors.white.withOpacity(0.9),
                   fontSize: 13.5,
                   fontFamily: 'KantumruyPro',
                   fontWeight: FontWeight.w600,
-                  height: 1.4,
                 ),
               ),
             ),
