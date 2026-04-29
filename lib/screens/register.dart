@@ -2415,7 +2415,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   SizedBox(height: 8),
                   Text(
-                    'Exit-Entry System',
+                    'ENTRY/EXIT SYSTEM',
                     style: TextStyle(
                       fontSize: 26,
                       color: Color(0xFFDFB73B),
