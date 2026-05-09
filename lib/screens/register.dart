@@ -2413,29 +2413,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
               ),
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'ប្រព័ន្ធច្រកចេញ-ចូល',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFDFB73B),
-                      fontFamily: 'khmer moul light',
+              Expanded(
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ប្រព័ន្ធច្រកចេញ-ចូល',
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFDFB73B),
+                        fontFamily: 'khmer moul light',
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'ENTRY/EXIT SYSTEM',
-                    style: TextStyle(
-                      fontSize: 22,
-                      color: Color(0xFFDFB73B),
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'khmer moul light',
+                    SizedBox(height: 8),
+                    Text(
+                      'ENTRY/EXIT SYSTEM',
+                      style: TextStyle(
+                        fontSize: 22,
+                        color: Color(0xFFDFB73B),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),

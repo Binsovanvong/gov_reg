@@ -25,6 +25,8 @@ class _RegisterSuccessMixedScreenState
 
   final ScreenshotController _screenshotController = ScreenshotController();
 
+  double _badgeScale = 0.92;
+
   Future<Uint8List?> _qrFuture = Future.value(null);
   Uint8List? _qrBytes;
 
@@ -261,6 +263,11 @@ class _RegisterSuccessMixedScreenState
     _loadSelfieFromAttachments();
 
     if (mounted) setState(() {});
+
+    Future.delayed(const Duration(milliseconds: 250), () {
+      if (!mounted) return;
+      setState(() => _badgeScale = 1.0);
+    });
   }
 
   void _switchToResult(int index) {
@@ -375,6 +382,16 @@ class _RegisterSuccessMixedScreenState
       }
 
       await Gal.putImageBytes(bytes);
+
+      if (mounted) {
+        setState(() => _badgeScale = 0.88);
+      }
+
+      Future.delayed(const Duration(milliseconds: 350), () {
+        if (!mounted) return;
+        setState(() => _badgeScale = 1.0);
+      });
+
       _showCreativeSuccessTopSnackBar();
     } catch (e, stack) {
       debugPrint("SAVE ERROR: $e");
@@ -661,7 +678,11 @@ class _RegisterSuccessMixedScreenState
                         onTap: _saving
                             ? null
                             : () =>
-                                Navigator.pushNamed(context, Approute.welcome),
+                                Navigator.pushNamedAndRemoveUntil(
+                                  context,
+                                  Approute.welcome,
+                                  (route) => false,
+                                ),
                       ),
                     ),
                   ],
@@ -675,16 +696,18 @@ class _RegisterSuccessMixedScreenState
             builder: (context, constraints) {
               return Padding(
                 padding: const EdgeInsets.all(12),
-                child: SizedBox(
-                  height: constraints.maxHeight,
-                  width: constraints.maxWidth,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: SizedBox(
-                      height: constraints.maxHeight,
+                child: Center(
+                  child: InteractiveViewer(
+                    minScale: 0.65,
+                    maxScale: 2.5,
+                    boundaryMargin: const EdgeInsets.all(100),
+                    child: AnimatedScale(
+                      scale: _badgeScale,
+                      duration: const Duration(milliseconds: 420),
+                      curve: Curves.easeOutBack,
                       child: FittedBox(
-                        fit: BoxFit.fitHeight,
-                        alignment: Alignment.topLeft,
+                        fit: BoxFit.contain,
+                        alignment: Alignment.center,
                         child: SizedBox(
                           width: _MoIStyleBadge.badgeW,
                           height: _MoIStyleBadge.badgeH,

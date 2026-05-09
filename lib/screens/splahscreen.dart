@@ -33,7 +33,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     _timer = Timer(const Duration(seconds: 3), () {
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, Approute.welcome);
+        Navigator.pushReplacementNamed(context, Approute.welcome);
     });
   }
 
@@ -110,7 +110,7 @@ class _SplashScreenState extends State<SplashScreen>
           const SizedBox(height: 22),
 
           Text(
-            'កម្មវិធី EES',
+            'កម្មវិធី EES MOI',
             style: TextStyle(
               foreground: Paint()
                 ..shader = const LinearGradient(

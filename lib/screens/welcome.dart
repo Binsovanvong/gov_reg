@@ -19,48 +19,51 @@ class WelcomeScreen extends StatelessWidget {
     final size = MediaQuery.of(context).size;
     final isSmall = size.height < 700 || size.width < 360;
 
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              _bgTop,
-              _bgMid,
-              _bgBottom,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                _bgTop,
+                _bgMid,
+                _bgBottom,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
           ),
-        ),
-        child: Stack(
-          children: [
-            _buildBackgroundDecoration(),
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 22),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 18),
-                    Expanded(
-                      child: Center(
-                        child: SingleChildScrollView(
-                          physics: const BouncingScrollPhysics(),
-                          child: Column(
-                            children: [
-                              _buildHeroCard(isSmall),
-                              SizedBox(height: isSmall ? 28 : 34),
-                              _buildRegisterButton(context),
-                            ],
+          child: Stack(
+            children: [
+              _buildBackgroundDecoration(),
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 22),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 18),
+                      Expanded(
+                        child: Center(
+                          child: SingleChildScrollView(
+                            physics: const BouncingScrollPhysics(),
+                            child: Column(
+                              children: [
+                                _buildHeroCard(isSmall),
+                                SizedBox(height: isSmall ? 28 : 34),
+                                _buildRegisterButton(context),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    _buildFooter(),
-                  ],
+                      _buildFooter(),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -127,7 +130,7 @@ class WelcomeScreen extends StatelessWidget {
           const SizedBox(height: 8),
 
           Text(
-            'កម្មវិធី EES',
+            'កម្មវិធី EES MOI',
             style: TextStyle(
               color: Colors.white,
               fontSize: isSmall ? 26 : 30,
