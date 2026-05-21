@@ -236,6 +236,144 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String _normalizePlate(String s) =>
       s.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
 
+  String _onlyDigits(String value, int max) {
+    final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+    return digits.substring(0, digits.length.clamp(0, max));
+  }
+
+  String _formatVariablePrefixNumber(String raw, int digitCount) {
+    final cleaned = raw.replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    if (cleaned.isEmpty) return '';
+
+    final prefix = cleaned.substring(0, 1);
+    final digits = cleaned.substring(1).replaceAll(RegExp(r'[^0-9]'), '');
+    final limitedDigits =
+        digits.substring(0, digits.length.clamp(0, digitCount));
+
+    if (limitedDigits.isEmpty) return prefix;
+    return '$prefix-$limitedDigits';
+  }
+
+  String _formatFixedPrefixNumber(String raw, String prefix, int digitCount) {
+    final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+
+    var numberPart = digits;
+    if (numberPart.startsWith(prefix)) {
+      numberPart = numberPart.substring(prefix.length);
+    }
+
+    final limitedNumber =
+        numberPart.substring(0, numberPart.length.clamp(0, digitCount));
+
+    if (limitedNumber.isEmpty) return prefix;
+    return '$prefix-$limitedNumber';
+  }
+
+  String _formatRegularPlateNumber(String raw, RegExp firstRule) {
+    final cleaned = raw.replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    if (cleaned.isEmpty) return '';
+
+    final first = cleaned.substring(0, 1);
+    if (!firstRule.hasMatch(first)) return '';
+
+    final rest = cleaned.substring(1);
+    final letters = RegExp(r'^[A-Z]{0,2}').stringMatch(rest) ?? '';
+
+    final nums =
+        rest.substring(letters.length).replaceAll(RegExp(r'[^0-9]'), '');
+
+    final limitedNums = nums.substring(0, nums.length.clamp(0, 4));
+
+    if (letters.isNotEmpty && limitedNums.isNotEmpty) {
+      return '$first$letters-$limitedNums';
+    }
+
+    return '$first$letters$limitedNums';
+  }
+
+  String _formatPlateCode(
+    String raw,
+    String prefix,
+    int digitCount, [
+    int? suffixCount,
+  ]) {
+    var cleaned = raw.replaceAll(RegExp(r'[^A-Z0-9]'), '');
+
+    if (cleaned.startsWith(prefix)) {
+      cleaned = cleaned.substring(prefix.length);
+    }
+
+    final digits = cleaned.replaceAll(RegExp(r'[^0-9]'), '');
+
+    final mainDigits = digits.substring(0, digits.length.clamp(0, digitCount));
+
+    if (suffixCount == null) {
+      if (mainDigits.isEmpty) return prefix;
+      return '$prefix-$mainDigits';
+    }
+
+    final suffixRaw =
+        digits.length > mainDigits.length ? digits.substring(mainDigits.length) : '';
+
+    final suffix = suffixRaw.substring(0, suffixRaw.length.clamp(0, suffixCount));
+
+    if (mainDigits.isEmpty) return prefix;
+    if (suffix.isEmpty) return '$prefix-$mainDigits';
+
+    return '$prefix-$mainDigits-$suffix';
+  }
+
+  String _formatPlateNumberValue(String value, String ruleKey) {
+    final rawValue = value.toUpperCase().replaceAll(RegExp(r'\s+'), '');
+
+    if (rawValue.isEmpty) return '';
+
+    switch (ruleKey) {
+      case 'ROYAL_PALACE':
+        return _onlyDigits(rawValue, 3);
+
+      case 'STATE':
+      case 'POLICE':
+      case 'ARMY_FORCE':
+      case 'OI':
+      case 'ONG1':
+      case 'ONG2':
+      case 'AT18':
+        return _formatVariablePrefixNumber(rawValue, 4);
+
+      case 'REGULAR':
+        return _formatRegularPlateNumber(rawValue, RegExp(r'^[2-6]$'));
+
+      case 'CAMBODIA':
+      case 'MOTORBIKE_CAMBODIA':
+        final cleaned = rawValue.replaceAll(RegExp(r'[^A-Z0-9.]'), '');
+        return cleaned.substring(0, cleaned.length.clamp(0, 8));
+
+      case 'MOTORBIKE_REGULAR':
+        return _formatRegularPlateNumber(rawValue, RegExp(r'^1$'));
+
+      case 'MOTORBIKE_POLICE':
+      case 'MOTORBIKE_ARMY_FORCE':
+        return _formatFixedPrefixNumber(rawValue, '1', 4);
+
+      case 'CMD01_1':
+        return _formatPlateCode(rawValue, 'CMD', 2, 1);
+
+      case 'CD01':
+        return _formatPlateCode(rawValue, 'CD', 2);
+
+      case 'ONU01_1':
+        return _formatPlateCode(rawValue, 'ONU', 2, 1);
+
+      case 'ONU01':
+        return _formatVariablePrefixNumber(rawValue, 3);
+
+      default:
+        final cleaned = rawValue.replaceAll(RegExp(r'[^A-Z0-9.-]'), '');
+        return cleaned.substring(0, cleaned.length.clamp(0, 8));
+    }
+  }
+
   String _fmtDmy(DateTime d) =>
       "${d.day.toString().padLeft(2, '0')}-${d.month.toString().padLeft(2, '0')}-${d.year}";
 
@@ -262,51 +400,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   String _formatPlateLive(_VehicleForm v, String raw) {
-    final ruleKey = _ruleKeyForVehicle(v);
-    final upper = raw.toUpperCase();
-
-    if (ruleKey.contains("CAMBODIA")) {
-      return upper.replaceAll(RegExp(r'[^A-Z0-9.]'), '');
-    }
-
-    var cleaned =
-        upper.replaceAll(RegExp(r'[^A-Z0-9-]'), '').replaceAll('-', '');
-
-    final isGov = [
-      "STATE",
-      "POLICE",
-      "ARMY_FORCE",
-      "MOTORBIKE_POLICE",
-      "MOTORBIKE_ARMY_FORCE"
-    ].contains(ruleKey);
-
-    if (isGov) {
-      if (cleaned.length <= 1) return cleaned;
-      return '${cleaned.substring(0, 1)}-${cleaned.substring(1)}';
-    }
-
-    if (cleaned.isEmpty) return '';
-    final first = cleaned.substring(0, 1);
-    final rest = cleaned.substring(1);
-    final letters = RegExp(r'^[A-Z]{0,2}').stringMatch(rest) ?? '';
-    final nums =
-        rest.substring(letters.length).replaceAll(RegExp(r'[^0-9]'), '');
-
-    if (letters.isNotEmpty && nums.isNotEmpty) return '$first$letters-$nums';
-    return '$first$letters$nums';
+    return _formatPlateNumberValue(raw, _ruleKeyForVehicle(v));
   }
 
   List<TextInputFormatter> _plateFormatters(_VehicleForm v) {
     final ruleKey = _ruleKeyForVehicle(v);
+
     return [
       FilteringTextInputFormatter.allow(
         ruleKey.contains("CAMBODIA")
             ? RegExp(r'[0-9A-Za-z.]')
             : RegExp(r'[0-9A-Za-z-]'),
       ),
-      LengthLimitingTextInputFormatter(ruleKey.contains("CAMBODIA") ? 20 : 12),
+      LengthLimitingTextInputFormatter(ruleKey.contains("CAMBODIA") ? 8 : 12),
       TextInputFormatter.withFunction((oldValue, newValue) {
-        final formatted = _formatPlateLive(v, newValue.text);
+        final formatted = _formatPlateNumberValue(
+          newValue.text,
+          _ruleKeyForVehicle(v),
+        );
+
         return TextEditingValue(
           text: formatted,
           selection: TextSelection.collapsed(offset: formatted.length),
@@ -323,7 +435,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   if (picked != null) {
     setState(() {
       attachFiles.add(File(picked.path));
-      attachFileNames.add(picked.name);
+      attachFileNames.add("vehicle_${DateTime.now().millisecondsSinceEpoch}.jpg");
     });
   }
 }
@@ -336,7 +448,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() {
         for (var file in pickedFiles) {
           attachFiles.add(File(file.path));
-          attachFileNames.add(file.name);
+          attachFileNames.add("vehicle_${DateTime.now().millisecondsSinceEpoch}.jpg");
         }
       });
     }
@@ -356,7 +468,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            /// Top indicator
             Container(
               width: 40,
               height: 4,
@@ -806,7 +917,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() {
       cameraFile = file;
-      cameraFileName = xfile.name;
+      cameraFileName = "selfie_${DateTime.now().millisecondsSinceEpoch}.jpg";
       cameraError = null;
     });
   }
