@@ -1,4 +1,4 @@
-package com.gov_reg.myapp
+package kh.gov.interior.ees.prod
 
 import io.flutter.embedding.android.FlutterActivity
 
