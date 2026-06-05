@@ -128,53 +128,37 @@ class _RegisterSuccessMixedScreenState
     return s;
   }
 
-  Future<bool> _requestPhotoPermissions() async {
-    try {
-      if (Platform.isIOS) {
-        var status = await Permission.photosAddOnly.status;
-        if (status.isDenied || status.isRestricted) {
-          status = await Permission.photosAddOnly.request();
-        }
+ Future<bool> _requestPhotoPermissions() async {
+  try {
+    if (Platform.isIOS) {
+      var status = await Permission.photosAddOnly.status;
 
-        if (status.isGranted || status.isLimited) {
-          return true;
-        }
-
-        if (status.isPermanentlyDenied) {
-          await openAppSettings();
-        }
-        return false;
+      if (status.isDenied || status.isRestricted) {
+        status = await Permission.photosAddOnly.request();
       }
 
-      if (Platform.isAndroid) {
-        var photos = await Permission.photos.status;
-        if (photos.isDenied) {
-          photos = await Permission.photos.request();
-        }
-        if (photos.isGranted || photos.isLimited) {
-          return true;
-        }
-
-        var storage = await Permission.storage.status;
-        if (storage.isDenied) {
-          storage = await Permission.storage.request();
-        }
-        if (storage.isGranted) {
-          return true;
-        }
-
-        if (photos.isPermanentlyDenied || storage.isPermanentlyDenied) {
-          await openAppSettings();
-        }
-        return false;
+      if (status.isGranted || status.isLimited) {
+        return true;
       }
 
-      return true;
-    } catch (e) {
-      debugPrint("Permission error: $e");
+      if (status.isPermanentlyDenied) {
+        await openAppSettings();
+      }
+
       return false;
     }
+
+    if (Platform.isAndroid) {
+      // No media/storage permission required
+      return true;
+    }
+
+    return true;
+  } catch (e) {
+    debugPrint("Permission error: $e");
+    return false;
   }
+}
 
   String _formatKhmerDate(DateTime d) {
     const khMonths = [
